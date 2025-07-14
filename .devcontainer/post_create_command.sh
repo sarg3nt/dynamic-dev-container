@@ -20,7 +20,7 @@ main() {
     install_mise_applications
     log_success "Mise applications installed successfully."
   else
-    log_info "Mise is not installed. Installing mise applications."
+    log_info "Mise is not installed. Skipping mise applications."
     echo ""
   fi
 

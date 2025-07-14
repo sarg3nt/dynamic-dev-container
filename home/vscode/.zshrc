@@ -183,14 +183,14 @@ source "${HOME}/.fzf-key-bindings.zsh"
 source "${HOME}/.fzf-completion.zsh"
 
 # Active mise
-if command -v mise &> /dev/null; then
+if command -v mise &>/dev/null; then
   eval "$(/usr/local/bin/mise activate zsh)"
   mise trust --all
   mise install --yes
 fi
 
 # Activate zoxide
-if command -v zoxide &> /dev/null; then
+if command -v zoxide &>/dev/null; then
   eval "$(zoxide init zsh --cmd cd)"
 fi
 

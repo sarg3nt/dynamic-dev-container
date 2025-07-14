@@ -11,25 +11,12 @@ main() {
 
   log "30-install-other-apps.sh" "blue"
   mise install python@'3.13'
-  #install_cloc
   add_fzf_completions_files
   add_vscode_extensions_cache
   add_bash_history_cache
   install_omz_plugins
   clean_up
   date >/home/vscode/build_date.txt
-}
-
-install_cloc() {
-  log "Adding CLOC (Count Lines of Code)" "green"
-  cd /tmp
-  cloc_version=$(/usr/bin/lib/sh/get_latest_version.sh AlDanial cloc)
-  curl -fsSL -o cloc.tar.gz "https://github.com/AlDanial/cloc/releases/download/v${cloc_version}/cloc-${cloc_version}.tar.gz"
-  tar -xzvf cloc.tar.gz --wildcards --no-anchored 'cloc'
-  mv "cloc-${cloc_version}/cloc" .
-  chmod +x cloc
-  sudo mv cloc /usr/local/bin
-  cd -
 }
 
 add_vscode_extensions_cache() {
@@ -64,7 +51,7 @@ install_omz_plugins() {
 clean_up() {
   echo ""
   log "Deleting files from /tmp" "green"
-  sudo rm -rf /tmp/*
+  sudo rm -rf /tmp/* || true
 }
 
 # Run main

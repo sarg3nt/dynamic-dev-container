@@ -8,6 +8,7 @@ IFS=$'\n\t'
 # This will show the user what tools are installed in the dev container and is ran on shell start.
 main() {
   source /usr/bin/lib/sh/colors.sh
+  : "${DEV_CONTAINER_VERSION:=unknown}"
   echo -e "${BLUE}********************************************************************"
   echo -e "              Generic Dev Container Tooling v${DEV_CONTAINER_VERSION}"
   echo -e "              Built: $(cat $HOME/build_date.txt)"
@@ -21,11 +22,12 @@ main() {
   echo -e " cloc, cmctl, btop, dive, fzf, gitui, go, goreleaser, krew, kube-bench, kustomize, lsd, mise, ncdu, popeye, python 3.13, starship, tldr, trivy, zoxide"
   echo -e ""
   echo -e "${GREEN}**** Installables:${NC}"
-  echo -e "${CYAN}To keep the dev container as small as possible, some tools are not installed by default.  Run the below commands to install them.${NC}"
-  echo -e " install_powershell, install_powercli"
+  echo -e "${CYAN}To install vSphere PowerCLI run the below command.  You must have PowerShell installed via the .mise.toml file first..${NC}"
+  echo -e " install_powercli"
   echo -e "${CYAN}Use 'mise' to install many other applications.${NC}"
   echo -e " List installable applications: ${BLUE}mise registry${NC}"
   echo -e " Install: ${BLUE}mise use -g argocd@latest${NC}"
+  echo -e " Or add them to the .mise.toml file and run ${BLUE}mise install${NC}"
   echo -e ""
   echo -e "${GREEN}**** Kubectl Plugins:${NC}"
   echo -e "${CYAN}Invoke a plugin: 'kubectl <plugin>'  List plugins: 'kubectl krew list'${NC}"

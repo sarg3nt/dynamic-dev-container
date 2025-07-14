@@ -19,6 +19,8 @@ ARG GITHUB_TOKEN
 ENV GITHUB_API_TOKEN=$GITHUB_TOKEN
 LABEL org.opencontainers.image.source=https://github.com/sarg3nt/generic-dev-container
 
+ARG VER=""
+ENV DEV_CONTAINER_VERSION=$VER
 ENV TZ='America/Los_Angeles'
 
 # What user will be created in the dev container and will we run under.
