@@ -1,0 +1,29 @@
+# https://k9scli.io/topics/config/
+# default cluster, default context
+# This is primarily here to enable nodeShell as that cannot be done in the root config.
+k9s:
+  # The name of the context parent cluster
+  cluster: default
+  readOnly: false          # [New!] you can now single out a given context and make it readonly. Woof!
+  #skin: red        # [NEW!] you can also skin individual contexts. Woof Woof!
+  # Tracks namespace configuration
+  # WARNING: if the namespace section is commented out :q will stop working
+  namespace:
+    # Active namespace
+    active: kube-system
+    # Disable k9s favorites ns updates.
+    lockFavorites: false
+    # Favorite namespaces.
+    favorites:
+    - all
+    - kube-system
+    - cert-manager
+  # Active view
+  view:
+    active: nodes
+  # Feature gates toggle k9s features
+  featureGates:
+    # Enable/Disable nodeShell
+    nodeShell: true
+  # Default port forward host
+  portForwardAddress: localhost

@@ -1,0 +1,234 @@
+# cspell:ignore pyyaml pytest mypy pkgs datetimez Pyflakes Pylint isort pycodestyle pydocstyle pyupgrade pyproject orjson
+
+####### Example pyproject.toml file. #######
+# Edit this file for your own Python project.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pip]
+index-url = "<add your index URL here>"
+
+[project]
+name = "<project name>"
+dynamic = ["version"]
+description = "<project descripton>."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "<add license here>"
+keywords = [
+  "<add your keywords here>",
+  "Config.yaml",
+  "infrastructure",
+  "helm",
+]
+authors = [{ name = "<auther name>", email = "<auther email>" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+  # https://pypi.org/project/fabric/
+  "fabric~=3.2",
+  # https://pypi.org/project/GitPython/
+  "gitpython~=3.1",
+  # https://pypi.org/project/kubernetes/
+  "kubernetes~=32.0",
+  # https://pypi.org/project/loguru/
+  "loguru~=0.7",
+  # https://pypi.org/project/orjson/
+  "orjson~=3.10",
+  # https://pypi.org/project/prettytable/
+  "prettytable~=3.14",
+  # https://pypi.org/project/python-hcl2/
+  "python-hcl2~=7.0",
+  # https://pypi.org/project/PyYAML/
+  "pyyaml~=6.0",
+  # https://pypi.org/project/requests/
+  "requests~=2.32",
+  # https://pypi.org/project/termcolor/
+  "termcolor~=2.5",
+]
+
+[project.optional-dependencies]
+### These are mainly here for documentation as we don't do a pip install -e .[dev] ###
+# We install them in our requirements.txt file.
+dev = [
+  # https://pypi.org/project/hatch/
+  "hatch~=1.14",
+  # https://pypi.org/project/pytest/
+  "pytest~=8.3",
+  # https://pypi.org/project/pytest-mock/
+  "pytest-mock~=3.14",
+  # https://pypi.org/project/pytest-cov/
+  "pytest-cov~=6.0",
+  # https://pypi.org/project/ruff/
+  "ruff~=0.9",
+
+  ### Type stubs for type checking. ###
+  "kubernetes-typed~=18.20",
+  "types-PyYAML~=6.0",
+  "types-requests",
+]
+
+[project.urls]
+Documentation = "<add linke to documentation MD file, probably in GitHub"
+Homepage = "<Add Link too project home page in GitHub>"
+Source = "<Add link to project source in Github>"
+
+[tool.hatch.version]
+path = "src/<project>/__about__.py"
+
+disable = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/<project>"]
+
+[tool.hatch.envs.types]
+extra-dependencies = ["mypy~=1.15.0"]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src tests}"
+
+[tool.coverage.run]
+source_pkgs = ["<project>", "tests"]
+branch = true
+parallel = true
+omit = ["src/<project>>/__about__.py"]
+
+[tool.coverage.paths]
+<project> = ["src", "*/<project>/src"]
+tests = ["tests", "*/<project>/tests"]
+
+[tool.coverage.report]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
+
+[tool.pytest.ini_options]
+markers = ["order(number): runs tests in the order given", "serial"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+#Default value: ["E4", "E7", "E9", "F"]
+# See: https://docs.astral.sh/ruff/linter/#rule-selection
+# and, https://docs.astral.sh/ruff/rules/
+select = [
+  # Pyflakes: https://docs.astral.sh/ruff/rules/#pyflakes-f
+  "F",
+  # pycodestyle: https://docs.astral.sh/ruff/rules/#error-e
+  "E",
+  # Warning: https://docs.astral.sh/ruff/rules/#warning-w
+  "W",
+  # isort: https://docs.astral.sh/ruff/rules/#isort-i
+  "I",
+  # pep8-naming: https://docs.astral.sh/ruff/rules/#pep8-naming-n
+  "N",
+  # pydocstyle: https://docs.astral.sh/ruff/rules/#pydocstyle-d
+  "D",
+  # pyupgrade: https://docs.astral.sh/ruff/rules/#pyupgrade-up
+  "UP",
+  # flake8-2020: https://docs.astral.sh/ruff/rules/#flake8-2020-ytt
+  "YTT",
+  # flake8-annotations: https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
+  "ANN",
+  # flake8-async: https://docs.astral.sh/ruff/rules/#flake8-async-async
+  "ASYNC",
+  # flake8-bandit: https://docs.astral.sh/ruff/rules/#flake8-bandit-s
+  "S",
+  # flake8-bugbear: https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+  "B",
+  # flake8-builtins: https://docs.astral.sh/ruff/rules/#flake8-builtins-a
+  "A",
+  # flake8-commas: https://docs.astral.sh/ruff/rules/#flake8-commas-com
+  "COM",
+  # flake8-comprehensions: https://docs.astral.sh/ruff/rules/#flake8-comprehensions-c4
+  "C4",
+  # flake8-datetimez: https://docs.astral.sh/ruff/rules/#flake8-datetimez-dtz
+  "DTZ",
+  # flake8-debugger: https://docs.astral.sh/ruff/rules/#flake8-debugger-t10
+  "T10",
+  # flake8-errmsg: https://docs.astral.sh/ruff/rules/#flake8-errmsg-em
+  "EM",
+  # flake8-executable: https://docs.astral.sh/ruff/rules/#flake8-executable-exe
+  "EXE",
+  # flake8-implicit-str-concat: https://docs.astral.sh/ruff/rules/#flake8-implicit-str-concat-isc
+  "ISC",
+  # flake8-import-conventions: https://docs.astral.sh/ruff/rules/#flake8-import-conventions-icn
+  "ICN",
+  # flake8-logging: https://docs.astral.sh/ruff/rules/#flake8-logging-log
+  "LOG",
+  # flake8-logging-format: https://docs.astral.sh/ruff/rules/#flake8-logging-format-g
+  "G",
+  # flake8-no-pep420: https://docs.astral.sh/ruff/rules/#flake8-no-pep420-inp
+  "INP",
+  # flake8-pie: https://docs.astral.sh/ruff/rules/#flake8-pie-pie
+  "PIE",
+  # flake8-print: https://docs.astral.sh/ruff/rules/#flake8-print-t20
+  "T20",
+  # flake8-pyi: https://docs.astral.sh/ruff/rules/#flake8-pyi-pyi
+  "PYI",
+  # flake8-pytest-style: https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
+  "PT",
+  # flake8-quotes: https://docs.astral.sh/ruff/rules/#flake8-quotes-q
+  "Q",
+  # flake8-raise: https://docs.astral.sh/ruff/rules/#flake8-raise-rse
+  "RSE",
+  # flake8-return: https://docs.astral.sh/ruff/rules/#flake8-return-ret
+  "RET",
+  # flake8-self: https://docs.astral.sh/ruff/rules/#flake8-self-slf
+  "SLF",
+  # flake8-slots: https://docs.astral.sh/ruff/rules/#flake8-slots-slot
+  "SLOT",
+  # flake8-simplify: https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
+  "SIM",
+  # flake8-tidy-imports: https://docs.astral.sh/ruff/rules/#flake8-tidy-imports-tid
+  "TID",
+  # flake8-type-checking: https://docs.astral.sh/ruff/rules/#flake8-type-checking-tch
+  "TCH",
+  # flake8-gettext: https://docs.astral.sh/ruff/rules/#flake8-gettext-int
+  "INT",
+  # flake8-unused-arguments: https://docs.astral.sh/ruff/rules/#flake8-unused-arguments-arg
+  "ARG",
+  # flake8-todos: https://docs.astral.sh/ruff/rules/#flake8-todos-td
+  "TD",
+  # eradicate: https://docs.astral.sh/ruff/rules/#eradicate-era
+  "ERA",
+  # Pylint: https://docs.astral.sh/ruff/rules/#pylint-pl
+  "PL",
+]
+
+# 2. Avoid enforcing line-length violations (`E501`)
+ignore = [
+  "E501",
+  "BLE001",
+  "D202",
+  "T201",
+  "D401",
+  "D205",
+  "PLR0912",
+  "PLR0915",
+  "S603",
+  "TD002",
+  "TD003",
+]
+
+task-tags = ["FIXME", "TODO"]
+
+# 3. Avoid trying to fix flake8-bugbear (`B`) violations.
+unfixable = ["B"]
+
+[tool.ruff.lint.pylint]
+max-args = 8
+
+# 4. Ignore `E402` (import violations) in all `__init__.py` files, and in select subdirectories.
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+"**/{tests,docs,tools}/*" = ["E402"]
+
+#[tool.ruff.format]
+# 5. Use single quotes for non-triple-quoted strings.
+# quote-style = "single"

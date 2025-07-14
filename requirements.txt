@@ -1,0 +1,46 @@
+# cspell:ignore hvac ipython pylint pyyaml orjson pytest
+
+# An example requirements file.
+
+# https://pypi.org/project/fabric/
+# fabric~=3.2.2
+# https://pypi.org/project/GitPython/
+# gitpython~=3.1.44
+# https://pypi.org/project/hatch/
+# hatch~=1.14.0
+# https://pypi.org/project/keeper-secrets-manager-core/
+# keeper-secrets-manager-core~=16.6
+# https://pypi.org/project/kubernetes/
+# kubernetes~=32.0
+# https://pypi.org/project/kubernetes-typed/
+# kubernetes-typed~=18.20
+# https://pypi.org/project/loguru/
+# loguru~=0.7.3
+# https://pypi.org/project/orjson/
+# orjson~=3.10.15
+# https://pypi.org/project/prettytable/
+# prettytable~=3.14.0
+# https://pypi.org/project/pytest/
+# pytest~=8.3.4
+# https://pypi.org/project/python-hcl2/
+# python-hcl2~=6.1.0
+# https://pypi.org/project/PyYAML/
+# pyyaml~=6.0
+# https://pypi.org/project/types-PyYAML/
+# types-PyYAML~=6.0
+# https://pypi.org/project/requests/
+# requests~=2.32
+# https://pypi.org/project/types-requests/
+# types-requests~=2.32
+# https://pypi.org/project/ruff/
+# ruff~=0.9.7
+# https://pypi.org/project/termcolor/
+# termcolor~=2.5.0
+# https://pypi.org/project/ipython/
+# ipython~=9.1.0
+# https://pypi.org/project/argcomplete/
+# argcomplete~=3.6.2
+# https://pypi.org/project/pylint/
+# pylint~=3.3.6
+# https://pypi.org/project/python-dotenv/
+# python-dotenv~=1.1.0
