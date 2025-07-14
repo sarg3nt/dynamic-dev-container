@@ -1,18 +1,18 @@
 <!--cspell:ignore sarg trivy gitui kubectx Fira Firacode Caskaydia Consolas   -->
 # Generic Dev Container
 
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sarg3nt/go-dev-container/badge)](https://scorecard.dev/viewer/?uri=github.com/sarg3nt/go-dev-container)
-[![trivy](https://github.com/sarg3nt/go-dev-container/actions/workflows/trivy.yml/badge.svg)](https://github.com/sarg3nt/go-dev-container/actions/workflows/trivy.yml)
-[![Release](https://github.com/sarg3nt/go-dev-container/actions/workflows/release.yml/badge.svg)](https://github.com/sarg3nt/go-dev-container/actions/workflows/release.yml)
-[![Weekly Release](https://github.com/sarg3nt/go-dev-container/actions/workflows/release-weekly.yml/badge.svg)](https://github.com/sarg3nt/go-dev-container/actions/workflows/release-weekly.yml)  
-[![Scorecard Analyzer](https://github.com/sarg3nt/go-dev-container/actions/workflows/scorecard.yml/badge.svg)](https://github.com/sarg3nt/go-dev-container/actions/workflows/scorecard.yml)
-[![Dependabot Updates](https://github.com/sarg3nt/go-dev-container/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/sarg3nt/go-dev-container/actions/workflows/dependabot/dependabot-updates)
-[![Dependency Review](https://github.com/sarg3nt/go-dev-container/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/sarg3nt/go-dev-container/actions/workflows/dependency-review.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sarg3nt/generic-dev-container/badge)](https://scorecard.dev/viewer/?uri=github.com/sarg3nt/generic-dev-container)
+[![trivy](https://github.com/sarg3nt/generic-dev-container/actions/workflows/trivy.yml/badge.svg)](https://github.com/sarg3nt/generic-dev-container/actions/workflows/trivy.yml)
+[![Release](https://github.com/sarg3nt/generic-dev-container/actions/workflows/release.yml/badge.svg)](https://github.com/sarg3nt/generic-dev-container/actions/workflows/release.yml)
+[![Weekly Release](https://github.com/sarg3nt/generic-dev-container/actions/workflows/release-weekly.yml/badge.svg)](https://github.com/sarg3nt/generic-dev-container/actions/workflows/release-weekly.yml)  
+[![Scorecard Analyzer](https://github.com/sarg3nt/generic-dev-container/actions/workflows/scorecard.yml/badge.svg)](https://github.com/sarg3nt/generic-dev-container/actions/workflows/scorecard.yml)
+[![Dependabot Updates](https://github.com/sarg3nt/generic-dev-container/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/sarg3nt/generic-dev-container/actions/workflows/dependabot/dependabot-updates)
+[![Dependency Review](https://github.com/sarg3nt/generic-dev-container/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/sarg3nt/generic-dev-container/actions/workflows/dependency-review.yml)
 ****
 A Go Dev Container using [mise](https://mise.jdx.dev/) to install Go and other convenient tools.  
 `mise` can then be used to install various other Go versions as needed.
 
-- [Using the Go Dev Container](#using-the-go-dev-container)
+- [Using the Go Dev Container](#using-the-generic-dev-container)
 - [Included Tools](#included-tools)
   - [Go](#go)
   - [Utilities](#utilities)
@@ -33,7 +33,7 @@ A Go Dev Container using [mise](https://mise.jdx.dev/) to install Go and other c
 
 ## Using the Go Dev Container
 
-The container is stored in the [Github Container Registry](https://github.com/sarg3nt/go-dev-container/pkgs/container/go-dev-container).
+The container is stored in the [Github Container Registry](https://github.com/sarg3nt/generic-dev-container/pkgs/container/generic-dev-container).
 
 You can use the container in your own dev container config or use the [included one](#included-devcontainer-config).
 
@@ -76,7 +76,7 @@ This repository also includes an example on how to use the built Go dev containe
 Do the following to use this example:
 
 1. Clone the repository:  
-   `git clone https://github.com/sarg3nt/go-dev-container.git`
+   `git clone https://github.com/sarg3nt/generic-dev-container.git`
 2. Ensure your target project does not already have a `.devcontainer` directory. If it does, you will either need to rename it for testing or delete it.
 3. Copy the `.devcontainer` directory to your project.
 4. Copy the following files to the root of your project.  
@@ -87,7 +87,7 @@ Do the following to use this example:
 
 We've included an `install.sh` script to automate the process of copying the above files into your project directory.
 
-The script must be run from the root of the `go-dev-container` project.  
+The script must be run from the root of the `generic-dev-container` project.  
 
 > **Example:**  
 > `./install.sh ~/src/my-go-project`
@@ -98,13 +98,13 @@ Once you've followed the above instructions to copy the needed files to your pro
 
 Edit the `devcontainer.json` file to make the following changes.
 
-- Change `name` from `go-dev-container` to the name of your project.
-- Change `--name` in `runargs` from `go-dev-container` to the name of your project.
-- Change `source=go-dev-container-bashhistory` to `source=<YOUR-PROJECT>-bashhistory`
-- Change `source=go-dev-container-plugins` to `source=<YOUR-PROJECT>-plugins`
+- Change `name` from `generic-dev-container` to the name of your project.
+- Change `--name` in `runargs` from `generic-dev-container` to the name of your project.
+- Change `source=generic-dev-container-bashhistory` to `source=<YOUR-PROJECT>-bashhistory`
+- Change `source=generic-dev-container-plugins` to `source=<YOUR-PROJECT>-plugins`
 
 > [!NOTE]  
-> You may be tempted to find and replace `go-dev-container` with the name of your project; however, the `image` for the container is called `go-dev-container` so that would break things. If you want to do a controlled replacement you can, just be careful not to replace that one line.
+> You may be tempted to find and replace `generic-dev-container` with the name of your project; however, the `image` for the container is called `generic-dev-container` so that would break things. If you want to do a controlled replacement you can, just be careful not to replace that one line.
 
 ### `dev.sh`
 

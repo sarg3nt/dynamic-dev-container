@@ -14,7 +14,7 @@ FROM jdxcode/mise@sha256:5a4eb0b7b6687f2f42ad24d37a50e605b6064d4cd051edb3286a303
 # https://hub.docker.com/r/rockylinux/rockylinux/tags
 FROM rockylinux/rockylinux:10-ubi@sha256:eca03145dd5e0b2a281eef164d391e4758b4a5962d29b688d15a72cef712fbb4 AS final
 
-LABEL org.opencontainers.image.source=https://github.com/sarg3nt/go-dev-container
+LABEL org.opencontainers.image.source=https://github.com/sarg3nt/generic-dev-container
 
 ENV TZ='America/Los_Angeles'
 

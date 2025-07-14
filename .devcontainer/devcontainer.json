@@ -1,108 +1,152 @@
-// cSpell:ignore FUMPT ciiqr darkriszty euskadi Gruntfuggly huizhou githd kato mhutchie tamasfe koehler yzhang gopls gofumpt docomment 
+// Dev Container Configuration File
 {
-  "name": "generic-dev-container",
-  "runArgs": [
-    "--name=generic-dev-container"
-  ],
+  // See the root README.md file for more detailed instructions!
+  // You must consider the following when customizing this file:
+  // - "name" = The name of the project and is fairly arbitrairy.
+  // - "runArgs" = The name of the container and should be "your-repo-dev". Do NOT remove the "-dev".
+  // - "mounts" = The first two mounts source lines should be unique:
+  //   * your-repo-bashhistory
+  //   * your-repo-plugins
+  // - "containerEnv" = Add any "containerEnv" variables to the top of the list.
+  //   These are variables that you want to be able to set on the host and passed into the container.
+  "name": "Generic Dev Container",
+  // Using the latest version of the generic-dev-container image
+  "image": "ghcr.io/sarg3nt/generic-dev-container:latest",
+  "runArgs": ["--name=generic-dev-container"],
+  // Mounts
   "mounts": [
-    "source=generic-dev-container-bashhistory,target=/commandhistory,type=volume",
-    "source=generic-dev-container-plugins,target=/home/vscode/.vscode-server/extensions,type=volume",
-    ///// The following should be the same for all dev containers using this image. The post_start_command.sh relies on these.
-    // Your host should have a .docker directory set up and you should be logged into any repos you need access to.
-    // Logging into a repo inside the dev container will not stick.
-    "source=${localEnv:HOME}/.docker,target=/home/vscode/.docker-localhost,type=bind",
-    // If you will be working with Kubernetes you should have a configured kube config file in your .kube directory.
-    "source=${localEnv:HOME}/.kube,target=/home/vscode/.kube-localhost,type=bind",
-    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh-localhost,type=bind",
-    "source=${localEnv:HOME}/.config/k9s,target=/home/vscode/.config/k9s-localhost,type=bind",
-    "source=${localEnv:HOME}/.local/share/k9s,target=/home/vscode/.local/share/k9s-localhost,type=bind",
-    "source=/var/run/docker.sock,target=/var/run/docker-host.sock,type=bind"
+    // User-defined Mounts (Customizable)
+    {
+      "source": "generic-dev-container-bashhistory",
+      "target": "/commandhistory",
+      "type": "volume"
+    },
+    {
+      "source": "generic-dev-container-plugins",
+      "target": "/home/vscode/.vscode-server/extensions",
+      "type": "volume"
+    },
+    // Dev Container Mounts (Do NOT Change)
+    // Should be the same for all dev containers as the scripts are relied on them.
+    {
+      // Docker
+      "source": "${localEnv:HOME}/.docker",
+      "target": "/home/vscode/.docker-localhost",
+      "type": "bind"
+    },
+    {
+      // Kubernetes (Should have a configured kube config in your kube directory)
+      "source": "${localEnv:HOME}/.kube",
+      "target": "/home/vscode/.kube-localhost",
+      "type": "bind"
+    },
+    {
+      // SSH
+      "source": "${localEnv:HOME}/.ssh",
+      "target": "/home/vscode/.ssh-localhost",
+      "type": "bind"
+    },
+    {
+      "source": "/var/run/docker.sock",
+      "target": "/var/run/docker-host.sock",
+      "type": "bind"
+    }
+    /* {
+      // Workspace Mount
+      "source": "${localWorkspaceFolder}/..",
+      "target": "/workspaces",
+      "type": "bind"
+    } */
+  ],
+  "forwardPorts": [
+    8000 // This is for kube_login
   ],
   "containerEnv": {
-    ////////// Repo Specific Environment Variables //////////
-    // "MY_VAR": "${localEnv:MY_VAR}",
-    //// End Repo Specific Env Vars ////
-    ////////// Dev Container specific environment variables, do not change. //////////
-    // If the user has a ZSH_THEME set up then we will use it and not load Starship
-    "ZSH_THEME": "${localEnv:ZSH_THEME}",
+    "TZ": "America/Los_Angeles", // Timezone
+    "HOST_PATH": "${localWorkspaceFolder}", // Eg. '/home/davesarg-sa/src/kairos-rocky-rke2'
+    "WORKSPACE_PATH": "${containerWorkspaceFolder}", // Eg. '/workspaces/kairos-rocky-rke2'
+    "PYTHON_PATH": "/home/vscode/.local/share/mise/installs/python", // Location of our Python modules
+    "ZSH_THEME": "${localEnv:ZSH_THEME}", // Will use local ZSH_THEME if set, otherwise will use Starship
+    "KUBE_EDITOR": "vi",
     "TERM": "xterm-256color",
-    // Used to set the hosts project path for use in scripts running inside a docker container inside the dev container
-    "HOST_PROJECT_PATH": "${localWorkspaceFolder}",
-    "WORKSPACE_FOLDER": "${containerWorkspaceFolder}",
-    "TZ": "America/Los_Angeles" // Set the timezone in the devcontainer
+    "NODE_EXTRA_CA_CERTS": "/etc/pki/ca-trust/source/anchors/zscaler.crt",
+    "TYPE_CHECKING": "true", // Enable type checking for Python
+    // CUSTOM USER ENVIRONMENT VARIABLES
+    "MY_CUSTOM_VAR": "my_custom_value" // Example of a custom environment variable
   },
-  "image": "ghcr.io/sarg3nt/generic-dev-container:latest",
-  "initializeCommand": [
-    ".devcontainer/initialize_command.sh"
-  ],
-  "postStartCommand": [
-    ".devcontainer/post_start_command.sh"
-  ],
-  "init": true,
-  "overrideCommand": false,
+  // Custom scripts for Dev Container environment (modifying Docker image)
+  "initializeCommand": [".devcontainer/initialize_command.sh"],
+  "postStartCommand": [".devcontainer/post_start_command.sh"],
+  "postCreateCommand": [".devcontainer/post_create_command.sh"],
   "remoteUser": "vscode",
+  "init": true, // Ensures the container is initialized with the default entrypoint.
+  "overrideCommand": false, // Prevents overriding the container's default command.
+  // VS Code Settings
   "customizations": {
     "vscode": {
       "extensions": [
-        "albert.TabOut", // Tab to exit closures
-        "ciiqr.encode", // encoder, such as base64, url etc.
-        "darkriszty.markdown-table-prettify", // markdown table prettify
-        "EditorConfig.EditorConfig", // Add support for editorConfig
-        "euskadi31.json-pretty-printer", // json pretty print
-        "foxundermoon.shell-format", // bash and sh files
-        "GitHub.copilot", // Copilot
-        "GitHub.copilot-chat", // Copilot inline chat.
-        "GitHub.vscode-github-actions", // Github actions
-        "github.vscode-pull-request-github", // Github pull requests
-        "golang.go", // Golang support
-        "Gruntfuggly.todo-tree", // TODO, FIXME, etc highlights and tree
-        "huizhou.githd", // Git blame and some other git stuff
-        "IronGeek.vscode-env", // For linux environment files
-        "k--kato.docomment", // Code documentation
-        "mhutchie.git-graph", // Git graph
-        "ms-azuretools.vscode-docker", // Docker
-        "ms-kubernetes-tools.vscode-kubernetes-tools", // Kubernetes
-        "ms-vscode.makefile-tools", // Makefile support
-        "redhat.vscode-yaml", // YAML
-        "streetsidesoftware.code-spell-checker", // Spell checker
-        "tamasfe.even-better-toml", // TOML
-        "tim-koehler.helm-intellisense", // Helm
-        "timonwong.shellcheck", //bash script linting
-        "yzhang.markdown-all-in-one" // markdown preview and support
+        "vscode.git", // Ensure Git is installed
+        "vscode.git-base", // Ensure Git is installed
+        "albert.TabOut", // https://marketplace.visualstudio.com/items/?itemName=albert.TabOut
+        "charliermarsh.ruff", // https://marketplace.visualstudio.com/items/?itemName=charliermarsh.ruff
+        "ciiqr.encode", // https://marketplace.visualstudio.com/items/?itemName=ciiqr.encode
+        "GitHub.copilot", // https://marketplace.visualstudio.com/items/?itemName=GitHub.copilot
+        "GitHub.copilot-chat", // https://marketplace.visualstudio.com/items/?itemName=GitHub.copilot-chat
+        "darkriszty.markdown-table-prettify", // https://marketplace.visualstudio.com/items/?itemName=darkriszty.markdown-table-prettify
+        "dbaeumer.vscode-eslint", // https://marketplace.visualstudio.com/items/?itemName=dbaeumer.vscode-eslint
+        "EditorConfig.EditorConfig", // https://marketplace.visualstudio.com/items/?itemName=EditorConfig.EditorConfig
+        "euskadi31.json-pretty-printer", // https://marketplace.visualstudio.com/items/?itemName=euskadi31.json-pretty-printer
+        "foxundermoon.shell-format", // https://marketplace.visualstudio.com/items/?itemName=foxundermoon.shell-format
+        "Gruntfuggly.todo-tree", // https://marketplace.visualstudio.com/items/?itemName=Gruntfuggly.todo-tree
+        "opentofu.vscode-opentofu", // https://marketplace.visualstudio.com/items/?itemName=opentofu.vscode-opentofu
+        "hediet.vscode-drawio", // https://marketplace.visualstudio.com/items/?itemName=hediet.vscode-drawio
+        "huizhou.githd", // https://marketplace.visualstudio.com/items/?itemName=huizhou.githd
+        "IronGeek.vscode-env", // https://marketplace.visualstudio.com/items/?itemName=IronGeek.vscode-env
+        "k--kato.docomment", // https://marketplace.visualstudio.com/items/?itemName=k--kato.docomment
+        "mhutchie.git-graph", // https://marketplace.visualstudio.com/items/?itemName=mhutchie.git-graph
+        "ms-python.mypy-type-checker", // https://marketplace.visualstudio.com/items/?itemName=ms-python.mypy-type-checker
+        "ms-python.python", // https://marketplace.visualstudio.com/items/?itemName=ms-python.python
+        "ms-azuretools.vscode-docker", // https://marketplace.visualstudio.com/items/?itemName=ms-azuretools.vscode-docker
+        "ms-kubernetes-tools.vscode-kubernetes-tools", // https://marketplace.visualstudio.com/items/?itemName=ms-kubernetes-tools.vscode-kubernetes-tools
+        "naumovs.color-highlight", // https://marketplace.visualstudio.com/items/?itemName=naumovs.color-highlight
+        "psioniq.psi-header", // https://marketplace.visualstudio.com/items/?itemName=psioniq.psi-header
+        "PKief.material-icon-theme", // https://marketplace.visualstudio.com/items/?itemName=PKief.material-icon-theme
+        "RapidAPI.vscode-rapidapi-client", // https://marketplace.visualstudio.com/items/?itemName=RapidAPI.vscode-rapidapi-client
+        "redhat.vscode-yaml", // https://marketplace.visualstudio.com/items/?itemName=redhat.vscode-yaml
+        "SonarSource.sonarlint-vscode", // https://marketplace.visualstudio.com/items/?itemName=SonarSource.sonarlint-vscode
+        "streetsidesoftware.code-spell-checker", // https://marketplace.visualstudio.com/items/?itemName=streetsidesoftware.code-spell-checker
+        "szTheory.vscode-packer-powertools", // https://marketplace.visualstudio.com/items/?itemName=szTheory.vscode-packer-powertools
+        "tamasfe.even-better-toml", // https://marketplace.visualstudio.com/items/?itemName=tamasfe.even-better-toml
+        "tim-koehler.helm-intellisense", // https://marketplace.visualstudio.com/items/?itemName=tim-koehler.helm-intellisense
+        "timonwong.shellcheck", // https://marketplace.visualstudio.com/items/?itemName=timonwong.shellcheck
+        "tomoki1207.pdf", // https://marketplace.visualstudio.com/items/?itemName=tomoki1207.pdf
+        "yzhang.markdown-all-in-one", // https://marketplace.visualstudio.com/items/?itemName=yzhang.markdown-all-in-one
+        "esbenp.prettier-vscode" // https://marketplace.visualstudio.com/items/?itemName=esbenp.prettier-vscode
       ],
       "settings": {
+        "code-runner.enableAppInsights": false,
+        "code-runner.showExecutionMessage": false,
+        "code-runner.runInTerminal": true,
         "dev.containers.dockerCredentialHelper": false,
-        "go.buildTags": "",
-        "go.toolsEnvVars": {
-          "CGO_ENABLED": "0"
+        "files.associations": {
+          "*.yaml.tftpl": "yaml",
+          "*.hcl.tftpl": "hcl",
+          "*.env.tftpl": "shellscript",
+          "*.json.tftpl": "json",
+          "Jenkinsfile*": "groovy",
+          ".env": "env",
+          "*.env.*": "env"
         },
-        "go.useLanguageServer": true,
-        "go.testEnvVars": {
-          "CGO_ENABLED": "1"
+        "[groovy]": {
+          "editor.tabSize": 2,
+          "editor.insertSpaces": true
         },
-        "go.testFlags": [
-          "-v",
-          "-race"
-        ],
-        "go.testTimeout": "30s",
-        "go.coverOnSingleTest": true,
-        "go.coverOnSingleTestFile": true,
-        "go.coverOnTestPackage": true,
-        "go.lintTool": "golangci-lint",
-        "go.lintOnSave": "package",
-        "[go]": {
-          "editor.codeActionsOnSave": {
-            "source.organizeImports": "always"
-          }
+        "[jenkinsfile]": {
+          "editor.tabSize": 2,
+          "editor.insertSpaces": true
         },
-        "gopls": {
-          "usePlaceholders": false,
-          "staticcheck": true,
-          "formatting.gofumpt": true
-        },
-        // cspell settings
-        // https://marketplace.visualstudio.com/items?itemName=streetsidesoftware.code-spell-checker
-        // check language ids here: https://code.visualstudio.com/docs/languages/identifiers
+        // Cspell Settings
+        // Find language IDs here: https://code.visualstudio.com/docs/languages/identifiers
         "cSpell": {
           "enabledLanguageIds": [
             "asciidoc",
@@ -140,9 +184,7 @@
             "typescriptreact",
             "yaml"
           ],
-          "enableFiletypes": [
-            "terraform"
-          ],
+          "enableFiletypes": ["terraform"],
           "blockCheckingWhenAverageChunkSizeGreaterThan": 10000,
           "blockCheckingWhenLineLengthGreaterThan": 10000,
           "blockCheckingWhenTextChunkSizeGreaterThan": 10000,
@@ -151,21 +193,36 @@
         "vs-kubernetes": {
           "vscode-kubernetes.kubectl-path": "/home/vscode/.local/share/mise/installs/kubectl/latest/bin/kubectl"
         },
+        "powershell.powerShellAdditionalExePaths": {
+          "Powershell7": "/home/vscode/.local/share/mise/installs/powershell/latest/pwsh"
+        },
+        "powershell.powerShellDefaultVersion": "Powershell7",
+        "sonarlint.pathToNodeExecutable": "/home/vscode/.local/share/mise/installs/node/latest/bin/node",
         "editor.detectIndentation": false,
         "editor.insertSpaces": true,
         "editor.tabSize": 2,
         "editor.formatOnSave": true,
         "editor.renderWhitespace": "all",
-        "editor.rulers": [
-          120,
-          180
-        ],
+        "editor.rulers": [120, 180],
         "files.eol": "\n",
         "files.watcherExclude": {
           "**/node_modules/*/**": true,
           "**/.git/objects/**": true,
           "**/.git/subtree-cache/**": true,
           "**/.hg/**": true
+        },
+        "python.pythonPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
+        "python.defaultInterpreterPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
+        "autopep8.args": ["--max-line-length=180"],
+        "python.analysis.ignore": ["*"],
+        "[python]": {
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.tabSize": 4,
+          "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+          }
         },
         "[markdown]": {
           "editor.defaultFormatter": "darkriszty.markdown-table-prettify",
@@ -179,17 +236,89 @@
             "siblings_only": true
           }
         },
+        /* "mypy-type-checker.severity": {
+          "error": "Warning",
+          "note": "Information"
+        }, */
         "helm-intellisense.lintFileOnSave": true,
         "helm-intellisense.customValueFileNames": [
           "values.yaml"
         ],
+        "omnisharp.autoStart": false,
+        "psi-header.config": {
+          "company": "Schweitzer Engineering Laboratories, Inc."
+        },
+        "psi-header.lang-config": [
+          {
+            "language": "*",
+            "begin": "",
+            "end": "",
+            "prefix": "// "
+          },
+          {
+            "language": "dockerfile",
+            "begin": "",
+            "end": "",
+            "prefix": "# "
+          },
+          {
+            "language": "markdown",
+            "begin": "",
+            "end": "",
+            "prefix": "> "
+          },
+          {
+            "language": "powershell",
+            "begin": "<#",
+            "end": "#>",
+            "prefix": ""
+          },
+          {
+            "language": "python",
+            "begin": "",
+            "end": "",
+            "prefix": "# "
+          },
+          {
+            "language": "shellscript",
+            "begin": "",
+            "end": "",
+            "prefix": "# "
+          },
+          {
+            "language": "terraform",
+            "begin": "",
+            "end": "",
+            "prefix": "# "
+          },
+          {
+            "language": "yaml",
+            "begin": "",
+            "end": "",
+            "prefix": "# "
+          },
+          {
+            "language": "env",
+            "begin": "",
+            "end": "",
+            "prefix": "# "
+          }
+        ],
+        "psi-header.changes-tracking": {
+          "autoHeader": "autoSave",
+          "exclude": ["json"],
+          "excludeGlob": ["**/.git/**"]
+        },
+        "psi-header.variables": [["projectCreationYear", "2025"]],
+        "psi-header.templates": [], // Create your own templates here:
         "markdown.extension.orderedList.autoRenumber": true,
         "markdown.extension.toc.levels": "2..6",
+        "markdown.extension.orderedList.marker": "one",
         "shellcheck.customArgs": [
           "-x" // allows shellcheck to evaluate "sourced" scripts. see https://www.shellcheck.net/wiki/SC1091
         ],
         "shellcheck.exclude": [
-          "SC2188" // This is excluded here because inline disable doesn't seem to work for this rule.
+          "SC2188" // This is excluded here because inline disable doesnt seem to work for this rule.
         ],
         "terminal.integrated.profiles.linux": {
           "zsh": {

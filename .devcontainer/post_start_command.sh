@@ -1,16 +1,39 @@
 #!/bin/bash
+# cSpell:ignore pylintrc
+# shellcheck disable=SC2016,SC1091
+
 set -euo pipefail
 IFS=$'\n\t'
 
-main() {
-  # $HOME is not set in certain situations and since we will always know the home user in the dev container we hard code it.
-  HOME="/home/vscode"
+source "$(dirname "$0")/utils/log.sh"
 
+main() {
+  echo ""
+  log "EXECUTING POST START COMMAND..." "gray" "INFO"
+  link_pylintrc_file
+  echo ""
   git_update_diff_tool
+  echo ""
   copy_ssh_folder
+  echo ""
   copy_kube_config
-  copy_k9s_config
+  echo ""
   copy_docker_config
+  # Uncomment to install Powershelll
+  # bash usr/local/bin/install_powershell
+  # Uncomment to install PowerCLI
+  # bash usr/local/bin/install_powercli
+}
+
+#######################################
+# Link the .pylintrc file from the home directory to the workspace folder
+# Arguments:
+#   None
+#######################################
+link_pylintrc_file() {
+  log_info "Linking '.pylintrc' from Home to Workspace folder."
+  ln -f -s "${HOME}/.pylintrc" "${WORKSPACE_PATH}/.pylintrc"
+  log_success "Link added successfully."
 }
 
 #######################################
@@ -21,7 +44,7 @@ main() {
 # NOTE Required to use double quotes here because if we use single quotes the ' is removed from the aliases.
 # shellcheck disable=SC2016
 git_update_diff_tool() {
-  echo "************** Update .gitconfig to use vscode ******************"
+  log_info "Update '.gitconfig' to use vscode."
   grep -qxF '[merge]' ~/.gitconfig || echo "
 [merge]
   tool = vscode
@@ -34,12 +57,11 @@ git_update_diff_tool() {
 [core]
   editor = \"code --wait\"
   pager = bat
- [alias]
-   s = !git for-each-ref --format='%(refname:short)' refs/heads | fzf | xargs git switch
-   c = !git for-each-ref --format='%(refname:short)' refs/heads | fzf | xargs git switch
+[alias]
+  s = !git for-each-ref --format='%(refname:short)' refs/heads | fzf | xargs git switch
+  c = !git for-each-ref --format='%(refname:short)' refs/heads | fzf | xargs git switch
 " >>~/.gitconfig
-  echo "  - Updated."
-  echo ""
+  log_success "Updated config successfully."
 }
 
 #######################################
@@ -50,19 +72,18 @@ git_update_diff_tool() {
 #   None
 #######################################
 copy_ssh_folder() {
-  echo "************** SSH Folder Setup ******************"
+  log_info "SSH Folder Setup:"
   REMOTE_CONFIG="${HOME}/.ssh-localhost"
   CONFIG="${HOME}/.ssh"
   if [[ -d "$REMOTE_CONFIG" ]]; then
-    echo "  - Remote ssh folder detected, copying in."
+    log_success "Remote ssh folder detected, copying in."
     rm -rf "$CONFIG"
     mkdir -p "${CONFIG}" >/dev/null 2>&1
     cp -R "${REMOTE_CONFIG}/." "${CONFIG}/"
     sudo chown -R "$(id -u)" "${CONFIG}"
   else
-    echo "  - No remote ssh folder detected. Could not copy in.  You probably need to set up SSH."
+    log_warning "No remote SSH folder detected. You need to set up SSH."
   fi
-  echo ""
 }
 
 #######################################
@@ -73,54 +94,18 @@ copy_ssh_folder() {
 #   None
 #######################################
 copy_kube_config() {
-  echo "************** k8s Config Setup ******************"
+  log_info "K8s Config Setup:"
   REMOTE_CONFIG="${HOME}/.kube-localhost"
   CONFIG="${HOME}/.kube"
   if [[ -d "$REMOTE_CONFIG" ]]; then
-    echo "  - Remote k8s config detected, copying in."
+    log_success "Remote k8s config detected, copying in."
     rm -rf "$CONFIG"
     mkdir -p "${CONFIG}" >/dev/null 2>&1
     cp -R "${REMOTE_CONFIG}/." "${CONFIG}/"
     sudo chown -R "$(id -u)" "${CONFIG}"
   else
-    echo "  - No remote k8s config detected, using defaults."
+    log_warning "No remote k8s config detected, using defaults."
   fi
-  echo ""
-}
-
-#######################################
-# Copy in the user's `~/.config/k9s` if it exists, otherwise use local one.
-# Globals:
-#   HOME
-# Arguments:
-#   None
-#######################################
-copy_k9s_config() {
-  echo "************** k9s Config Setup ******************"
-  REMOTE_CONFIG="${HOME}/.config/k9s-localhost"
-  CONFIG="${HOME}/.config/k9s"
-  if [[ -d "$REMOTE_CONFIG" ]]; then
-    echo "  - Remote k9s config detected, copying in."
-    rm -rf "$CONFIG"
-    mkdir -p "${CONFIG}" >/dev/null 2>&1
-    cp -R "${REMOTE_CONFIG}/." "${CONFIG}/"
-    sudo chown -R "$(id -u)" "${CONFIG}"
-  else
-    echo "  - No remote k9s config detected, using defaults."
-  fi
-
-  REMOTE_SHARE=${HOME}/.local/share/k9s-localhost
-  SHARE="${HOME}/.local/share/k9s"
-  if [[ -d "$REMOTE_SHARE" ]]; then
-    echo "  - Remote k9s share detected, copying in."
-    rm -rf "$SHARE"
-    mkdir -p "$SHARE" >/dev/null 2>&1
-    cp -R "${REMOTE_SHARE}/." "${SHARE}/"
-    sudo chown -R "$(id -u)" "${SHARE}"
-  else
-    echo "  - No remote k9s share detected, using defaults."
-  fi
-  echo ""
 }
 
 #######################################
@@ -131,29 +116,19 @@ copy_k9s_config() {
 #   None
 #######################################
 copy_docker_config() {
-  echo "************** Docker Config Setup ******************"
+  log_info "Docker Config Setup:"
   REMOTE_CONFIG="${HOME}/.docker-localhost"
   CONFIG="${HOME}/.docker"
-  if [[ -d "$REMOTE_CONFIG" ]]; then
-    echo "  - Remote Docker config detected, copying in."
+  if [[ -d "$REMOTE_CONFIG" && -f "${REMOTE_CONFIG}/config.json" ]]; then
+    log_success "Remote Docker config detected, copying in."
     rm -rf "$CONFIG"
     mkdir -p "${CONFIG}" >/dev/null 2>&1
     cp -R "${REMOTE_CONFIG}/." "${CONFIG}/"
     sudo chown -R "$(id -u)" "${CONFIG}"
-
-    if [[ $(jq '.credsStore' "${CONFIG}/config.json") != "null" ]]; then
-      echo "  - Removing Windows credsStore from .docker/config.json."
-      json_revision=$(jq 'del(.credsStore)' "${CONFIG}/config.json" 2>/dev/null)
-      # -n tests if the length of json_revision is nonzero
-      [ -n "${json_revision}" ] && echo -e "${json_revision}" >"${CONFIG}/config.json" 2>/dev/null
-    else
-      echo "  - No Windows credstore detected, skipping removal."
-    fi
-
   else
-    echo "  - No remote Docker config detected, using defaults."
+    log_warning "No remote Docker config detected, using defaults."
+    log_info "You should run 'docker login' to your private repos if you want to be able to push images to them."
   fi
-  echo ""
 }
 
 if ! (return 0 2>/dev/null); then

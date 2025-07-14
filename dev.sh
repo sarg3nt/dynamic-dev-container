@@ -12,7 +12,7 @@ IFS=$'\n\t'
 # Example: qq
 docker_exec_command=""
 # Name of the project folder
-project_name="go-dev-container"
+project_name="generic-dev-container"
 # Name of the container
 container_name="${project_name}"
 # User being created in the container
@@ -36,27 +36,14 @@ if [ "$colors_sourced" = false ]; then
 fi
 
 add_docker_exec_command() {
-  if [[ -n "$docker_exec_command" ]]; then
-    # Add ${docker_exec_command} command to open the dev container to a users .bashrc file if it is not already there.
-    if ! grep -F "${docker_exec_command} ()" "${HOME}/.bashrc" >/dev/null 2>&1 && [ -f "${HOME}/.bashrc" ]; then
-      echo -e "\n${docker_exec_command} (){\n\
-        docker exec -it -u ${container_user} -w /workspaces/${project_name} ${container_name} zsh\n\
-      }" >>"${HOME}/.bashrc"
-      echo -e "${GREEN}Created \"${docker_exec_command}\" command in your ${HOME}/.bashrc file.${NC}"
-      # Source .bashrc in a subshell to retain current environment variables
-      bash -c "source '${HOME}/.bashrc'"
-    fi
+  if [[ -n "$docker_exec_command" ]] && [ -f "${HOME}/.zshrc" ] && ! grep -F "${docker_exec_command} ()" "${HOME}/.zshrc" >/dev/null 2>&1; then
+    echo -e "\n${docker_exec_command} (){\n\
+      docker exec -it -u ${container_user} -w /workspaces/${project_name} ${container_name} zsh\n\
+    }" >>"${HOME}/.zshrc"
+    echo -e "${GREEN}Created \"${docker_exec_command}\" command in your ${HOME}/.zshrc file.${NC}"
 
-    # Add ${docker_exec_command} command to open the dev container to a users .zshrc file if it is not already there.
-    if ! grep -F "${docker_exec_command} ()" "${HOME}/.zshrc" >/dev/null 2>&1 && [ -f "${HOME}/.zshrc" ]; then
-      echo -e "\n${docker_exec_command} (){\n\
-        docker exec -it -u ${container_user} -w /workspaces/${project_name} ${container_name} zsh\n\
-      }" >>"${HOME}/.zshrc"
-      echo -e "${GREEN}Created \"${docker_exec_command}\" command in your ${HOME}/.zshrc file.${NC}"
-
-      # Source .zshrc in a subshell to retain current environment variables
-      zsh -c "source '${HOME}/.zshrc'"
-    fi
+    # Source .zshrc in a subshell to retain current environment variables
+    zsh -c "source '${HOME}/.zshrc'"
   fi
 }
 

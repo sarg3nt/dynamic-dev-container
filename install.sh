@@ -10,8 +10,8 @@ IFS=$'\n\t'
 main() {
   # shellcheck source=/dev/null
   if [[ ! -f "usr/bin/lib/sh/colors.sh" ]]; then
-    echo "You do not appear to be in the go-dev-container project directory."
-    echo "This script must be ran from the root of the go-dev-container project directory."
+    echo "You do not appear to be in the generic-dev-container project directory."
+    echo "This script must be ran from the root of the generic-dev-container project directory."
     exit 1
   fi
   source "usr/bin/lib/sh/colors.sh"
