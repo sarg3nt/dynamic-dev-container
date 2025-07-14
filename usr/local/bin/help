@@ -1,0 +1,38 @@
+#!/bin/bash
+set -euo pipefail
+IFS=$'\n\t'
+
+# cSpell:ignore gitui
+
+# The main help file for the dev container.
+# This will show the user what tools are installed in the dev container and is ran on shell start.
+main() {
+  source /usr/bin/lib/sh/colors.sh
+  echo -e "${BLUE}********************************************************************"
+  echo -e "                          Go Dev Container"
+  echo -e "                      Build Date: $(cat /home/vscode/build_date.txt)"
+  echo -e "********************************************************************${NC}"
+  echo -e "${CYAN}Type \"help\" to display this messsage again.${NC}"
+  echo -e ""
+  echo -e "${GREEN}**** Primary Tools:${NC}"
+  echo -e " go, goreleaser, docker (d), git (g), gitui, helm (h), k9s (k), kubectl (kc)"
+  echo -e ""
+  echo -e "${GREEN}**** Utilities:${NC}"
+  echo -e " fzf, lsd, mise, starship"
+  echo -e ""
+  echo -e "${GREEN}**** Configure Installed Versions of Go and Go Tools:${NC}"
+  echo -e " Edit the '.mise.toml' file in the root of your project to set the versions of go and go tools to install, then run 'mise install'."
+  echo -e " Other 'mise' comands."
+  echo -e "   'mise ls'                         - List installed tools."
+  echo -e "   'mise install'                    - Install tools from '.mise.toml'."
+  echo -e "   'mise update'                     - Update installed tools."
+  echo -e "   'mise registry'                   - List available tools."
+  echo -e "   'mise install <tool>@<version>'   - Install a specific tool and version."
+  echo -e "   'mise use <tool>@<version>'       - Use an existing tool in current project"
+  echo -e ""
+}
+
+# Run main
+if ! (return 0 2>/dev/null); then
+  (main "$@")
+fi
