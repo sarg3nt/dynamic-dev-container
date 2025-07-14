@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # cSpell:ignore pylintrc
 # shellcheck disable=SC2016,SC1091
 
@@ -19,11 +20,11 @@ main() {
   copy_kube_config
   echo ""
   copy_docker_config
-  #echo ""
-  #add_go_tools
-
+  echo ""
+  install_kubectl_plugins
+  echo ""
+  install_kubectx_kubens_completions
   # Uncomment to install Powershelll
-  # echo ""
   # bash usr/local/bin/install_powershell
   # Uncomment to install PowerCLI
   # bash usr/local/bin/install_powercli
@@ -136,22 +137,43 @@ copy_docker_config() {
 }
 
 #######################################
-# Add Go Tooling.  This is optional and should only be used if you need a Go development environment.
+# Install any kubectl plugins using krew.
 # Globals:
 #   HOME
 # Arguments:
 #   None
 #######################################
+install_kubectl_plugins() {
+  log_info "Adding krew to the path" "green"
+  export_statement="export PATH=\"\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH\""
+  echo "$export_statement" >>~/.zshrc
+  echo "$export_statement" >>~/.bashrc
 
-add_go_tools() {
-  log "Adding Go Tools" "green"
-  go install "github.com/go-delve/delve/cmd/dlv@latest"
-  go install "mvdan.cc/gofumpt@latest"
-  go install golang.org/x/tools/gopls@latest
+  log_info "Installing plugins" "green"
+  krew install access-matrix blame get-all node-restart switch-config view-allocations
+
+  log_info "Deleting files from /tmp" "green"
+  sudo rm -rf /tmp/*
+}
+
+#######################################
+# Install kubectx and kubens completions.
+# Globals:
+#   HOME
+# Arguments:
+#   None
+#######################################
+install_kubectx_kubens_completions() {
+  log "Installing kubectx and kubens completions" "green"
+  mkdir -p "$HOME/.oh-my-zsh/custom/completions"
+  chmod -R 755 "$HOME/.oh-my-zsh/custom/completions"
+
+  log "Installing kubectx completions" "green"
+  curl -sL https://raw.githubusercontent.com/ahmetb/kubectx/master/completion/_kubectx.zsh --output "$HOME/.oh-my-zsh/custom/completions/_kubectx.zsh"
+  log "Installing kubens completions" "green"
+  curl -sL https://raw.githubusercontent.com/ahmetb/kubectx/master/completion/_kubens.zsh --output "$HOME/.oh-my-zsh/custom/completions/_kubens.zsh"
 }
 
 if ! (return 0 2>/dev/null); then
   (main "$@")
 fi
-
-
