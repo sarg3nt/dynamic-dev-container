@@ -11,7 +11,7 @@ main() {
 
   log "50-install-other-apps.sh" "blue"
 
-  install_cloc
+  #install_cloc
   add_fzf_completions_files
   add_vscode_extensions_cache
   add_bash_history_cache

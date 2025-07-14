@@ -17,12 +17,6 @@ main() {
   local repo="${2:-}"
   local major_minor_version="${3:-}"
 
-  if [[ -z "${GITHUB_API_TOKEN:+1}" ]]; then
-    log "ERROR: GITHUB_API_TOKEN is not set and is required." "red"
-    log "Usage: GITHUB_API_TOKEN=your_token_here get_latest_version.sh project repo [major_minor_version]" "red"
-    exit 1
-  fi
-
   if [[ -z "${project}" ]]; then
     log "ERROR: Project is not specified and is required." "red"
     log "Usage: get_latest_version.sh project repo [major_minor_version]" "red"

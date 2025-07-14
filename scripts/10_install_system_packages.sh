@@ -99,15 +99,13 @@ package_install() {
 
 install_dev_container_features() {
   log "Installing Microsoft Dev Container Features" "green"
- 
-  log "Running /usr/bin/crb enable" "green"
-  /usr/bin/crb enable
 
+  cd /tmp/
   log "Cloning devcontainers features repository" "green"
   git clone --depth 1 -- https://github.com/devcontainers/features.git
 
   log "Running install script" "green"
-  cd /tmp/source/features/src/common-utils/
+  cd /tmp/features/src/common-utils/
   ./install.sh
 }
 
