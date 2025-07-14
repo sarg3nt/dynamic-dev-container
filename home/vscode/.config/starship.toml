@@ -1,0 +1,57 @@
+format = """
+$memory_usage\
+$directory\
+$username\
+$hostname\
+$kubernetes\
+$git_branch\
+$custom\
+$time\
+$cmd_duration\
+$line_break\
+$status\
+$character"""
+
+[memory_usage]
+format = "[  $ram_pct ]($style)"
+threshold = 0
+style = "white bg:#000519"
+disabled = true
+[directory]
+truncation_length = 5
+truncate_to_repo = false
+truncation_symbol = "…/"
+style = "white bg:#000519"
+format = "[](fg:black bg:#000519)[ $path$read_only ]($style)"
+[kubernetes]
+symbol = "[ ⎈ ](bold white bg:#000a35)"
+format = '[](fg:#000519 bg:#000a35)[$symbol CTX:$context( NS:$namespace) ](bold fg:#F2F2F2 bg:#000a35)'
+disabled = false
+[git_branch]
+symbol = "[  ](bold white bg:#000f4c)"
+truncation_length = 35
+truncation_symbol = "..."
+format = "[](fg:#000a35 bg:#000f4c)[$symbol$branch ](bold fg:#F2F2F2 bg:#000f4c)"
+[custom.dirty]
+command = "echo '*'"
+when = "~/.config/git-change"
+style = "fg:red bg:#000f4c"
+#shell = "bsh"
+#prefix = ""
+#suffix = " "
+[time]
+disabled = false
+style = "bold fg:#F2F2F2 bg:#001363"
+format = '[](fg:#000f4c bg:#001363)[  $time ]($style)'
+time_format = "%I:%M:%S%p"
+utc_time_offset = "local"
+time_range = "-"
+[cmd_duration]
+min_time = 0
+show_notifications = true
+min_time_to_notify = 30_000
+format = '[](fg:#001363 bg:#00187a)[  $duration ](bold white bg:#00187a)[](fg:#00187a)'
+[status]
+disabled = false
+style = "#ffffff bg:#8B0000"
+format = ' [\[$common_meaning$signal_name$maybe_int\]]($style)'

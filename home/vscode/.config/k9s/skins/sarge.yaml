@@ -1,0 +1,106 @@
+# -----------------------------------------------------------------------------
+# Sarges K9s Gruvbox Dark Skin variant
+# Author: [@indiebrain](https://github.com/indiebrain)
+# -----------------------------------------------------------------------------
+
+# Styles...
+foreground: &foreground "#ebdbb2"
+background: &background "#000000" #272727
+current_line: &current_line "#ebdbb2"
+selection: &selection "#3c3735"
+comment: &comment "#bdad93"
+cyan: &cyan "#689d69"
+green: &green "#989719"
+orange: &orange "#d79920"
+magenta: &magenta "#b16185"
+blue: &blue "#448488"
+red: &red "#cc231c"
+
+k9s:
+  body:
+    fgColor: *foreground
+    bgColor: *background
+    logoColor: *blue
+  prompt:
+    fgColor: *foreground
+    bgColor: *background
+    suggestColor: *orange
+  info:
+    fgColor: *orange
+    sectionColor: *foreground
+  help:
+    fgColor: *foreground
+    bgColor: *background
+    keyColor: *orange
+    numKeyColor: *blue
+    sectionColor: *green
+  dialog:
+  # most dialog skinning is broken as of 0.32.4
+    fgColor: *foreground
+    bgColor: *background
+    buttonFgColor: *foreground
+    buttonBgColor: *magenta
+    buttonFocusFgColor: white
+    buttonFocusBgColor: *cyan
+    labelFgColor: *orange
+    fieldFgColor: *foreground
+  frame:
+    border:
+      fgColor: *selection
+      focusColor: *current_line
+    menu:
+      fgColor: *foreground
+      keyColor: *orange
+      numKeyColor: *orange
+    crumbs:
+      fgColor: white
+      bgColor: black
+      activeColor: *selection
+    status:
+      newColor: *cyan
+      modifyColor: *blue
+      addColor: *green
+      errorColor: *red
+      highlightColor: *orange
+      killColor: *comment
+      completedColor: *comment
+    title:
+      fgColor: *foreground
+      bgColor: *background
+      highlightColor: *orange
+      counterColor: *blue
+      filterColor: *magenta
+  views:
+    charts:
+      bgColor: background
+      defaultDialColors:
+        - *blue
+        - *red
+      defaultChartColors:
+        - *blue
+        - *red
+    table:
+      fgColor: *foreground
+      bgColor: *background
+      cursorFgColor: "#fff"
+      cursorBgColor: *current_line
+      header:
+        fgColor: *foreground
+        bgColor: *background
+        sorterColor: *selection
+    xray:
+      fgColor: *foreground
+      bgColor: *background
+      cursorColor: *current_line
+      graphicColor: *blue
+      showIcons: true
+    yaml:
+      keyColor: *magenta
+      colonColor: *blue
+      valueColor: *foreground
+    logs:
+      fgColor: "#D9DEE8"
+      bgColor: *background
+      indicator:
+        fgColor: *foreground
+        bgColor: *background
