@@ -1,0 +1,45 @@
+# cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr
+[env]
+MISE_PYTHON_COMPILE = false
+
+[tools]
+####### Pinned versions
+python = '3.13'
+kubectl = "1.32"
+# https://github.com/opentofu/opentofu
+opentofu = "1.10.2"
+# https://github.com/openbao/openbao/releases
+openbao = "2.3.1"
+
+######### Latest versions
+bat = "latest"
+cmctl = "latest"
+dive = "latest"
+fzf = "latest"
+gitui = "latest" 
+golang = 'latest'
+goreleaser = 'latest'
+helm = "latest"
+k3d = "latest"
+k9s = "latest"
+krew = "latest"
+kubebench = "latest"
+kubectx = "latest"
+lsd = "latest"
+packer = "latest"
+popeye = "latest"
+starship = "latest"
+tealdeer = "latest"
+trivy = "latest"
+yq = "latest"
+
+# See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
+[alias]
+kubebench = 'asdf:sarg3nt/asdf-kube-bench'
+tealdeer = 'asdf:sarg3nt/asdf-tealdeer'
+
+[settings]
+experimental = true
+http_timeout = "90s"
+jobs = 1
+yes = true
