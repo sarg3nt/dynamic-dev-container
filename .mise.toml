@@ -4,7 +4,6 @@ MISE_PYTHON_COMPILE = false
 
 [tools]
 ####### Pinned versions
-python = '3.13'
 kubectl = "1.32"
 # https://github.com/opentofu/opentofu
 opentofu = "1.10.2"
@@ -15,7 +14,6 @@ openbao = "2.3.1"
 bat = "latest"
 cmctl = "latest"
 dive = "latest"
-fzf = "latest"
 gitui = "latest" 
 golang = 'latest'
 goreleaser = 'latest'
@@ -25,13 +23,10 @@ k9s = "latest"
 krew = "latest"
 kubebench = "latest"
 kubectx = "latest"
-lsd = "latest"
 packer = "latest"
 popeye = "latest"
-starship = "latest"
 tealdeer = "latest"
 trivy = "latest"
-yq = "latest"
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
 [alias]

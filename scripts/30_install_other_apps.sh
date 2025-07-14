@@ -9,14 +9,13 @@ main() {
   source "/usr/bin/lib/sh/log.sh"
   export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin/:$PATH"
 
-  log "50-install-other-apps.sh" "blue"
-
+  log "30-install-other-apps.sh" "blue"
+  mise install python@'3.13'
   #install_cloc
   add_fzf_completions_files
   add_vscode_extensions_cache
   add_bash_history_cache
   install_omz_plugins
-  install_zoxide
   clean_up
   date >/home/vscode/build_date.txt
 }
@@ -61,12 +60,6 @@ install_omz_plugins() {
   git clone --branch "24.09.04" --depth 1 -- https://github.com/marlonrichert/zsh-autocomplete.git "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autocomplete"
   git clone --depth 1 -- https://github.com/zsh-users/zsh-completions.git "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-completions"
 }
-
-install_zoxide() {
-  log "Installing zoxide cd replacement tool" "green"
-  curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
-}
-
 
 clean_up() {
   echo ""

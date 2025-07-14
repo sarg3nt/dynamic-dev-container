@@ -11,6 +11,7 @@ source "$(dirname "$0")/utils/log.sh"
 main() {
   echo ""
   log "EXECUTING POST START COMMAND..." "gray" "INFO"
+  eval "$(/usr/local/bin/mise activate bash)"
   link_pylintrc_file
   echo ""
   git_update_diff_tool
@@ -153,7 +154,7 @@ install_kubectl_plugins() {
   krew install access-matrix blame get-all node-restart switch-config view-allocations
 
   log_info "Deleting files from /tmp" "green"
-  sudo rm -rf /tmp/*
+  sudo rm -rf /tmp/* || true
 }
 
 #######################################

@@ -36,7 +36,7 @@ get_latest_dev_container_version() {
   else
     echo ""
     log_error "Failed to pull the latest generic-dev-container image. Please check your connection or credentials."
-    exit 1
+    log_error "The container will attempt to load with a cached copy if you have it."
   fi
 }
 

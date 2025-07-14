@@ -35,16 +35,18 @@ if [ "$colors_sourced" = false ]; then
 fi
 
 add_docker_exec_command() {
-    # Add ${docker_exec_command} command to open the dev container to a users .zshrc file if it is not already there.
-    if ! grep -F "${docker_exec_command} ()" "${HOME}/.zshrc" >/dev/null 2>&1 && [ -f "${HOME}/.zshrc" ]; then
-      echo -e "\n${docker_exec_command} (){\n\
-        docker exec -it -u ${container_user} -w /workspaces/${project_name} ${container_name} zsh\n\
-      }" >>"${HOME}/.zshrc"
-      echo -e "${GREEN}Created \"${docker_exec_command}\" command in your ${HOME}/.zshrc file.${NC}"
+  # Add ${docker_exec_command} command to open the dev container to a users .zshrc file if it is not already there.
+  if [[ -n "$docker_exec_command" ]] && ! grep -F "${docker_exec_command} ()" "${HOME}/.zshrc" >/dev/null 2>&1 && [ -f "${HOME}/.zshrc" ]; then
+    cat >>"${HOME}/.zshrc" <<EOF
 
-      # Source .zshrc in a subshell to retain current environment variables
-      zsh -c "source '${HOME}/.zshrc'"
-    fi
+${docker_exec_command} (){
+  docker exec -it -u "${container_user}" -w "/workspaces/${project_name}" "${container_name}" zsh
+}
+EOF
+    echo -e "${GREEN}Created \"${docker_exec_command}\" command in your ${HOME}/.zshrc file.${NC}"
+
+    # Source .zshrc in a subshell to retain current environment variables
+    zsh -c "source '${HOME}/.zshrc'"
   fi
 }
 
@@ -63,7 +65,7 @@ open_vs_code() {
     # open code without container
     if [ -f "$CODE_WS_FILE" ]; then
       echo "Opening vscode workspace from $CODE_WS_FILE"
-      code $CODE_WS_FILE
+      code "$CODE_WS_FILE"
     else
       echo "Opening vscode in current directory"
       code .
@@ -72,14 +74,14 @@ open_vs_code() {
   fi
 
   # open devcontainer
-  HOST_PATH=$(echo $(wslpath -w $PWD) | sed -e 's,\\,\\\\,g')
-  WORKSPACE="/workspaces/$(basename $PWD)"
+  HOST_PATH=$(wslpath -w "$PWD" | sed -e 's,\\,\\\\,g')
+  WORKSPACE="/workspaces/$(basename "$PWD")"
 
   URI_SUFFIX=
   if [ -f "$CODE_WS_FILE" ]; then
     # open workspace file
     URI_TYPE="--file-uri"
-    URI_SUFFIX="$WORKSPACE/$(basename $CODE_WS_FILE)"
+    URI_SUFFIX="$WORKSPACE/$(basename "$CODE_WS_FILE")"
     echo "Opening vscode workspace file within devcontainer"
   else
     URI_TYPE="--folder-uri"
@@ -88,8 +90,8 @@ open_vs_code() {
   fi
 
   URI="{\"hostPath\":\"$HOST_PATH\",\"configFile\":{\"\$mid\":1,\"path\":\"$DEVCONTAINER_JSON\",\"scheme\":\"vscode-fileHost\"}}"
-  URI_HEX=$(echo "${URI}" | xxd -c 0 -p)
-  code ${URI_TYPE}="vscode-remote://dev-container%2B${URI_HEX}${URI_SUFFIX}" &
+  URI_HEX=$(printf '%s' "$URI" | xxd -c 0 -p)
+  code "${URI_TYPE}=vscode-remote://dev-container%2B${URI_HEX}${URI_SUFFIX}" &
 }
 
 exec_into_container() {
@@ -101,7 +103,7 @@ exec_into_container() {
   local rot=0
   # If not then docker_id will be empty and the while loop kicks in.
   local docker_id=""
-  docker_id=$(docker container ls -f name=${container_name} -q)
+  docker_id=$(docker container ls -f "name=${container_name}" -q)
   if [ -z "$docker_id" ]; then
     echo -e "${BLUE}Waiting up to 10 minutes for the dev container to start ${NO_NEW_LINE}"
   fi
@@ -110,7 +112,7 @@ exec_into_container() {
     # Sleep for one second then try and get the docker_id of the dev container again.
     # Once we can get the id, the loop quits and we run the last line below, exe'ing into the container.
     sleep 1s
-    docker_id=$(docker container ls -f name=${container_name} -q)
+    docker_id=$(docker container ls -f "name=${container_name}" -q)
     count=$((count + 1))
 
     if ((count == 20)); then
@@ -133,8 +135,8 @@ exec_into_container() {
   if [[ -n "$docker_exec_command" ]]; then
     echo -e "${BLUE}You can use the \"${docker_exec_command}\" command to exec into the dev container from another terminal.${NC}"
   fi
-  
-  docker exec -u "${container_user}" -w /workspaces/${project_name} -it ${container_name} zsh
+
+  docker exec -u "${container_user}" -w "/workspaces/${project_name}" -it "${container_name}" zsh
 }
 
 # Check if user is using Docker Deskop for Windows or the native Docker Engine.
@@ -142,7 +144,7 @@ main() {
   add_docker_exec_command
 
   # If the dev container is running, we assume VSCode is also running. If VSCode is not running, then open it.
-  if ! docker ps | grep ${container_name}; then
+  if ! docker ps | grep -q "${container_name}"; then
     open_vs_code
   fi
 

@@ -184,7 +184,7 @@ source "${HOME}/.fzf-completion.zsh"
 
 # Active mise
 if command -v mise &> /dev/null; then
-  eval "$(~/.local/bin/mise activate zsh)"
+  eval "$(/usr/local/bin/mise activate zsh)"
   mise trust --all
   mise install --yes
 fi

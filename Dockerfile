@@ -15,7 +15,8 @@ FROM jdxcode/mise@sha256:5a4eb0b7b6687f2f42ad24d37a50e605b6064d4cd051edb3286a303
 
 # https://hub.docker.com/r/rockylinux/rockylinux/tags
 FROM rockylinux/rockylinux:10-ubi@sha256:eca03145dd5e0b2a281eef164d391e4758b4a5962d29b688d15a72cef712fbb4 AS final
-
+ARG GITHUB_TOKEN
+ENV GITHUB_API_TOKEN=$GITHUB_TOKEN
 LABEL org.opencontainers.image.source=https://github.com/sarg3nt/generic-dev-container
 
 ENV TZ='America/Los_Angeles'
@@ -35,12 +36,13 @@ USER vscode
 
 # Copy the mise binary from the mise container
 COPY --from=mise /usr/local/bin/mise /usr/local/bin/mise
-
-RUN --mount=type=bind,source=scripts/20_install_other_apps.sh,target=/20.sh,ro bash -c "/20.sh"
-RUN --mount=type=bind,source=scripts/30_setup_ssh_known_hosts.sh,target=/30.sh,ro bash -c "/30.sh"
+COPY --chown=vscode:vscode home/vscode/.config/mise /home/vscode/.config/mise
+RUN --mount=type=bind,source=scripts/20_install_mise_apps.sh,target=/20.sh,ro bash -c "/20.sh"
+RUN --mount=type=bind,source=scripts/30_install_other_apps.sh,target=/30.sh,ro bash -c "/30.sh"
+RUN --mount=type=bind,source=scripts/40_setup_ssh_known_hosts.sh,target=/40.sh,ro bash -c "/40.sh"
 
 COPY --chown=vscode:vscode home /home/
-COPY usr /usr
+COPY usr /usr 
 
 # VS Code by default overrides ENTRYPOINT and CMD with default values when executing `docker run`.
 # Setting the ENTRYPOINT to docker_init.sh will configure non-root access to
