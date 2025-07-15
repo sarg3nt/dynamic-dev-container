@@ -18,7 +18,7 @@
   "mounts": [
     // User-defined Mounts (Customizable)
     {
-      "source": "generic-dev-container-bashhistory",
+      "source": "generic-dev-container-shellhistory",
       "target": "/commandhistory",
       "type": "volume"
     },
@@ -83,7 +83,7 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        // **** Begin Github ****
+        // #### Begin Github ####
         "GitHub.copilot", // GitHub Copilot AI assistant
         "GitHub.copilot-chat", // GitHub Copilot Chat
         "GitHub.vscode-pull-request-github", // GitHub pull request management
@@ -91,49 +91,49 @@
         "GitHub.remotehub", // GitHub remote repositories
         "mhutchie.git-graph", // Git graph visualization
         "huizhou.githd", // Git history diff
-        // **** End Github ****
+        // #### End Github ####
 
-        // **** Begin Go ****
+        // #### Begin Go ####
         "golang.go", // Go language support
         "golang.go-nightly", // Go nightly builds support
-        // **** End Go ****
+        // #### End Go ####
 
-        // **** Begin Python ****
+        // #### Begin Python ####
         "ms-python.python", // Python language support
         "ms-python.mypy-type-checker", // MyPy type checker
         "charliermarsh.ruff", // Ruff linter and formatter
-        // **** End Python ****
+        // #### End Python ####
 
-        // **** Begin Markdown ****
+        // #### Begin Markdown ####
         "yzhang.markdown-all-in-one", // Markdown all-in-one
         "darkriszty.markdown-table-prettify", // Markdown table prettifier
-        // **** End Markdown ****
+        // #### End Markdown ####
 
-        // **** Begin Shell/Bash ****
+        // #### Begin Shell/Bash ####
         "foxundermoon.shell-format", // Shell script formatter
         "timonwong.shellcheck", // Shell script linter
-        // **** End Shell/Bash ****
+        // #### End Shell/Bash ####
 
-        // **** Begin Kubernetes/Helm ****
+        // #### Begin Kubernetes/Helm ####
         "ms-kubernetes-tools.vscode-kubernetes-tools", // Kubernetes tools
         "tim-koehler.helm-intellisense", // Helm IntelliSense
         "redhat.vscode-yaml", // YAML language support
-        // **** End Kubernetes/Helm ****
+        // #### End Kubernetes/Helm ####
 
-        // **** Begin Terraform/OpenTofu ****
+        // #### Begin Terraform/OpenTofu ####
         "opentofu.vscode-opentofu", // OpenTofu/Terraform support
-        // **** End Terraform/OpenTofu ****
+        // #### End Terraform/OpenTofu ####
 
-        // **** Begin JavaScript/TypeScript ****
+        // #### Begin JavaScript/TypeScript ####
         "dbaeumer.vscode-eslint", // ESLint for JavaScript/TypeScript
         "esbenp.prettier-vscode", // Prettier code formatter
-        // **** End JavaScript/TypeScript ****
+        // #### End JavaScript/TypeScript ####
 
-        // **** Begin Packer ****
+        // #### Begin Packer ####
         "szTheory.vscode-packer-powertools", // Packer tools
-        // **** End Packer ****
+        // #### End Packer ####
 
-        // **** Begin Core Extensions ****
+        // #### Begin Core Extensions ####
         "albert.TabOut", // Tab out of brackets/quotes
         "ciiqr.encode", // Encode/decode utilities
         "EditorConfig.EditorConfig", // EditorConfig support
@@ -150,10 +150,10 @@
         "streetsidesoftware.code-spell-checker", // Spell checker
         "tamasfe.even-better-toml", // TOML language support
         "tomoki1207.pdf" // PDF viewer
-        // **** End Core Extensions ****
+        // #### End Core Extensions ####
       ],
       "settings": {
-        // **** Begin Core VS Code Settings ****
+        // #### Begin Core VS Code Settings ####
         "code-runner.enableAppInsights": false,
         "code-runner.showExecutionMessage": false,
         "code-runner.runInTerminal": true,
@@ -190,9 +190,9 @@
         },
         "terminal.integrated.defaultProfile.linux": "zsh",
         "reformat": true,
-        // **** End Core VS Code Settings ****
+        // #### End Core VS Code Settings ####
         
-        // **** Begin Go Settings ****
+        // #### Begin Go Settings ####
         "go.buildTags": "",
         "go.toolsEnvVars": {
           "CGO_ENABLED": "0"
@@ -221,9 +221,9 @@
           "staticcheck": true,
           "formatting.gofumpt": true
         },
-        // **** End Go Settings ****
+        // #### End Go Settings ####
 
-        // **** Begin Python Settings ****
+        // #### Begin Python Settings ####
         "python.pythonPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
         "python.defaultInterpreterPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
         "autopep8.args": ["--max-line-length=180"],
@@ -241,9 +241,9 @@
           "error": "Warning",
           "note": "Information"
         }, */
-        // **** End Python Settings ****
+        // #### End Python Settings ####
 
-        // **** Begin Markdown Settings ****
+        // #### Begin Markdown Settings ####
         "[markdown]": {
           "editor.defaultFormatter": "darkriszty.markdown-table-prettify",
           "rewrap.autoWrap.enabled": false,
@@ -259,18 +259,18 @@
         "markdown.extension.orderedList.autoRenumber": true,
         "markdown.extension.toc.levels": "2..6",
         "markdown.extension.orderedList.marker": "one",
-        // **** End Markdown Settings ****
+        // #### End Markdown Settings ####
 
-        // **** Begin Shell/Bash Settings ****
+        // #### Begin Shell/Bash Settings ####
         "shellcheck.customArgs": [
           "-x" // allows shellcheck to evaluate "sourced" scripts. see https://www.shellcheck.net/wiki/SC1091
         ],
         "shellcheck.exclude": [
           "SC2188" // This is excluded here because inline disable doesnt seem to work for this rule.
         ],
-        // **** End Shell/Bash Settings ****
+        // #### End Shell/Bash Settings ####
 
-        // **** Begin Kubernetes/Helm Settings ****
+        // #### Begin Kubernetes/Helm Settings ####
         "vs-kubernetes": {
           "vscode-kubernetes.kubectl-path": "/home/vscode/.local/share/mise/installs/kubectl/latest/bin/kubectl"
         },
@@ -278,9 +278,9 @@
         "helm-intellisense.customValueFileNames": [
           "values.yaml"
         ],
-        // **** End Kubernetes/Helm Settings ****
+        // #### End Kubernetes/Helm Settings ####
 
-        // **** Begin JavaScript/TypeScript Settings ****
+        // #### Begin JavaScript/TypeScript Settings ####
         "[groovy]": {
           "editor.tabSize": 2,
           "editor.insertSpaces": true
@@ -289,17 +289,17 @@
           "editor.tabSize": 2,
           "editor.insertSpaces": true
         },
-        // **** End JavaScript/TypeScript Settings ****
+        // #### End JavaScript/TypeScript Settings ####
 
-        // **** Begin PowerShell Settings ****
+        // #### Begin PowerShell Settings ####
         "powershell.powerShellAdditionalExePaths": {
           "Powershell7": "/home/vscode/.local/share/mise/installs/powershell/latest/pwsh"
         },
         "powershell.powerShellDefaultVersion": "Powershell7",
         "omnisharp.autoStart": false,
-        // **** End PowerShell Settings ****
+        // #### End PowerShell Settings ####
 
-        // **** Begin Spell Checker Settings ****
+        // #### Begin Spell Checker Settings ####
         "cSpell": {
           "enabledLanguageIds": [
             "asciidoc",
@@ -343,9 +343,9 @@
           "blockCheckingWhenTextChunkSizeGreaterThan": 10000,
           "allowCompoundWords": true
         },
-        // **** End Spell Checker Settings ****
+        // #### End Spell Checker Settings ####
 
-        // **** Begin TODO Tree Settings ****
+        // #### Begin TODO Tree Settings ####
         "todo-tree.general.tags": [
           "TODO:",
           "NOTE:",
@@ -390,9 +390,9 @@
             "gutterIcon": true
           }
         }
-        // **** End TODO Tree Settings ****
+        // #### End TODO Tree Settings ####
         ,
-        // **** Begin PSI Header Settings ****
+        // #### Begin PSI Header Settings ####
         "psi-header.config": {
           "company": "<Add your company name here>"
         },
@@ -480,7 +480,7 @@
             ]
           }
         ]
-        // **** End PSI Header Settings ****
+        // #### End PSI Header Settings ####
       }
     }
   }

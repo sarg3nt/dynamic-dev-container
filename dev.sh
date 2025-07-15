@@ -15,18 +15,15 @@ container_user="vscode" # User being created in the container
 
 # Source colors library
 source_colors() {
-  local colors_paths=("usr/bin/lib/sh/colors.sh" "lib/sh/colors.sh")
-  
-  for path in "${colors_paths[@]}"; do
-    if [[ -f "$path" ]]; then
-      # shellcheck source=/dev/null
-      source "$path"
-      return 0
-    fi
-  done
-  
-  echo "Error: colors.sh not found. Please ensure it is available in either the usr/bin/lib/sh or lib/sh directory."
-  exit 1
+  # Define colors directly instead of sourcing external file
+  # shellcheck disable=SC2034
+  RED="\033[1;31m"
+  YELLOW="\033[1;33m"
+  GREEN="\033[1;32m"
+  BLUE="\033[1;34m"
+  CYAN="\033[1;36m"
+  NC="\033[0m"
+  NO_NEW_LINE='\033[0K\r'
 }
 
 # Add docker exec command to user's .zshrc
