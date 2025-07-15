@@ -135,26 +135,32 @@ EOF
   # Ask about OpenTofu/Terraform
   if ask_yes_no "Install OpenTofu (Terraform alternative)?"; then
     INSTALL_OPENTOFU=true
-    echo "# https://github.com/opentofu/opentofu" >> "$temp_file"
-    echo 'opentofu = "1.10.2"' >> "$temp_file"
+    {
+      echo "# https://github.com/opentofu/opentofu"
+      echo 'opentofu = "1.10.2"'
+    } >> "$temp_file"
   fi
 
   # Ask about OpenBao
   if ask_yes_no "Install OpenBao (Vault alternative)?"; then
-    echo "# https://github.com/openbao/openbao/releases" >> "$temp_file"
-    echo 'openbao = "2.3.1"' >> "$temp_file"
+    {
+      echo "# https://github.com/openbao/openbao/releases"
+      echo 'openbao = "2.3.1"'
+    } >> "$temp_file"
   fi
 
   # Ask about Kubernetes/Helm tools
   if ask_yes_no "Install Kubernetes/Helm tools (kubectl, helm, k9s, kubectx)?"; then
     INSTALL_KUBERNETES=true
-    echo "" >> "$temp_file"
-    echo "#### Begin Kubernetes/Helm ####" >> "$temp_file"
-    echo 'kubectl = "1.32"' >> "$temp_file"
-    echo 'kubectx = "latest"' >> "$temp_file"
-    echo 'k9s = "latest"' >> "$temp_file"
-    echo 'helm = "latest"' >> "$temp_file"
-    echo "#### End Kubernetes/Helm ####" >> "$temp_file"
+    {
+      echo ""
+      echo "#### Begin Kubernetes/Helm ####"
+      echo 'kubectl = "1.32"'
+      echo 'kubectx = "latest"'
+      echo 'k9s = "latest"'
+      echo 'helm = "latest"'
+      echo "#### End Kubernetes/Helm ####"
+    } >> "$temp_file"
     
     # Ask about individual Kubernetes utilities
     echo ""
@@ -164,8 +170,10 @@ EOF
     
     if ask_yes_no "Install krew (kubectl plugin manager)?"; then
       if [ "$kube_utils_added" = false ]; then
-        echo "" >> "$temp_file"
-        echo "#### Begin Kubernetes Utilities ####" >> "$temp_file"
+        {
+          echo ""
+          echo "#### Begin Kubernetes Utilities ####"
+        } >> "$temp_file"
         kube_utils_added=true
       fi
       echo 'krew = "latest"' >> "$temp_file"
@@ -173,8 +181,10 @@ EOF
     
     if ask_yes_no "Install dive (Docker image explorer)?"; then
       if [ "$kube_utils_added" = false ]; then
-        echo "" >> "$temp_file"
-        echo "#### Begin Kubernetes Utilities ####" >> "$temp_file"
+        {
+          echo ""
+          echo "#### Begin Kubernetes Utilities ####"
+        } >> "$temp_file"
         kube_utils_added=true
       fi
       echo 'dive = "latest"' >> "$temp_file"
@@ -182,8 +192,10 @@ EOF
     
     if ask_yes_no "Install popeye (Kubernetes cluster sanitizer)?"; then
       if [ "$kube_utils_added" = false ]; then
-        echo "" >> "$temp_file"
-        echo "#### Begin Kubernetes Utilities ####" >> "$temp_file"
+        {
+          echo ""
+          echo "#### Begin Kubernetes Utilities ####"
+        } >> "$temp_file"
         kube_utils_added=true
       fi
       echo 'popeye = "latest"' >> "$temp_file"
@@ -191,8 +203,10 @@ EOF
     
     if ask_yes_no "Install trivy (vulnerability scanner)?"; then
       if [ "$kube_utils_added" = false ]; then
-        echo "" >> "$temp_file"
-        echo "#### Begin Kubernetes Utilities ####" >> "$temp_file"
+        {
+          echo ""
+          echo "#### Begin Kubernetes Utilities ####"
+        } >> "$temp_file"
         kube_utils_added=true
       fi
       echo 'trivy = "latest"' >> "$temp_file"
@@ -200,8 +214,10 @@ EOF
     
     if ask_yes_no "Install k3d (lightweight Kubernetes)?"; then
       if [ "$kube_utils_added" = false ]; then
-        echo "" >> "$temp_file"
-        echo "#### Begin Kubernetes Utilities ####" >> "$temp_file"
+        {
+          echo ""
+          echo "#### Begin Kubernetes Utilities ####"
+        } >> "$temp_file"
         kube_utils_added=true
       fi
       echo 'k3d = "latest"' >> "$temp_file"
@@ -209,8 +225,10 @@ EOF
     
     if ask_yes_no "Install cmctl (cert-manager CLI)?"; then
       if [ "$kube_utils_added" = false ]; then
-        echo "" >> "$temp_file"
-        echo "#### Begin Kubernetes Utilities ####" >> "$temp_file"
+        {
+          echo ""
+          echo "#### Begin Kubernetes Utilities ####"
+        } >> "$temp_file"
         kube_utils_added=true
       fi
       echo 'cmctl = "latest"' >> "$temp_file"
@@ -228,8 +246,10 @@ EOF
 
   if ask_yes_no "Install Go programming language?"; then
     INSTALL_GO=true
-    echo 'golang = "latest"' >> "$temp_file"
-    echo 'goreleaser = "latest"' >> "$temp_file"
+    {
+      echo 'golang = "latest"'
+      echo 'goreleaser = "latest"'
+    } >> "$temp_file"
   fi
 
   if ask_yes_no "Install Packer (HashiCorp image builder)?"; then
@@ -247,17 +267,19 @@ EOF
   fi
 
   # Add aliases section
-  echo "" >> "$temp_file"
-  echo "# See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section." >> "$temp_file"
-  echo "[alias]" >> "$temp_file"
-  echo "kubebench = 'asdf:sarg3nt/asdf-kube-bench'" >> "$temp_file"
-  echo "tealdeer = 'asdf:sarg3nt/asdf-tealdeer'" >> "$temp_file"
-  echo "" >> "$temp_file"
-  echo "[settings]" >> "$temp_file"
-  echo "experimental = true" >> "$temp_file"
-  echo 'http_timeout = "90s"' >> "$temp_file"
-  echo "jobs = 1" >> "$temp_file"
-  echo "yes = true" >> "$temp_file"
+  {
+    echo ""
+    echo "# See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section."
+    echo "[alias]"
+    echo "kubebench = 'asdf:sarg3nt/asdf-kube-bench'"
+    echo "tealdeer = 'asdf:sarg3nt/asdf-tealdeer'"
+    echo ""
+    echo "[settings]"
+    echo "experimental = true"
+    echo 'http_timeout = "90s"'
+    echo "jobs = 1"
+    echo "yes = true"
+  } >> "$temp_file"
 
   mv "$temp_file" "${project_path}/.mise.toml"
 }
