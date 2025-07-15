@@ -34,9 +34,28 @@ source_colors() {
 # Ask yes/no question
 ask_yes_no() {
   local question="$1"
+  local default="${2:-}"  # Optional default parameter
+  local prompt_suffix="(y/n)"
+  local default_response=""
+  
+  # Set prompt and default based on parameter
+  if [[ "$default" == "n" || "$default" == "N" ]]; then
+    prompt_suffix="(y/N)"
+    default_response="n"
+  elif [[ "$default" == "y" || "$default" == "Y" ]]; then
+    prompt_suffix="(Y/n)"
+    default_response="y"
+  fi
+  
   local response
   while true; do
-    read -r -p "$(echo -e "${CYAN}${question} (y/n): ${NC}")" response
+    read -r -p "$(echo -e "${CYAN}${question} ${prompt_suffix}: ${NC}")" response
+    
+    # Use default if response is empty
+    if [[ -z "$response" && -n "$default_response" ]]; then
+      response="$default_response"
+    fi
+    
     case "$response" in
       [yY]|[yY][eE][sS]) return 0 ;;
       [nN]|[nN][oO]) return 1 ;;
@@ -121,7 +140,7 @@ generate_mise_toml() {
   local project_path="$1"
   local temp_file="${project_path}/.mise.toml.tmp"
   
-  echo -e "${BLUE}Configuring .mise.toml...${NC}"
+  echo -e "${BLUE}Primary Tools and Languages:${NC}"
   
   # Start with the header and environment section from source
   echo "# cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr" > "$temp_file"
@@ -131,8 +150,7 @@ generate_mise_toml() {
   echo "[tools]" >> "$temp_file"
   echo "" >> "$temp_file"
 
-  # Ask about OpenTofu/Terraform
-  if ask_yes_no "Install OpenTofu (Terraform alternative)?"; then
+  if ask_yes_no "Install OpenTofu (Terraform alternative)?" "N"; then
     INSTALL_OPENTOFU=true
     {
       echo "# https://github.com/opentofu/opentofu"
@@ -140,16 +158,28 @@ generate_mise_toml() {
     } >> "$temp_file"
   fi
 
-  # Ask about OpenBao
-  if ask_yes_no "Install OpenBao (Vault alternative)?"; then
+  if ask_yes_no "Install OpenBao (Vault alternative)?" "N"; then
     {
       echo "# https://github.com/openbao/openbao/releases"
       echo 'openbao = "2.3.1"'
     } >> "$temp_file"
   fi
 
+  if ask_yes_no "Install Packer (HashiCorp image builder)?" "N"; then
+    INSTALL_PACKER=true
+    echo 'packer = "latest"' >> "$temp_file"
+  fi
+
+  if ask_yes_no "Install Go programming language?" "N"; then
+    INSTALL_GO=true
+    {
+      echo 'golang = "latest"'
+      echo 'goreleaser = "latest"'
+    } >> "$temp_file"
+  fi
+
   # Ask about Kubernetes/Helm tools
-  if ask_yes_no "Install Kubernetes/Helm tools (kubectl, helm, k9s, kubectx)?"; then
+  if ask_yes_no "Install Kubernetes/Helm tools (kubectl, helm, k9s, kubectx)?" "N"; then
     INSTALL_KUBERNETES=true
     {
       echo ""
@@ -167,7 +197,7 @@ generate_mise_toml() {
     
     local kube_utils_added=false
     
-    if ask_yes_no "Install krew (kubectl plugin manager)?"; then
+    if ask_yes_no "Install krew (kubectl plugin manager)?" "N"; then
       if [ "$kube_utils_added" = false ]; then
         {
           echo ""
@@ -178,7 +208,7 @@ generate_mise_toml() {
       echo 'krew = "latest"' >> "$temp_file"
     fi
     
-    if ask_yes_no "Install dive (Docker image explorer)?"; then
+    if ask_yes_no "Install dive (Docker image explorer)?" "N"; then
       if [ "$kube_utils_added" = false ]; then
         {
           echo ""
@@ -189,7 +219,7 @@ generate_mise_toml() {
       echo 'dive = "latest"' >> "$temp_file"
     fi
     
-    if ask_yes_no "Install popeye (Kubernetes cluster sanitizer)?"; then
+    if ask_yes_no "Install popeye (Kubernetes cluster sanitizer)?" "N"; then
       if [ "$kube_utils_added" = false ]; then
         {
           echo ""
@@ -200,7 +230,7 @@ generate_mise_toml() {
       echo 'popeye = "latest"' >> "$temp_file"
     fi
     
-    if ask_yes_no "Install trivy (vulnerability scanner)?"; then
+    if ask_yes_no "Install trivy (vulnerability scanner)?" "N"; then
       if [ "$kube_utils_added" = false ]; then
         {
           echo ""
@@ -211,7 +241,7 @@ generate_mise_toml() {
       echo 'trivy = "latest"' >> "$temp_file"
     fi
     
-    if ask_yes_no "Install k3d (lightweight Kubernetes)?"; then
+    if ask_yes_no "Install k3d (lightweight Development Kubernetes)?" "N"; then
       if [ "$kube_utils_added" = false ]; then
         {
           echo ""
@@ -222,7 +252,7 @@ generate_mise_toml() {
       echo 'k3d = "latest"' >> "$temp_file"
     fi
     
-    if ask_yes_no "Install cmctl (cert-manager CLI)?"; then
+    if ask_yes_no "Install cmctl (cert-manager CLI)?" "N"; then
       if [ "$kube_utils_added" = false ]; then
         {
           echo ""
@@ -237,30 +267,20 @@ generate_mise_toml() {
       echo "#### End Kubernetes Utilities ####" >> "$temp_file"
     fi
   fi
-
+  
   # Ask about individual tools
-  if ask_yes_no "Install Git UI (gitui)?"; then
+  echo ""
+  echo -e "${BLUE}Other utilities and languages:${NC}"
+
+  if ask_yes_no "Install Git UI (gitui)?" "N"; then
     echo 'gitui = "latest"' >> "$temp_file"
   fi
 
-  if ask_yes_no "Install Go programming language?"; then
-    INSTALL_GO=true
-    {
-      echo 'golang = "latest"'
-      echo 'goreleaser = "latest"'
-    } >> "$temp_file"
-  fi
-
-  if ask_yes_no "Install Packer (HashiCorp image builder)?"; then
-    INSTALL_PACKER=true
-    echo 'packer = "latest"' >> "$temp_file"
-  fi
-
-  if ask_yes_no "Install TealDeer (fast tldr client)?"; then
+  if ask_yes_no "Install TealDeer (fast tldr client)?" "N"; then
     echo 'tealdeer = "latest"' >> "$temp_file"
   fi
 
-  if ask_yes_no "Install PowerShell?"; then
+  if ask_yes_no "Install PowerShell?" "N"; then
     INSTALL_POWERSHELL=true
     echo 'powershell = "latest"' >> "$temp_file"
   fi
@@ -303,7 +323,8 @@ generate_devcontainer_json() {
   local display_name="$4"
   local temp_file="${project_path}/.devcontainer/devcontainer.json.tmp"
   
-  echo -e "${BLUE}Configuring devcontainer.json...${NC}"
+  echo ""
+  echo -e "${BLUE}Configuring devcontainer.json plugins and settings:${NC}"
   
   # Read the base devcontainer.json up to extensions
   awk '/^      "extensions": \[/,/^      \],$/{if(/^      "extensions": \[/) print; else if(/^      \],$/) exit; else next} !/^      "extensions": \[/' .devcontainer/devcontainer.json | head -n -1 > "$temp_file"
@@ -328,21 +349,21 @@ generate_devcontainer_json() {
   fi
   
   # Ask about Python extensions (no corresponding tool installation)
-  if ask_yes_no "Include Python development extensions?"; then
+  if ask_yes_no "Include Python development extensions?" "Y"; then
     INCLUDE_PYTHON_EXTENSIONS=true
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin Python ####" "// #### End Python ####" >> "$temp_file"
   fi
   
   # Ask about Markdown extensions (no corresponding tool installation)
-  if ask_yes_no "Include Markdown editing extensions?"; then
+  if ask_yes_no "Include Markdown editing extensions?" "Y"; then
     INCLUDE_MARKDOWN_EXTENSIONS=true
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin Markdown ####" "// #### End Markdown ####" >> "$temp_file"
   fi
   
   # Ask about Shell/Bash extensions (always useful, no specific tool)
-  if ask_yes_no "Include Shell/Bash development extensions?"; then
+  if ask_yes_no "Include Shell/Bash development extensions?" "Y"; then
     INCLUDE_SHELL_EXTENSIONS=true
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin Shell/Bash ####" "// #### End Shell/Bash ####" >> "$temp_file"
@@ -363,7 +384,7 @@ generate_devcontainer_json() {
   fi
   
   # Ask about JavaScript/TypeScript extensions (no corresponding tool installation)
-  if ask_yes_no "Include JavaScript/TypeScript development extensions?"; then
+  if ask_yes_no "Include JavaScript/TypeScript development extensions?" "N"; then
     INCLUDE_JS_EXTENSIONS=true
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin JavaScript/TypeScript ####" "// #### End JavaScript/TypeScript ####" >> "$temp_file"
@@ -508,6 +529,9 @@ main() {
   echo -e "  .mise.toml (customized based on your choices)"
   echo -e "  cspell.json"
   echo -e "  dev.sh (customized with your project settings)"
+  echo -e "  run.sh"
+  echo -e "  .gitignore (if not already present)"
+  echo -e "  pyproject.toml & requirements.txt (if Python extensions selected and not already present)"
   echo ""
   
   local response
@@ -599,6 +623,36 @@ main() {
   echo -e "${BLUE}Copying remaining files...${NC}"
   echo -e "  ${GREEN}Copying${NC} cspell.json"
   cp "cspell.json" "${project_path}/"
+  
+  # Always copy run.sh
+  echo -e "  ${GREEN}Copying${NC} run.sh"
+  cp "run.sh" "${project_path}/"
+  chmod +x "${project_path}/run.sh"
+  
+  # Copy .gitignore if it doesn't already exist
+  if [[ ! -f "${project_path}/.gitignore" ]]; then
+    echo -e "  ${GREEN}Copying${NC} .gitignore"
+    cp ".gitignore" "${project_path}/"
+  else
+    echo -e "  ${YELLOW}Skipping${NC} .gitignore (already exists)"
+  fi
+  
+  # Copy Python files if Python extensions were selected and files don't exist
+  if [ "$INCLUDE_PYTHON_EXTENSIONS" = true ]; then
+    if [[ ! -f "${project_path}/pyproject.toml" ]]; then
+      echo -e "  ${GREEN}Copying${NC} pyproject.toml (Python extensions selected)"
+      cp "pyproject.toml" "${project_path}/"
+    else
+      echo -e "  ${YELLOW}Skipping${NC} pyproject.toml (already exists)"
+    fi
+    
+    if [[ ! -f "${project_path}/requirements.txt" ]]; then
+      echo -e "  ${GREEN}Copying${NC} requirements.txt (Python extensions selected)"
+      cp "requirements.txt" "${project_path}/"
+    else
+      echo -e "  ${YELLOW}Skipping${NC} requirements.txt (already exists)"
+    fi
+  fi
   
   # Copy devcontainer scripts
   echo -e "  ${GREEN}Copying${NC} .devcontainer scripts"

@@ -2,7 +2,7 @@
 #
 # This script will start the dev container outside of VSCode.
 #
-# cSpell:ignore 
+# cSpell:ignore sarg3nt 
 
 set -euo pipefail
 IFS=$'\n\t'
