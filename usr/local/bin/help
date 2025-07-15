@@ -8,30 +8,80 @@ IFS=$'\n\t'
 # This will show the user what tools are installed in the dev container and is ran on shell start.
 main() {
   source /usr/bin/lib/sh/colors.sh
-  : "${DEV_CONTAINER_VERSION:=unknown}"
   echo -e "${BLUE}********************************************************************"
   echo -e "              Generic Dev Container Tooling v${DEV_CONTAINER_VERSION}"
   echo -e "              Built: $(cat $HOME/build_date.txt)"
   echo -e "********************************************************************${NC}"
   echo -e "${CYAN}Type \"help\" to display this messsage again.${NC}"
   echo -e ""
-  echo -e "${GREEN}**** Primary Tools:${NC}"
-  echo -e " docker (d), git (g), helm (h), k9s (k), kubectl (kc), packer (p), tofu (tf), vault (v)"
-  echo -e ""
   echo -e "${GREEN}**** Utilities:${NC}"
-  echo -e " cloc, cmctl, btop, dive, fzf, gitui, go, goreleaser, krew, kube-bench, kustomize, lsd, mise, ncdu, popeye, python 3.13, starship, tldr, trivy, zoxide"
+  echo -e " docker $(docker version --format '{{.Client.Version}}') (d)"
+  echo -e " git $(git --version | awk '{print $3}') (g)"
+  # Get installed apps and versions from mise
+  local mise_json
+  mise_json=$(mise list --json 2>/dev/null)
+  #echo -e " mise_json ${mise_json}"
+  if [ -n "$mise_json" ]; then
+    # Parse aliases directly from .zshrc file (much faster)
+    declare -A app_aliases
+
+    if [[ -f "$HOME/.zshrc" ]]; then
+      while read -r line; do
+        # Skip empty lines and comments
+        [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]] || continue
+
+        # Match alias lines: alias kc=kubectl, alias kc='kubectl', alias kc="kubectl"
+        if [[ "$line" =~ ^[[:space:]]*alias[[:space:]]+([a-zA-Z0-9_]+)=[\'\"]*([a-zA-Z0-9_-]+)[\'\"]*([[:space:]]|$) ]]; then
+          alias_name="${BASH_REMATCH[1]}"
+          app_name="${BASH_REMATCH[2]}"
+          app_name_lc="${app_name,,}"
+
+          if [[ -n "$app_name_lc" ]]; then
+            if [[ -z "${app_aliases[$app_name_lc]:-}" ]]; then
+              app_aliases[$app_name_lc]="$alias_name"
+            else
+              app_aliases[$app_name_lc]="${app_aliases[$app_name_lc]}, $alias_name"
+            fi
+          fi
+        fi
+      done <"$HOME/.zshrc"
+    fi
+
+    # Parse JSON and print installed apps with version and aliases
+    while IFS= read -r line; do
+      app=$(echo "$line" | cut -d' ' -f1)
+      version=$(echo "$line" | cut -d' ' -f2)
+      alias_str=""
+      app_lc="$(echo "$app" | tr '[:upper:]' '[:lower:]')"
+      if [ -n "${app_aliases[$app_lc]:-}" ]; then
+        alias_str=" (${app_aliases[$app_lc]})"
+      fi
+      echo -e " $app $version$alias_str"
+    done < <(echo "$mise_json" | jq -r 'to_entries[] | select(.value[0].installed == true) | "\(.key) \(.value[0].version)"')
+  else
+    echo -e " (No mise apps detected)"
+  fi
   echo -e ""
   echo -e "${GREEN}**** Installables:${NC}"
-  echo -e "${CYAN}To install vSphere PowerCLI run the below command.  You must have PowerShell installed via the .mise.toml file first..${NC}"
+  echo -e "${CYAN}To install vSphere PowerCLI run the below command. ${NC}"
   echo -e " install_powercli"
   echo -e "${CYAN}Use 'mise' to install many other applications.${NC}"
   echo -e " List installable applications: ${BLUE}mise registry${NC}"
   echo -e " Install: ${BLUE}mise use -g argocd@latest${NC}"
   echo -e " Or add them to the .mise.toml file and run ${BLUE}mise install${NC}"
   echo -e ""
-  echo -e "${GREEN}**** Kubectl Plugins:${NC}"
-  echo -e "${CYAN}Invoke a plugin: 'kubectl <plugin>'  List plugins: 'kubectl krew list'${NC}"
-  echo -e " access-matrix, blame, ctx (kx), get-all, krew, node-restart, ns (kn), switch-config, view-allocations"
+  # Only print Kubectl Plugins section if both kubectl and krew are installed
+  if echo "$mise_json" | jq -e 'has("kubectl") and .kubectl[0].installed == true and has("krew") and .krew[0].installed == true' >/dev/null; then
+    echo -e "${GREEN}**** Kubectl Plugins:${NC}"
+    echo -e "${CYAN}Invoke a plugin: 'kubectl <plugin>'  List plugins: 'krew list'${NC}"
+    # Get plugin list dynamically from krew
+    if command -v krew &>/dev/null && krew list &>/dev/null; then
+      plugin_list=$(krew list | awk 'NR>1 {print $1}' | tr '\n' ',' | sed 's/,/, /g' | sed 's/, $//')
+      echo -e " ${plugin_list}"
+    else
+      echo -e " (No krew plugins detected)"
+    fi
+  fi
 }
 
 # Run main

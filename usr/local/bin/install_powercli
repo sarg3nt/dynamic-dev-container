@@ -10,6 +10,11 @@ main() {
   log "Installing PowerCLI" "blue"
   cd /tmp/ || exit
 
+  if ! command -v pwsh &>/dev/null; then
+    log "pwsh not found, installing with mise" "yellow"
+    mise install powershell@latest
+  fi
+
   log "Adding PSRepository PSGallery as Trusted" "green"
   pwsh -c 'Set-PSRepository -Name PSGallery -InstallationPolicy Trusted'
 

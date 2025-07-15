@@ -6,9 +6,9 @@ MISE_PYTHON_COMPILE = false
 ####### Pinned versions
 kubectl = "1.32"
 # https://github.com/opentofu/opentofu
-#opentofu = "1.10.2"
+# opentofu = "1.10.2"
 # https://github.com/openbao/openbao/releases
-#openbao = "2.3.1"
+# openbao = "2.3.1"
 
 ######### Latest versions
 # bat = "latest"
@@ -20,7 +20,7 @@ kubectl = "1.32"
 # helm = "latest"
 # k3d = "latest"
 # k9s = "latest"
-# krew = "latest"
+krew = "latest"
 # kubebench = "latest"
 # kubectx = "latest"
 # packer = "latest"

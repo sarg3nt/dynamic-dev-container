@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# cSpell:ignore
+# cSpell:ignore sarg
 
 set -euo pipefail
 IFS=$'\n\t'

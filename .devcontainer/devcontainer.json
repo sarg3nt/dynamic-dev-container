@@ -68,7 +68,6 @@
     "TERM": "xterm-256color",
     "NODE_EXTRA_CA_CERTS": "/etc/pki/ca-trust/source/anchors/zscaler.crt",
     "TYPE_CHECKING": "true", // Enable type checking for Python
-    "DEV_CONTAINER_VERSION": "${DEV_CONTAINER_VERSION}",
     // CUSTOM USER ENVIRONMENT VARIABLES
     "MY_CUSTOM_VAR": "my_custom_value" // Example of a custom environment variable
   },
