@@ -1,6 +1,8 @@
 # cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr
+#### Begin Environment ####
 [env]
 MISE_PYTHON_COMPILE = false
+#### End Environment ####
 
 [tools]
 
@@ -26,7 +28,7 @@ cmctl = "latest"
 k3d = "latest"
 #### End Kubernetes Utilities ####
 
-gitui = "latest" 
+gitui = "latest"
 golang = 'latest'
 goreleaser = 'latest'
 packer = "latest"
@@ -34,12 +36,16 @@ tealdeer = "latest"
 powershell = "latest"
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
+#### Begin Aliases ####
 [alias]
 kubebench = 'asdf:sarg3nt/asdf-kube-bench'
 tealdeer = 'asdf:sarg3nt/asdf-tealdeer'
+#### End Aliases ####
 
+#### Begin Settings ####
 [settings]
 experimental = true
 http_timeout = "90s"
 jobs = 1
 yes = true
+#### End Settings ####

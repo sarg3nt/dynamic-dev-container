@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Installs .devcontainer and other files into a project directory to use the dev container in a new project.
-#
+# cspell:ignore openbao myapp sudermanjr 
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -27,6 +27,7 @@ source_colors() {
   BLUE="\033[1;34m"
   CYAN="\033[1;36m"
   NC="\033[0m"
+  # shellcheck disable=SC2034
   NO_NEW_LINE='\033[0K\r'
 }
 
@@ -122,15 +123,13 @@ generate_mise_toml() {
   
   echo -e "${BLUE}Configuring .mise.toml...${NC}"
   
-  # Start with the header
-  cat > "$temp_file" << 'EOF'
-# cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr
-[env]
-MISE_PYTHON_COMPILE = false
-
-[tools]
-
-EOF
+  # Start with the header and environment section from source
+  echo "# cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr" > "$temp_file"
+  # shellcheck disable=SC2129
+  extract_mise_section "#### Begin Environment ####" "#### End Environment ####" >> "$temp_file"
+  echo "" >> "$temp_file"
+  echo "[tools]" >> "$temp_file"
+  echo "" >> "$temp_file"
 
   # Ask about OpenTofu/Terraform
   if ask_yes_no "Install OpenTofu (Terraform alternative)?"; then
@@ -266,20 +265,12 @@ EOF
     echo 'powershell = "latest"' >> "$temp_file"
   fi
 
-  # Add aliases section
-  {
-    echo ""
-    echo "# See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section."
-    echo "[alias]"
-    echo "kubebench = 'asdf:sarg3nt/asdf-kube-bench'"
-    echo "tealdeer = 'asdf:sarg3nt/asdf-tealdeer'"
-    echo ""
-    echo "[settings]"
-    echo "experimental = true"
-    echo 'http_timeout = "90s"'
-    echo "jobs = 1"
-    echo "yes = true"
-  } >> "$temp_file"
+  # Add aliases and settings sections from source
+  # shellcheck disable=SC2129
+  echo "" >> "$temp_file"
+  extract_mise_section "#### Begin Aliases ####" "#### End Aliases ####" >> "$temp_file"
+  echo "" >> "$temp_file"
+  extract_mise_section "#### Begin Settings ####" "#### End Settings ####" >> "$temp_file"
 
   mv "$temp_file" "${project_path}/.mise.toml"
 }
@@ -386,6 +377,7 @@ generate_devcontainer_json() {
   fi
   
   # Always include Core Extensions
+  # shellcheck disable=SC2129
   echo "" >> "$temp_file"
   extract_devcontainer_section "// #### Begin Core Extensions ####" "// #### End Core Extensions ####" >> "$temp_file"
   
@@ -405,6 +397,7 @@ generate_devcontainer_json() {
   # Include Go settings if Go was installed
   if [ "$INSTALL_GO" = true ]; then
     echo -e "${GREEN}✓ Including Go language settings${NC}"
+    # shellcheck disable=SC2129
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin Go Settings ####" "// #### End Go Settings ####" >> "$temp_file"
     echo "," >> "$temp_file"
@@ -413,6 +406,7 @@ generate_devcontainer_json() {
   # Include Python settings if Python extensions were selected
   if [ "$INCLUDE_PYTHON_EXTENSIONS" = true ]; then
     echo -e "${GREEN}✓ Including Python language settings${NC}"
+    # shellcheck disable=SC2129
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin Python Settings ####" "// #### End Python Settings ####" >> "$temp_file"
     echo "," >> "$temp_file"
@@ -421,6 +415,7 @@ generate_devcontainer_json() {
   # Include Markdown settings if Markdown extensions were selected
   if [ "$INCLUDE_MARKDOWN_EXTENSIONS" = true ]; then
     echo -e "${GREEN}✓ Including Markdown settings${NC}"
+    # shellcheck disable=SC2129
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin Markdown Settings ####" "// #### End Markdown Settings ####" >> "$temp_file"
     echo "," >> "$temp_file"
@@ -429,6 +424,7 @@ generate_devcontainer_json() {
   # Include Shell/Bash settings if Shell extensions were selected
   if [ "$INCLUDE_SHELL_EXTENSIONS" = true ]; then
     echo -e "${GREEN}✓ Including Shell/Bash settings${NC}"
+    # shellcheck disable=SC2129
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin Shell/Bash Settings ####" "// #### End Shell/Bash Settings ####" >> "$temp_file"
     echo "," >> "$temp_file"
@@ -437,6 +433,7 @@ generate_devcontainer_json() {
   # Include Kubernetes settings if Kubernetes tools were installed
   if [ "$INSTALL_KUBERNETES" = true ]; then
     echo -e "${GREEN}✓ Including Kubernetes/Helm settings${NC}"
+    # shellcheck disable=SC2129
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin Kubernetes/Helm Settings ####" "// #### End Kubernetes/Helm Settings ####" >> "$temp_file"
     echo "," >> "$temp_file"
@@ -445,6 +442,7 @@ generate_devcontainer_json() {
   # Include JavaScript/TypeScript settings if JS extensions were selected
   if [ "$INCLUDE_JS_EXTENSIONS" = true ]; then
     echo -e "${GREEN}✓ Including JavaScript/TypeScript settings${NC}"
+    # shellcheck disable=SC2129
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin JavaScript/TypeScript Settings ####" "// #### End JavaScript/TypeScript Settings ####" >> "$temp_file"
     echo "," >> "$temp_file"
@@ -453,12 +451,14 @@ generate_devcontainer_json() {
   # Include PowerShell settings if PowerShell was installed
   if [ "$INSTALL_POWERSHELL" = true ]; then
     echo -e "${GREEN}✓ Including PowerShell settings${NC}"
+    # shellcheck disable=SC2129
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin PowerShell Settings ####" "// #### End PowerShell Settings ####" >> "$temp_file"
     echo "," >> "$temp_file"
   fi
   
   # Always include Spell Checker, TODO Tree, and PSI Header settings
+  # shellcheck disable=SC2129
   echo "" >> "$temp_file"
   extract_devcontainer_section "// #### Begin Spell Checker Settings ####" "// #### End Spell Checker Settings ####" >> "$temp_file"
   echo "," >> "$temp_file"
