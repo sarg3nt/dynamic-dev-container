@@ -9,8 +9,8 @@ IFS=$'\n\t'
 
 # User customizable variables - modify these as needed
 docker_exec_command="gdc" # What quick two letter command do we want to use for this dev container / project. If empty, no command will be installed.
-project_name="generic-dev-container" # Name of the project folder
-container_name="generic-dev-container" # Name of the container
+project_name="dynamic-dev-container" # Name of the project folder
+container_name="dynamic-dev-container" # Name of the container
 container_user="vscode" # User being created in the container
 
 # Source colors library

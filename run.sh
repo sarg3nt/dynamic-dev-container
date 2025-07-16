@@ -14,7 +14,7 @@ main() {
   fi
 
   # Name of the container
-  local container_name="ghcr.io/sarg3nt/generic-dev-container:${tag}"
+  local container_name="ghcr.io/sarg3nt/dynamic-dev-container:${tag}"
 
   # User being created in the container
   local container_user="vscode"

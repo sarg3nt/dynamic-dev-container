@@ -3,7 +3,7 @@
 # See: https://hub.docker.com/r/docker/dockerfile.  Syntax directive must be first line
 # cspell:ignore
 
-# VER=1.0.0-dev1 && IMAGE="ghcr.io/sarg3nt/generic-dev-container" && docker build . -t ${IMAGE}:${VER} --build-arg "VER=${VER}"
+# VER=1.0.0-dev1 && IMAGE="ghcr.io/sarg3nt/dynamic-dev-container" && docker build . -t ${IMAGE}:${VER} --build-arg "VER=${VER}"
 
 # Mise application list and versions are located in
 # home/vscode/.config/mise/config.toml
@@ -17,7 +17,7 @@ FROM jdxcode/mise:v2025.7.10@sha256:647d0f9b3a6d2b5680ef07e3562e8c8dc83cacfd6952
 FROM rockylinux/rockylinux:10-ubi@sha256:eca03145dd5e0b2a281eef164d391e4758b4a5962d29b688d15a72cef712fbb4 AS final
 ARG GITHUB_TOKEN
 ENV GITHUB_API_TOKEN=$GITHUB_TOKEN
-LABEL org.opencontainers.image.source=https://github.com/sarg3nt/generic-dev-container
+LABEL org.opencontainers.image.source=https://github.com/sarg3nt/dynamic-dev-container
 
 ARG VER=""
 ENV DEV_CONTAINER_VERSION=$VER

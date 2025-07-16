@@ -11,19 +11,19 @@
   // - "containerEnv" = Add any "containerEnv" variables the list.
   //   These are variables that you want to be able to set on the host and passed into the container.
   "name": "Generic Dev Container",
-  // Using the latest version of the generic-dev-container image
-  "image": "ghcr.io/sarg3nt/generic-dev-container:latest",
-  "runArgs": ["--name=generic-dev-container"],
+  // Using the latest version of the dynamic-dev-container image
+  "image": "ghcr.io/sarg3nt/dynamic-dev-container:latest",
+  "runArgs": ["--name=dynamic-dev-container"],
   // Mounts
   "mounts": [
     // User-defined Mounts (Customizable)
     {
-      "source": "generic-dev-container-shellhistory",
+      "source": "dynamic-dev-container-shellhistory",
       "target": "/commandhistory",
       "type": "volume"
     },
     {
-      "source": "generic-dev-container-plugins",
+      "source": "dynamic-dev-container-plugins",
       "target": "/home/vscode/.vscode-server/extensions",
       "type": "volume"
     },
