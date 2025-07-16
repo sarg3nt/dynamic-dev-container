@@ -33,10 +33,14 @@ install_mise_applications() {
     echo ""
 
     # Trust the configuration and install tools
+    log_info "Installing mise tools (this may take a few minutes)..."
+    echo ""
     if mise install -y; then
       echo ""
       # Re-activate mise environment after installing new tools
-      eval "$(/usr/local/bin/mise activate bash)"
+      eval "$(/usr/local/bin/mise activate bash 2>/dev/null)" || true
+      # Create a flag file to indicate mise installation is complete
+      touch "${HOME}/.mise_ready"
       log_success "Mise applications installed successfully."
     else
       echo ""

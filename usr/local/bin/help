@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eo pipefail
 IFS=$'\n\t'
 
 # cSpell:ignore gitui,krew,kustomize,trivy,kubeseal,gping,tldr,kubesec,ncdu,btop,ipython,cmctl,cloc
@@ -8,16 +8,58 @@ IFS=$'\n\t'
 # This will show the user what tools are installed in the dev container and is ran on shell start.
 main() {
   source /usr/bin/lib/sh/colors.sh
+  
+  # Check if mise is ready first, before showing any output
+  local mise_json
+  if [[ -f "${HOME}/.mise_ready" ]]; then
+    mise_json=$(mise list --silent --json 2>/dev/null)
+  else
+    # Mise not ready yet, show a message and wait
+    local wait_count=0
+    local max_wait=200  # 200 seconds should be enough
+    local spin=("-" "\\" "|" "/")
+    local spin_idx=0
+    
+    printf "${YELLOW}Mise tools are still being installed... "
+    
+    while [[ ! -f "${HOME}/.mise_ready" ]] && [[ $wait_count -lt $max_wait ]]; do
+      printf "\b${spin[$spin_idx]}"
+      sleep 1
+      wait_count=$((wait_count + 1))
+      spin_idx=$(( (spin_idx + 1) % 4 ))
+    done
+    
+    if [[ -f "${HOME}/.mise_ready" ]]; then
+      # Clear the entire line and print completion message
+      printf "\r\033[K${GREEN}✓ Installation completed after %d seconds!${NC}\n" $wait_count
+      # Activate mise now that it's ready
+      local mise_activate_output
+      mise_activate_output=$(/usr/local/bin/mise activate bash 2>/dev/null || echo "FAILED")
+      
+      if [[ "$mise_activate_output" != "FAILED" ]] && [[ -n "$mise_activate_output" ]]; then
+        if eval "$mise_activate_output"; then
+          mise_json=$(mise list --silent --json 2>/dev/null)
+        else
+          export PATH="${HOME}/.local/share/mise/shims:$PATH"
+          mise_json=$(mise list --silent --json 2>/dev/null)
+        fi
+      else
+        export PATH="${HOME}/.local/share/mise/shims:$PATH"
+        mise_json=$(mise list --silent --json 2>/dev/null)
+      fi
+    else
+      printf "\b${YELLOW}✗ Continuing without mise tools (timeout after %d seconds)${NC}\n" $max_wait
+      mise_json=""
+    fi
+    echo ""
+  fi
+
   echo -e "${BLUE}********************************************************************"
   echo -e "              Generic Dev Container Tooling v${DEV_CONTAINER_VERSION}"
   echo -e "              Built: $(cat "$HOME/build_date.txt")"
   echo -e "********************************************************************${NC}"
   echo -e "${CYAN}Type \"help\" to display this message again.${NC}"
   echo -e ""
-
-  # Get installed apps and versions from mise once
-  local mise_json
-  mise_json=$(mise list --silent --json 2>/dev/null)
 
   # Parse aliases once and store in associative array
   local -A app_aliases
@@ -44,17 +86,29 @@ main() {
   local utilities
   utilities="docker $(docker version --format '{{.Client.Version}}') (d), git $(git --version | awk '{print $3}') (g)"
 
-  if [[ -n "$mise_json" ]]; then
+  if [[ -n "$mise_json" ]] && [[ "$mise_json" != "null" ]] && [[ "$mise_json" != "" ]]; then
     local tools_list=""
-    while IFS= read -r line; do
-      local app version alias_str=""
-      app=$(echo "$line" | cut -d' ' -f1)
-      version=$(echo "$line" | cut -d' ' -f2)
-      local app_lc="${app,,}"
+    # Check if mise_json is valid JSON before processing
+    if echo "$mise_json" | jq . >/dev/null 2>&1; then
+      # Use a different approach to avoid read issues with set -u
+      local jq_output
+      jq_output=$(echo "$mise_json" | jq -r 'to_entries[] | select(.value[0].installed == true) | "\(.key) \(.value[0].version)"' 2>/dev/null || echo "")
+      
+      if [[ -n "$jq_output" ]]; then
+        while read -r line || [[ -n "$line" ]]; do
+          [[ -z "$line" ]] && continue
+          local app version alias_str=""
+          app=$(echo "$line" | cut -d' ' -f1)
+          version=$(echo "$line" | cut -d' ' -f2)
+          local app_lc="${app,,}"
 
-      [[ -n "${app_aliases[$app_lc]:-}" ]] && alias_str=" (${app_aliases[$app_lc]})"
-      tools_list="${tools_list:+$tools_list, }$app $version$alias_str"
-    done < <(echo "$mise_json" | jq -r 'to_entries[] | select(.value[0].installed == true) | "\(.key) \(.value[0].version)"')
+          [[ -n "${app_aliases[$app_lc]:-}" ]] && alias_str=" (${app_aliases[$app_lc]})"
+          tools_list="${tools_list:+$tools_list, }$app $version$alias_str"
+        done <<< "$jq_output"
+      fi
+    else
+      echo "DEBUG: Invalid JSON from mise, skipping tools list"
+    fi
 
     [[ -n "$tools_list" ]] && utilities="$utilities, $tools_list"
   fi
@@ -71,7 +125,7 @@ main() {
   echo -e ""
 
   # Only print Kubectl Plugins section if both kubectl and krew are installed
-  if [[ -n "$mise_json" ]] && echo "$mise_json" | jq -e 'has("kubectl") and .kubectl[0].installed == true and has("krew") and .krew[0].installed == true' >/dev/null 2>&1; then
+  if [[ -n "$mise_json" ]] && [[ "$mise_json" != "null" ]] && echo "$mise_json" | jq -e 'has("kubectl") and .kubectl[0].installed == true and has("krew") and .krew[0].installed == true' >/dev/null 2>&1; then
     echo -e "${GREEN}**** Kubectl Plugins:${NC}"
     echo -e "${CYAN}Invoke a plugin: 'kubectl <plugin>'  List plugins: 'krew list'${NC}"
     # Get plugin list dynamically from krew
@@ -81,7 +135,6 @@ main() {
       echo -e " $plugin_list"
     else
       echo -e " (No krew plugins detected)"
-      echo -e "${YELLOW}If the container just started, mise may still be installing tools so the help output may be incorrect.${NC}"
     fi
   fi
 }

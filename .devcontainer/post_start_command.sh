@@ -11,7 +11,7 @@ source "$(dirname "$0")/utils/log.sh"
 main() {
   echo ""
   log "EXECUTING POST START COMMAND..." "gray" "INFO"
-  eval "$(/usr/local/bin/mise activate bash)"
+  eval "$(/usr/local/bin/mise activate bash 2>/dev/null)" || true
   link_pylintrc_file
   echo ""
   git_update_diff_tool

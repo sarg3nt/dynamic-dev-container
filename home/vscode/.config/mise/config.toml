@@ -7,6 +7,7 @@ MISE_PYTHON_COMPILE = false
 python = '3.13'
 
 ######### Latest versions
+cosign = "latest"
 fzf = "latest"
 lsd = "latest"
 starship = "latest"
