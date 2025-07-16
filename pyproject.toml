@@ -11,7 +11,7 @@ build-backend = "hatchling.build"
 index-url = "<add your index URL here>"
 
 [project]
-name = "<project name>"
+name = "project-name"
 dynamic = ["version"]
 description = "<project descripton>."
 readme = "README.md"
@@ -23,7 +23,7 @@ keywords = [
   "infrastructure",
   "helm",
 ]
-authors = [{ name = "<auther name>", email = "<auther email>" }]
+authors = [{ name = "author name", email = "author@myemail.com" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
@@ -76,8 +76,8 @@ dev = [
 ]
 
 [project.urls]
-Documentation = "<add linke to documentation MD file, probably in GitHub"
-Homepage = "<Add Link too project home page in GitHub>"
+Documentation = "<add link to documentation MD file, probably in GitHub"
+Homepage = "<Add Link to project home page in GitHub>"
 Source = "<Add link to project source in Github>"
 
 [tool.hatch.version]
@@ -100,7 +100,7 @@ parallel = true
 omit = ["src/<project>>/__about__.py"]
 
 [tool.coverage.paths]
-<project> = ["src", "*/<project>/src"]
+project = ["src", "*/<project>/src"]
 tests = ["tests", "*/<project>/tests"]
 
 [tool.coverage.report]
