@@ -24,7 +24,6 @@ source_colors() {
   # shellcheck disable=SC2034
   CYAN="\033[1;36m"
   NC="\033[0m"
-  NO_NEW_LINE='\033[0K\r'
 }
 
 # Add docker exec command to user's .zshrc
@@ -156,7 +155,8 @@ exec_into_container() {
   docker_id=$(docker container ls -f "name=${container_name}" -q)
   
   if [[ -z "$docker_id" ]]; then
-    echo -e "${BLUE}Waiting up to 10 minutes for the dev container to start ${NO_NEW_LINE}"
+    echo -e "${BLUE}Waiting up to 10 minutes for the dev container to start"
+    echo -ne "${spin[0]}"
   fi
 
   while [[ -z "$docker_id" && $count -lt $max_wait ]]; do
@@ -165,20 +165,25 @@ exec_into_container() {
     ((count++))
 
     if ((count == 20)); then
-      echo -ne "\b"
-      echo -e "${YELLOW}The dev container is taking a while to start, VS Code could be downloading a new version or you may need to manually open it from within VS Code.${BLUE}"
+      echo -ne "\r\033[K"  # Clear line and return to beginning
+      echo -e "${YELLOW}The dev container is taking a while to start, VS Code could be downloading a new version or you may need to manually open it from within VS Code."
+      echo -ne "${BLUE}${spin[$rot]}"
     fi
     
-    echo -ne "\b${spin[$rot]}"
-    rot=$(( (rot + 1) % 4 ))
+    # Only show spinner if container not found yet
+    if [[ -z "$docker_id" ]]; then
+      rot=$(( (rot + 1) % 4 ))
+      echo -ne "\r${spin[$rot]}"
+    fi
   done
   
   if [[ -z "$docker_id" ]]; then
-    echo -e "\b${RED}Timeout waiting for dev container to start.${NC}"
+    echo -ne "\r\033[K"  # Clear line and return to beginning
+    echo -e "${RED}Timeout waiting for dev container to start.${NC}"
     exit 1
   fi
   
-  echo -ne "\b"
+  echo -ne "\r\033[K"  # Clear line and return to beginning
   echo -e "${GREEN}Dev container started, execing into it.${NC}"
   
   if [[ -n "$docker_exec_command" ]]; then
