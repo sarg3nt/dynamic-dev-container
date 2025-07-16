@@ -35,13 +35,15 @@ gitui = "latest"
 #goreleaser = 'latest'
 packer = "latest"
 tealdeer = "latest"
+micro = "latest"
 #powershell = "latest"
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
 #### Begin Aliases ####
 [alias]
-kubebench = 'asdf:sarg3nt/asdf-kube-bench'  # Temporarily disabled due to plugin issues
-tealdeer = 'asdf:sarg3nt/asdf-tealdeer'  # Temporarily disabled due to plugin issues
+kubebench = 'asdf:sarg3nt/asdf-kube-bench'
+tealdeer = 'asdf:sarg3nt/asdf-tealdeer'
+micro = 'asdf:sarg3nt/asdf-micro'
 #### End Aliases ####
 
 #### Begin Settings ####

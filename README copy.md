@@ -46,7 +46,7 @@ All files in your current working directory will be accessible in the container 
 ```bash
 docker run --mount type=bind,source="$(pwd)",target=/workspaces/working \
   -w /workspaces/working -it --rm -u vscode \
-  ghcr.io/sarg3nt/generic-dev-container:latest zsh
+  ghcr.io/sarg3nt/dynamic-dev-container:latest zsh
 ```
 
 - `--mount` mounts your current working directory to `/workspaces/working` inside the container.

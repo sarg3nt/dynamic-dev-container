@@ -332,9 +332,9 @@ generate_devcontainer_json() {
   
   # Update the name and runArgs in the temp file
   sed -i "s/\"name\": \"[^\"]*\"/\"name\": \"${display_name}\"/" "$temp_file"
-  sed -i "s/--name=generic-dev-container/--name=${container_name}/g" "$temp_file"
-  sed -i "s/generic-dev-container-shellhistory/${container_name}-shellhistory/g" "$temp_file"
-  sed -i "s/generic-dev-container-plugins/${container_name}-plugins/g" "$temp_file"
+  sed -i "s/--name=dynamic-dev-container/--name=${container_name}/g" "$temp_file"
+  sed -i "s/dynamic-dev-container-shellhistory/${container_name}-shellhistory/g" "$temp_file"
+  sed -i "s/dynamic-dev-container-plugins/${container_name}-plugins/g" "$temp_file"
   
   # Start extensions array
   echo '      "extensions": [' >> "$temp_file"
@@ -506,7 +506,7 @@ main() {
   # Verify we're in the correct directory by checking for required files
   if [[ ! -f ".devcontainer/devcontainer.json" ]] || [[ ! -f ".mise.toml" ]]; then
     echo -e "${RED}Error: Required template files not found.${NC}"
-    echo "This script must be run from the root of the generic-dev-container project directory."
+    echo "This script must be run from the root of the dynamic-dev-container project directory."
     echo "Expected files: .devcontainer/devcontainer.json and .mise.toml"
     exit 1
   fi
