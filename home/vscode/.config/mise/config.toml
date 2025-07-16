@@ -1,31 +1,21 @@
-# cspell:ignore gitui kubectx
-# See: https://mise.jdx.dev/configuration.html for config options.
+# cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr
 [env]
-# supports arbitrary env vars so mise can be used like direnv/dotenv
+MISE_PYTHON_COMPILE = false
 
 [tools]
 ####### Pinned versions
-kubectl = "1.31"
+python = '3.13'
 
 ######### Latest versions
-bat = "latest"
+cosign = "latest"
 fzf = "latest"
-golang = 'latest'
-golangci-lint = 'latest'
-goreleaser = 'latest'
-gh = "latest"
-gitui = "latest"
-helm = "latest"
-k9s = "latest"
-kubectx = "latest"
 lsd = "latest"
 starship = "latest"
 yq = "latest"
-
+zoxide = "latest"
 
 [settings]
 experimental = true
-#http_timeout = "90s"
-#jobs = 1
-#yes = true
-trusted_config_paths = ['/workspaces/']
+http_timeout = "90s"
+jobs = 1
+yes = true

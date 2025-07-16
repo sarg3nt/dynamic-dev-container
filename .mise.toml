@@ -1,11 +1,52 @@
-# cspell:ignore direnv dotenv
-# See: https://mise.jdx.dev/configuration.html for config options.
-# NOTE: Top level tools are installed in home/vscode/config/mise/config.toml during setup.
-#[env]
-# supports arbitrary env vars so mise can be used like direnv/dotenv
-#EXAMPLE = 'bar'
+# cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr openbao kubens
+# NOTE: The #### section #### headers below must not be altered or moved as they are used as markers for the install script.
+
+#### Begin Environment ####
+[env]
+MISE_PYTHON_COMPILE = false
+#### End Environment ####
 
 [tools]
-# golang = '1.23.2'
-# golangci-lint = '1.61.0'
-# goreleaser = "2.3.2"
+
+# https://github.com/opentofu/opentofu
+opentofu = "1.10.2"
+# https://github.com/openbao/openbao/releases
+#openbao = "2.3.1"
+#### Begin Kubernetes/Helm ####
+kubectl = "1.32"
+kubectx = "latest"
+kubens = "latest"
+k9s = "latest"
+helm = "latest"
+#### End Kubernetes/Helm ####
+
+#### Begin Kubernetes Utilities ####
+krew = "latest"
+dive = "latest"
+kubebench = "latest"
+popeye = "latest"
+trivy = "latest"
+cmctl = "latest"
+#k3d = "latest"
+#### End Kubernetes Utilities ####
+
+gitui = "latest"
+#golang = 'latest'
+#goreleaser = 'latest'
+packer = "latest"
+tealdeer = "latest"
+#powershell = "latest"
+
+# See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
+#### Begin Aliases ####
+[alias]
+kubebench = 'asdf:sarg3nt/asdf-kube-bench'  # Temporarily disabled due to plugin issues
+tealdeer = 'asdf:sarg3nt/asdf-tealdeer'  # Temporarily disabled due to plugin issues
+#### End Aliases ####
+
+#### Begin Settings ####
+[settings]
+experimental = true
+http_timeout = "90s"
+yes = true
+#### End Settings ####

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# cSpell:ignore
+
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -8,11 +10,60 @@ source "$(dirname "$0")/utils/log.sh"
 main() {
   echo ""
   log "EXECUTING POST CREATE COMMAND..." "gray" "INFO"
+
+  install_mise_applications
   install_python_dependencies
-  mise trust -y "${WORKSPACE_PATH}"
+}
+
+install_mise_applications() {
+  if ! command -v mise &>/dev/null; then
+    return
+  fi
+
+  log_info "Installing mise applications."
+  echo ""
+  mise trust -y
+  eval "$(/usr/local/bin/mise activate bash)"
+  # Change to the workspace directory so mise can find .mise.toml
+  cd "${WORKSPACE_PATH}"
+  mise trust -y
+  # Check if .mise.toml exists
+  if [[ -f ".mise.toml" ]]; then
+    log_info "Found .mise.toml file:"
+    echo ""
+
+    # Trust the configuration and install tools
+    log_info "Installing mise tools (this may take a few minutes)..."
+    echo ""
+    if mise install -y; then
+      echo ""
+      # Re-activate mise environment after installing new tools
+      eval "$(/usr/local/bin/mise activate bash 2>/dev/null)" || true
+      # Create a flag file to indicate mise installation is complete
+      touch "${HOME}/.mise_ready"
+      log_success "Mise applications installed successfully."
+    else
+      echo ""
+      log_error "Failed to install mise applications."
+      exit 1
+    fi
+  else
+    log_warning "No .mise.toml file found in ${WORKSPACE_PATH}. Skipping mise applications installation."
+  fi
 }
 
 install_python_dependencies() {
+  log_success "Workspace path: ${WORKSPACE_PATH}"
+  echo ""
+
+  # Debug: Check if pip is available
+  if command -v pip &>/dev/null; then
+    log_success "pip is available at: $(which pip)"
+  else
+    log_error "pip is not available in PATH"
+    log_info "Current PATH: $PATH"
+  fi
+
   if [[ -f "${WORKSPACE_PATH}/requirements.txt" ]]; then
     log_info "Installing Python dependencies from requirements.txt."
     echo ""
@@ -22,9 +73,8 @@ install_python_dependencies() {
     else
       echo ""
       log_error "Failed to install Python dependencies."
-      exit 1
+      exit 2
     fi
-
   else
     log_warning "No requirements.txt file found in the workspace. Skipping Python dependencies installation."
   fi

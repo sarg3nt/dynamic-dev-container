@@ -2,67 +2,116 @@
 #
 # This script will start the dev container and open an interactive prompt into it.
 #
-# cSpell:ignore
+# cSpell:ignore wslpath
 
 set -euo pipefail
 IFS=$'\n\t'
 
-# What quick two letter command do we want to use for this dev container / project.
-# If this is empty, no command will be installed.
-# Example: qq
-docker_exec_command=""
-# Name of the project folder
-project_name="generic-dev-container"
-# Name of the container
-container_name="${project_name}"
-# User being created in the container
-container_user="vscode"
+# User customizable variables - modify these as needed
+docker_exec_command="gdc" # What quick two letter command do we want to use for this dev container / project. If empty, no command will be installed.
+project_name="generic-dev-container" # Name of the project folder
+container_name="generic-dev-container" # Name of the container
+container_user="vscode" # User being created in the container
 
-colors_sourced=false
-# shellcheck source=/dev/null
-if [ -f "usr/bin/lib/sh/colors.sh" ]; then
-  source "usr/bin/lib/sh/colors.sh"
-  colors_sourced=true
-fi
-# shellcheck source=/dev/null
-if [ -f "lib/sh/colors.sh" ]; then
-  source "lib/sh/colors.sh"
-  colors_sourced=true
-fi
+# Source colors library
+source_colors() {
+  # Define colors directly instead of sourcing external file
+  # shellcheck disable=SC2034
+  RED="\033[1;31m"
+  YELLOW="\033[1;33m"
+  GREEN="\033[1;32m"
+  BLUE="\033[1;34m"
+  # shellcheck disable=SC2034
+  CYAN="\033[1;36m"
+  NC="\033[0m"
+  NO_NEW_LINE='\033[0K\r'
+}
 
-if [ "$colors_sourced" = false ]; then
-  echo "Error: colors.sh not found. Please ensure it is availing in either the usr/bin/lib/sh or lib/sh directory."
-  exit 1
-fi
-
+# Add docker exec command to user's .zshrc
 add_docker_exec_command() {
-  if [[ -n "$docker_exec_command" ]] && [ -f "${HOME}/.zshrc" ] && ! grep -F "${docker_exec_command} ()" "${HOME}/.zshrc" >/dev/null 2>&1; then
-    echo -e "\n${docker_exec_command} (){\n\
-      docker exec -it -u ${container_user} -w /workspaces/${project_name} ${container_name} zsh\n\
-    }" >>"${HOME}/.zshrc"
-    echo -e "${GREEN}Created \"${docker_exec_command}\" command in your ${HOME}/.zshrc file.${NC}"
+  [[ -z "$docker_exec_command" || ! -f "${HOME}/.zshrc" ]] && return 0
+  
+  # Check if command already exists
+  if grep -qF "${docker_exec_command} ()" "${HOME}/.zshrc" 2>/dev/null; then
+    return 0
+  fi
 
-    # Source .zshrc in a subshell to retain current environment variables
-    zsh -c "source '${HOME}/.zshrc'"
+  cat >> "${HOME}/.zshrc" << EOF
+
+${docker_exec_command} (){
+  docker exec -it -u "${container_user}" -w "/workspaces/${project_name}" "${container_name}" zsh
+}
+EOF
+  
+  echo -e "${GREEN}Created \"${docker_exec_command}\" command in your ${HOME}/.zshrc file.${NC}"
+  
+  # Source .zshrc in a subshell to retain current environment variables
+  zsh -c "source '${HOME}/.zshrc'" 2>/dev/null || true
+}
+
+# Check for required dependencies
+check_dependencies() {
+  if ! command -v xxd >/dev/null 2>&1; then
+    echo "xxd command not found."
+    
+    # Detect OS type
+    local os_type=""
+    local install_cmd=""
+    
+    if command -v apt >/dev/null 2>&1; then
+      os_type="debian"
+      install_cmd="sudo apt update && sudo apt install -y xxd"
+    elif command -v dnf >/dev/null 2>&1; then
+      os_type="rhel"
+      install_cmd="sudo dnf install -y vim-common"
+    elif command -v yum >/dev/null 2>&1; then
+      os_type="rhel"
+      install_cmd="sudo yum install -y vim-common"
+    else
+      echo "Error: Unable to detect package manager (apt/dnf/yum)."
+      echo "Please install xxd manually and try again."
+      exit 1
+    fi
+    
+    echo "Detected ${os_type}-based system."
+    read -r -p "Would you like to install xxd now? [Y/n]: " response
+    response=${response:-Y}  # Default to Y if empty
+    
+    case "$response" in
+      [yY]|[yY][eE][sS])
+        echo "Installing xxd..."
+        if eval "$install_cmd"; then
+          echo "xxd installed successfully."
+        else
+          echo "Error: Failed to install xxd."
+          exit 1
+        fi
+        ;;
+      [nN]|[nN][oO])
+        echo "Error: xxd is required for this script to work."
+        echo "Please install it manually using: $install_cmd"
+        exit 1
+        ;;
+      *)
+        echo "Invalid response. Please answer Y or n."
+        exit 1
+        ;;
+    esac
   fi
 }
 
+# Open VS Code with devcontainer support
 open_vs_code() {
-  # check for dependencies
-  if ! command -v xxd &>/dev/null; then
-    echo "xxd command not found, install with"
-    echo "sudo apt install xxd"
-    exit 1
-  fi
+  check_dependencies
+  
+  local devcontainer_json="$PWD/.devcontainer/devcontainer.json"
+  local code_ws_file="$PWD/workspace.code-workspace"
 
-  DEVCONTAINER_JSON="$PWD/.devcontainer/devcontainer.json"
-  CODE_WS_FILE="$PWD/workspace.code-workspace"
-
-  if [ ! -f "$DEVCONTAINER_JSON" ]; then
-    # open code without container
-    if [ -f "$CODE_WS_FILE" ]; then
-      echo "Opening vscode workspace from $CODE_WS_FILE"
-      code $CODE_WS_FILE
+  # If no devcontainer config, open code normally
+  if [[ ! -f "$devcontainer_json" ]]; then
+    if [[ -f "$code_ws_file" ]]; then
+      echo "Opening vscode workspace from $code_ws_file"
+      code "$code_ws_file"
     else
       echo "Opening vscode in current directory"
       code .
@@ -70,84 +119,89 @@ open_vs_code() {
     exit 0
   fi
 
-  # open devcontainer
-  HOST_PATH=$(echo $(wslpath -w $PWD) | sed -e 's,\\,\\\\,g')
-  WORKSPACE="/workspaces/$(basename $PWD)"
+  # Open devcontainer
+  local host_path workspace uri_type uri_suffix uri uri_hex
+  host_path=$(wslpath -w "$PWD" | sed 's,\\,\\\\,g')
+  workspace="/workspaces/$(basename "$PWD")"
 
-  URI_SUFFIX=
-  if [ -f "$CODE_WS_FILE" ]; then
-    # open workspace file
-    URI_TYPE="--file-uri"
-    URI_SUFFIX="$WORKSPACE/$(basename $CODE_WS_FILE)"
+  if [[ -f "$code_ws_file" ]]; then
+    # Open workspace file
+    uri_type="--file-uri"
+    uri_suffix="$workspace/$(basename "$code_ws_file")"
     echo "Opening vscode workspace file within devcontainer"
   else
-    URI_TYPE="--folder-uri"
-    URI_SUFFIX="$WORKSPACE"
+    uri_type="--folder-uri"
+    uri_suffix="$workspace"
     echo "Opening vscode within devcontainer"
   fi
 
-  URI="{\"hostPath\":\"$HOST_PATH\",\"configFile\":{\"\$mid\":1,\"path\":\"$DEVCONTAINER_JSON\",\"scheme\":\"vscode-fileHost\"}}"
-  URI_HEX=$(echo "${URI}" | xxd -c 0 -p)
-  code ${URI_TYPE}="vscode-remote://dev-container%2B${URI_HEX}${URI_SUFFIX}" &
+  uri="{\"hostPath\":\"$host_path\",\"configFile\":{\"\$mid\":1,\"path\":\"$devcontainer_json\",\"scheme\":\"vscode-fileHost\"}}"
+  uri_hex=$(printf '%s' "$uri" | xxd -c 0 -p)
+  echo "Launching VS Code in background..."
+  code "${uri_type}=vscode-remote://dev-container%2B${uri_hex}${uri_suffix}" &
+  code_pid=$!
+  echo "VS Code launched with PID: $code_pid"
+  
+  # Give VS Code more time to process the command and start the container
+  echo "Waiting for VS Code to start the container..."
+  sleep 10
 }
 
+# Wait for container to start and exec into it
 exec_into_container() {
-  # Here we check if the dev container has started yet.
-  # Wait a max of 600 seconds (10 minutes).
-  local max_wait=600
-  local count=0
-  local spin=("-" "\\" "|" "/")
-  local rot=0
-  # If not then docker_id will be empty and the while loop kicks in.
-  local docker_id=""
-  docker_id=$(docker container ls -f name=${container_name} -q)
-  if [ -z "$docker_id" ]; then
+  local -r max_wait=600
+  local -r spin=("-" "\\" "|" "/")
+  local count=0 rot=0 docker_id
+  
+  docker_id=$(docker container ls -f "name=${container_name}" -q)
+  
+  if [[ -z "$docker_id" ]]; then
     echo -e "${BLUE}Waiting up to 10 minutes for the dev container to start ${NO_NEW_LINE}"
   fi
 
-  while [ -z "$docker_id" ] && ((count < max_wait)); do
-    # Sleep for one second then try and get the docker_id of the dev container again.
-    # Once we can get the id, the loop quits and we run the last line below, exe'ing into the container.
-    sleep 1s
-    docker_id=$(docker container ls -f name=${container_name} -q)
-    count=$((count + 1))
+  while [[ -z "$docker_id" && $count -lt $max_wait ]]; do
+    sleep 1
+    docker_id=$(docker container ls -f "name=${container_name}" -q)
+    ((count++))
 
     if ((count == 20)); then
       echo -ne "\b"
       echo -e "${YELLOW}The dev container is taking a while to start, VS Code could be downloading a new version or you may need to manually open it from within VS Code.${BLUE}"
     fi
-
-    if ((count >= max_wait)); then
-      exit 0
-    fi
+    
     echo -ne "\b${spin[$rot]}"
-    if ((rot >= 3)); then
-      rot=0
-    else
-      rot=$((rot + 1))
-    fi
+    rot=$(( (rot + 1) % 4 ))
   done
+  
+  if [[ -z "$docker_id" ]]; then
+    echo -e "\b${RED}Timeout waiting for dev container to start.${NC}"
+    exit 1
+  fi
+  
   echo -ne "\b"
   echo -e "${GREEN}Dev container started, execing into it.${NC}"
+  
   if [[ -n "$docker_exec_command" ]]; then
     echo -e "${BLUE}You can use the \"${docker_exec_command}\" command to exec into the dev container from another terminal.${NC}"
   fi
-  
-  docker exec -u "${container_user}" -w /workspaces/${project_name} -it ${container_name} zsh
+
+  docker exec -u "${container_user}" -w "/workspaces/${project_name}" -it "${container_name}" zsh
 }
 
-# Check if user is using Docker Deskop for Windows or the native Docker Engine.
+# Main function
 main() {
+  source_colors
   add_docker_exec_command
 
-  # If the dev container is running, we assume VSCode is also running. If VSCode is not running, then open it.
-  if ! docker ps | grep ${container_name}; then
+  # If the dev container is not running, open VS Code
+  if ! docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
     open_vs_code
   fi
 
   exec_into_container
 }
 
+# Run main if script is executed directly
 if ! (return 0 2>/dev/null); then
-  (main "$@")
+  main "$@"
 fi

@@ -1,6 +1,6 @@
 # cspell:ignore hvac ipython pylint pyyaml orjson pytest
 
-# An example requirements file for Python libraries.
+# An example requirements file.
 
 # https://pypi.org/project/fabric/
 # fabric~=3.2.2

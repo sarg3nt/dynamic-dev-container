@@ -4,7 +4,6 @@
 # example usage:
 # source "lib/sh/log.sh"
 # log "my message" "green"
-#
 
 # shellcheck disable=SC2034
 log() {

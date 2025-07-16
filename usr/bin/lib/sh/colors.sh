@@ -4,7 +4,6 @@
 # example usage:
 # source "lib/sh/colors.sh"
 # echo -e "${GREEN}This Text is green${NC}"
-#
 
 # shellcheck disable=SC2034
 RED="\033[1;31m"

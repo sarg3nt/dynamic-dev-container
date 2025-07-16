@@ -1,5 +1,6 @@
 #!/bin/bash
-# cSpell:ignore pylintrc
+
+# cSpell:ignore pylintrc kubectx kubens kubectl mise krew
 # shellcheck disable=SC2016,SC1091
 
 set -euo pipefail
@@ -10,6 +11,7 @@ source "$(dirname "$0")/utils/log.sh"
 main() {
   echo ""
   log "EXECUTING POST START COMMAND..." "gray" "INFO"
+  eval "$(/usr/local/bin/mise activate bash 2>/dev/null)" || true
   link_pylintrc_file
   echo ""
   git_update_diff_tool
@@ -19,8 +21,10 @@ main() {
   copy_kube_config
   echo ""
   copy_docker_config
-  # Uncomment to install Powershelll
-  # bash usr/local/bin/install_powershell
+  echo ""
+  install_kubectl_plugins
+  echo ""
+  install_kubectx_kubens_completions
   # Uncomment to install PowerCLI
   # bash usr/local/bin/install_powercli
 }
@@ -94,17 +98,19 @@ copy_ssh_folder() {
 #   None
 #######################################
 copy_kube_config() {
-  log_info "K8s Config Setup:"
-  REMOTE_CONFIG="${HOME}/.kube-localhost"
-  CONFIG="${HOME}/.kube"
-  if [[ -d "$REMOTE_CONFIG" ]]; then
-    log_success "Remote k8s config detected, copying in."
-    rm -rf "$CONFIG"
-    mkdir -p "${CONFIG}" >/dev/null 2>&1
-    cp -R "${REMOTE_CONFIG}/." "${CONFIG}/"
-    sudo chown -R "$(id -u)" "${CONFIG}"
-  else
-    log_warning "No remote k8s config detected, using defaults."
+  if command -v kubectl >/dev/null 2>&1; then
+    log_info "K8s Config Setup:"
+    REMOTE_CONFIG="${HOME}/.kube-localhost"
+    CONFIG="${HOME}/.kube"
+    if [[ -d "$REMOTE_CONFIG" ]]; then
+      log_success "Remote k8s config detected, copying in."
+      rm -rf "$CONFIG"
+      mkdir -p "${CONFIG}" >/dev/null 2>&1
+      cp -R "${REMOTE_CONFIG}/." "${CONFIG}/"
+      sudo chown -R "$(id -u)" "${CONFIG}"
+    else
+      log_warning "No remote k8s config detected, using defaults."
+    fi
   fi
 }
 
@@ -128,6 +134,54 @@ copy_docker_config() {
   else
     log_warning "No remote Docker config detected, using defaults."
     log_info "You should run 'docker login' to your private repos if you want to be able to push images to them."
+  fi
+}
+
+#######################################
+# Install any kubectl plugins using krew.
+# Globals:
+#   HOME
+# Arguments:
+#   None
+#######################################
+install_kubectl_plugins() {
+  if command -v krew >/dev/null 2>&1; then
+    log_info "Adding krew to the path" "green"
+    export_statement="export PATH=\"\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH\""
+    echo "$export_statement" >>~/.zshrc
+    echo "$export_statement" >>~/.bashrc
+
+    log_info "Installing plugins" "green"
+    krew install access-matrix blame get-all node-restart switch-config view-allocations
+
+    # Create a flag file to indicate krew plugins installation is complete
+    touch "${HOME}/.krew_plugins_ready"
+
+    log_info "Deleting files from /tmp" "green"
+    sudo rm -rf /tmp/* || true
+  else
+    # If krew is not available, still create the flag to avoid waiting
+    touch "${HOME}/.krew_plugins_ready"
+  fi
+}
+
+#######################################
+# Install kubectx and kubens completions.
+# Globals:
+#   HOME
+# Arguments:
+#   None
+#######################################
+install_kubectx_kubens_completions() {
+  if command -v kubectl >/dev/null 2>&1; then
+    log "Installing kubectx and kubens completions" "green"
+    mkdir -p "$HOME/.oh-my-zsh/custom/completions"
+    chmod -R 755 "$HOME/.oh-my-zsh/custom/completions"
+
+    log "Installing kubectx completions" "green"
+    curl -sL https://raw.githubusercontent.com/ahmetb/kubectx/master/completion/_kubectx.zsh --output "$HOME/.oh-my-zsh/custom/completions/_kubectx.zsh"
+    log "Installing kubens completions" "green"
+    curl -sL https://raw.githubusercontent.com/ahmetb/kubectx/master/completion/_kubens.zsh --output "$HOME/.oh-my-zsh/custom/completions/_kubens.zsh"
   fi
 }
 

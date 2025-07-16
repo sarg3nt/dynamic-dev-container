@@ -1,38 +1,288 @@
 #!/bin/bash
-set -euo pipefail
+# shellcheck disable=SC1091
+set -eo pipefail
 IFS=$'\n\t'
 
-# cSpell:ignore gitui
+# cSpell:ignore gitui,krew,kustomize,trivy,kubeseal,gping,tldr,kubesec,ncdu,btop,ipython,cmctl,cloc
 
-# The main help file for the dev container.
-# This will show the user what tools are installed in the dev container and is ran on shell start.
-main() {
-  source /usr/bin/lib/sh/colors.sh
-  echo -e "${BLUE}********************************************************************"
-  echo -e "                          Go Dev Container"
-  echo -e "                      Build Date: $(cat /home/vscode/build_date.txt)"
-  echo -e "********************************************************************${NC}"
-  echo -e "${CYAN}Type \"help\" to display this messsage again.${NC}"
-  echo -e ""
-  echo -e "${GREEN}**** Primary Tools:${NC}"
-  echo -e " go, goreleaser, docker (d), git (g), gitui, helm (h), k9s (k), kubectl (kc)"
-  echo -e ""
-  echo -e "${GREEN}**** Utilities:${NC}"
-  echo -e " fzf, lsd, mise, starship"
-  echo -e ""
-  echo -e "${GREEN}**** Configure Installed Versions of Go and Go Tools:${NC}"
-  echo -e " Edit the '.mise.toml' file in the root of your project to set the versions of go and go tools to install, then run 'mise install'."
-  echo -e " Other 'mise' comands."
-  echo -e "   'mise ls'                         - List installed tools."
-  echo -e "   'mise install'                    - Install tools from '.mise.toml'."
-  echo -e "   'mise update'                     - Update installed tools."
-  echo -e "   'mise registry'                   - List available tools."
-  echo -e "   'mise install <tool>@<version>'   - Install a specific tool and version."
-  echo -e "   'mise use <tool>@<version>'       - Use an existing tool in current project"
-  echo -e ""
+#######################################
+# Display container tooling information with progress indicators
+# Shows installed tools, available applications, and kubectl plugins
+# Handles mise tool installation progress and krew plugin installation
+# Globals:
+#   HOME, DEV_CONTAINER_VERSION
+# Arguments:
+#   None
+# Outputs:
+#   Formatted tool listing and installation instructions
+#######################################
+
+#######################################
+# Wait for mise tools to be installed with progress indicator
+# Shows spinner animation during installation process
+# Globals:
+#   HOME, YELLOW, GREEN, NC
+# Arguments:
+#   None
+# Returns:
+#   0 if successful, sets mise_json variable
+#######################################
+wait_for_mise_installation() {
+  local wait_count=0
+  local max_wait=200  # 200 seconds should be enough
+  local -a spin=("-" "\\" "|" "/")
+  local spin_idx=0
+  
+  echo -ne "${YELLOW}Mise tools installing   "
+  
+  while [[ ! -f "${HOME}/.mise_ready" ]] && [[ $wait_count -lt $max_wait ]]; do
+    echo -ne "\b${spin[$spin_idx]}"
+    sleep 1
+    wait_count=$((wait_count + 1))
+    spin_idx=$(( (spin_idx + 1) % 4 ))
+  done
+  
+  if [[ -f "${HOME}/.mise_ready" ]]; then
+    # Clear the entire line and print completion message
+    echo -e "\r\033[K${GREEN}✓ Installation completed after $wait_count seconds!${NC}"
+    activate_mise_environment
+  else
+    echo -e "\b${YELLOW}✗ Continuing without mise tools (timeout after $max_wait seconds)${NC}"
+    mise_json=""
+  fi
+  echo ""
 }
 
-# Run main
+#######################################
+# Activate mise environment and get tool list
+# Attempts multiple activation methods as fallback
+# Globals:
+#   HOME, mise_json
+# Arguments:
+#   None
+# Returns:
+#   Sets mise_json variable with tool information
+#######################################
+activate_mise_environment() {
+  local mise_activate_output
+  mise_activate_output=$(/usr/local/bin/mise activate bash 2>/dev/null || echo "FAILED")
+  
+  if [[ "$mise_activate_output" != "FAILED" ]] && [[ -n "$mise_activate_output" ]]; then
+    if eval "$mise_activate_output"; then
+      mise_json=$(mise list --silent --json 2>/dev/null)
+    else
+      export PATH="${HOME}/.local/share/mise/shims:$PATH"
+      mise_json=$(mise list --silent --json 2>/dev/null)
+    fi
+  else
+    export PATH="${HOME}/.local/share/mise/shims:$PATH"
+    mise_json=$(mise list --silent --json 2>/dev/null)
+  fi
+}
+
+#######################################
+# Parse shell aliases for tool shortcuts
+# Extracts alias definitions from zshrc file
+# Globals:
+#   HOME
+# Arguments:
+#   None
+# Returns:
+#   Populates app_aliases associative array
+#######################################
+parse_shell_aliases() {
+  if [[ -f "$HOME/.zshrc" ]]; then
+    while IFS= read -r line; do
+      # Skip empty lines and comments
+      [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]] || continue
+
+      # Match alias lines: alias kc=kubectl, alias kc='kubectl', alias kc="kubectl"
+      if [[ "$line" =~ ^[[:space:]]*alias[[:space:]]+([a-zA-Z0-9_]+)=[\'\"]*([a-zA-Z0-9_-]+)[\'\"]*([[:space:]]|$) ]]; then
+        local alias_name="${BASH_REMATCH[1]}"
+        local app_name="${BASH_REMATCH[2],,}" # Convert to lowercase
+
+        if [[ -n "$app_name" ]]; then
+          app_aliases[$app_name]="${app_aliases[$app_name]:+${app_aliases[$app_name]}, }$alias_name"
+        fi
+      fi
+    done <"$HOME/.zshrc"
+  fi
+}
+
+#######################################
+# Build comprehensive utilities list from installed tools
+# Combines system tools with mise-managed applications
+# Globals:
+#   mise_json, app_aliases
+# Arguments:
+#   None
+# Returns:
+#   Sets utilities variable with formatted tool list
+#######################################
+build_utilities_list() {
+  utilities="docker $(docker version --format '{{.Client.Version}}' 2>/dev/null || echo 'N/A') (d), git $(git --version 2>/dev/null | awk '{print $3}' || echo 'N/A') (g)"
+
+  if [[ -n "$mise_json" ]] && [[ "$mise_json" != "null" ]] && [[ "$mise_json" != "" ]]; then
+    local tools_list=""
+    # Check if mise_json is valid JSON before processing
+    if echo "$mise_json" | jq . >/dev/null 2>&1; then
+      local jq_output
+      jq_output=$(echo "$mise_json" | jq -r 'to_entries[] | select(.value[0].installed == true) | "\(.key) \(.value[0].version)"' 2>/dev/null || echo "")
+      
+      if [[ -n "$jq_output" ]]; then
+        while IFS= read -r line || [[ -n "$line" ]]; do
+          [[ -z "$line" ]] && continue
+          local app version alias_str=""
+          app=$(echo "$line" | cut -d' ' -f1)
+          version=$(echo "$line" | cut -d' ' -f2-)  # Handle versions with spaces
+          local app_lc="${app,,}"
+
+          [[ -n "${app_aliases[$app_lc]:-}" ]] && alias_str=" (${app_aliases[$app_lc]})"
+          tools_list="${tools_list:+$tools_list, }$app $version$alias_str"
+        done <<< "$jq_output"
+      fi
+    fi
+
+    [[ -n "$tools_list" ]] && utilities="$utilities, $tools_list"
+  fi
+}
+
+#######################################
+# Display kubectl plugins with installation progress
+# Handles krew plugin installation status and listing
+# Globals:
+#   HOME, YELLOW, NC, mise_json
+# Arguments:
+#   None
+# Outputs:
+#   Kubectl plugins section if applicable
+#######################################
+display_kubectl_plugins() {
+  # Only show section if both kubectl and krew are installed
+  if [[ -n "$mise_json" ]] && [[ "$mise_json" != "null" ]] && 
+     echo "$mise_json" | jq -e 'has("kubectl") and .kubectl[0].installed == true and has("krew") and .krew[0].installed == true' >/dev/null 2>&1; then
+    
+    echo -e "${GREEN}**** Kubectl Plugins:${NC}"
+    echo -e "${CYAN}Invoke a plugin: 'kubectl <plugin>'  List plugins: 'krew list'${NC}"
+    
+    if [[ -f "${HOME}/.krew_plugins_ready" ]]; then
+      show_installed_plugins
+    else
+      wait_for_krew_plugins
+    fi
+  fi
+}
+
+#######################################
+# Show currently installed krew plugins
+# Displays formatted list of available kubectl plugins
+# Arguments:
+#   None
+# Outputs:
+#   Comma-separated list of plugins or fallback message
+#######################################
+show_installed_plugins() {
+  if command -v krew >/dev/null 2>&1 && krew list >/dev/null 2>&1; then
+    local plugin_list
+    plugin_list=$(krew list 2>/dev/null | awk 'NR>1 {print $1}' | paste -sd, - | sed 's/,/, /g')
+    echo -e " $plugin_list"
+  else
+    echo -e " (No krew plugins detected)"
+  fi
+}
+
+#######################################
+# Wait for krew plugins installation with progress indicator
+# Shows spinner during plugin installation process
+# Globals:
+#   HOME, YELLOW, NC
+# Arguments:
+#   None
+# Outputs:
+#   Installation progress and final plugin list
+#######################################
+wait_for_krew_plugins() {
+  echo -ne " ${YELLOW}Krew plugins installing   "
+  
+  local wait_count=0
+  local max_wait=60  # 60 seconds should be enough for krew plugins
+  local -a spin=("-" "\\" "|" "/")
+  local spin_idx=0
+  
+  while [[ ! -f "${HOME}/.krew_plugins_ready" ]] && [[ $wait_count -lt $max_wait ]]; do
+    echo -ne "\b${spin[$spin_idx]}"
+    sleep 1
+    wait_count=$((wait_count + 1))
+    spin_idx=$(( (spin_idx + 1) % 4 ))
+  done
+  
+  if [[ -f "${HOME}/.krew_plugins_ready" ]]; then
+    # Clear the line and show plugins in default color
+    echo -ne "\r\033[K${NC}"
+    show_installed_plugins
+  else
+    # Timeout, show fallback message
+    echo -e "\r\033[K ${YELLOW}(Krew plugins still installing...)${NC}"
+  fi
+}
+
+#######################################
+# Main function to display container tooling information
+# Orchestrates the display of all sections with progress handling
+# Globals:
+#   HOME, DEV_CONTAINER_VERSION, color variables
+# Arguments:
+#   None
+# Outputs:
+#   Complete tooling information display
+#######################################
+main() {
+  # shellcheck source=/usr/bin/lib/sh/colors.sh
+  source /usr/bin/lib/sh/colors.sh
+  
+  # Initialize global variables
+  local mise_json utilities
+  local -A app_aliases
+  
+  # Check mise installation status and wait if needed
+  if [[ -f "${HOME}/.mise_ready" ]]; then
+    mise_json=$(mise list --silent --json 2>/dev/null)
+  else
+    wait_for_mise_installation
+  fi
+
+  # Display header
+  echo -e "${BLUE}********************************************************************"
+  echo -e "              Generic Dev Container Tooling v${DEV_CONTAINER_VERSION}"
+  echo -e "              Built: $(cat "$HOME/build_date.txt" 2>/dev/null || echo 'Unknown')"
+  echo -e "********************************************************************${NC}"
+  echo -e "${CYAN}Type \"help\" to display this message again.${NC}"
+  echo -e ""
+
+  # Parse shell aliases and build utilities list
+  parse_shell_aliases
+  build_utilities_list
+
+  # Display utilities section
+  echo -e "${GREEN}**** Utilities:${NC}"
+  echo -e " $utilities"
+  echo -e ""
+  
+  # Display installables section
+  echo -e "${GREEN}**** Installables:${NC}"
+  echo -e "${CYAN}To install vSphere PowerCLI run the below command.${NC}"
+  echo -e " install_powercli"
+  echo -e "${CYAN}Use 'mise' to install many other applications.${NC}"
+  echo -e " List installable applications: ${BLUE}mise registry${NC}"
+  echo -e " Install: ${BLUE}mise use -g argocd@latest${NC}"
+  echo -e " Or add them to the .mise.toml file and run ${BLUE}mise install${NC}"
+  echo -e ""
+
+  # Display kubectl plugins if available
+  display_kubectl_plugins
+}
+
+# Execute main function when script is run directly (not sourced)
 if ! (return 0 2>/dev/null); then
   (main "$@")
 fi

@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# cSpell:ignore sarg
+
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -15,7 +18,7 @@ main() {
 # Get the latest version of the dev container
 #
 # Description:
-#   Pulls the latest 'generic-dev-container' Docker image from GHCR.
+#   Pulls the latest 'generic-dev-container' Docker image from GitHub Container Registry.
 #   Logs success or failure messages based on the outcome.
 #
 # Arguments:
@@ -25,15 +28,15 @@ main() {
 #   1 - If the Docker pull command fails.
 #######################################
 get_latest_dev_container_version() {
-  log_info "Pulling latest 'generic-dev-container' image from GHCR."
+  log_info "Pulling latest 'generic-dev-container' image from GitHub Container Registry."
   echo ""
   if docker pull ghcr.io/sarg3nt/generic-dev-container:latest; then
     echo ""
     log_success "Latest generic-dev-container image pulled successfully."
   else
     echo ""
-    log_error "Failed to pull the latest generic-dev-container image. Please check your connection."
-    exit 1
+    log_error "Failed to pull the latest generic-dev-container image. Please check your connection or credentials."
+    log_error "The container will attempt to load with a cached copy if you have it."
   fi
 }
 

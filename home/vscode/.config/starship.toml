@@ -23,6 +23,16 @@ truncate_to_repo = false
 truncation_symbol = "…/"
 style = "white bg:#000519"
 format = "[](fg:black bg:#000519)[ $path$read_only ]($style)"
+# [username]
+# style_user = "#F2F2F2 bold bg:#000726"
+# style_root = "red bold bg:#000726"
+# format = "[](fg:#000519 bg:#000a35)[  $user]($style)"
+# disabled = false
+# [hostname]
+# ssh_only = true
+# format = "[@$hostname](white bg:#000726)"
+# trim_at = ".ad.selinc.com"
+# disabled = false
 [kubernetes]
 symbol = "[ ⎈ ](bold white bg:#000a35)"
 format = '[](fg:#000519 bg:#000a35)[$symbol CTX:$context( NS:$namespace) ](bold fg:#F2F2F2 bg:#000a35)'

@@ -1,9 +1,9 @@
-# cSpell:ignore agnoster zstyle strftime dotenv mvim ohmyzsh fpath kubectx kubens
+# cSpell:ignore agnoster, zstyle, strftime, dotenv, mvim, ohmyzsh, krew, zshell, CWORD, tldr, tealdeermusl, fpath, kubectx, kubens, trivy
 # If you come from bash you might have to change your $PATH.
-# export PATH=$HOME/bin:/usr/local/bin:$PATH
+# export PATH=${HOME}/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
-export ZSH=$HOME/.oh-my-zsh
+export ZSH=${HOME}/.oh-my-zsh
 
 # Set name of the theme to load --- if set to "random", it will
 # load a random theme each time oh-my-zsh is loaded, in which case,
@@ -73,8 +73,10 @@ export ZSH=$HOME/.oh-my-zsh
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 
+# Disable asking to load .env files.
+export DOTENV_PROMPT=0
+
 plugins=(
-  mise
   zsh-autosuggestions
   fast-syntax-highlighting
   zsh-autocomplete
@@ -83,6 +85,7 @@ plugins=(
   gitfast
   history
   kubectl
+  python
   dotenv
   helm
   docker
@@ -123,10 +126,17 @@ DISABLE_UPDATE_PROMPT=true
 # Set up bash history to work with the passed in Docker volume
 export PROMPT_COMMAND='history -a' &&
   export HISTFILE=/commandhistory/.bash_history
-export PATH="${HOME}/.local:${HOME}/.local/bin:${HOME}/.local/share:$HOME/.local/share/mise/shims:$HOME/bin:${PATH}"
+
+export PATH="${HOME}/.krew/bin:${HOME}/.local:${HOME}/.local/bin:${HOME}/.local/share:${HOME}/.local/share/mise/shims:${HOME}/bin:${HOME}/.linkerd2/bin:${PATH}"
+
+# Following command is needed for terraform, vault, packer and maybe others in zshell
+autoload -U +X bashcompinit && bashcompinit
+
+export EDITOR="nano"
 
 # List files colors and aliases
 export LS_COLORS=$LS_COLORS:"ow=0;32:"
+# alias ls to lsd, the colorful ls replacement
 alias ls='lsd'
 alias ll='ls -alh'
 alias la='ls -A'
@@ -135,43 +145,26 @@ alias la='ls -A'
 alias d="docker"
 
 # Kubernetes
+alias a="argocd"
 alias k="k9s"
 alias kc="kubectl"
-alias kga="kubectl_get_all"
 alias kx="kubectx"
 alias kn="kubens"
+alias l="linkerd"
 alias h="helm"
-
-# shellcheck source=/dev/null
-source <(kubectl completion zsh)
-complete -o default -F __start_kubectl k
-
-# kx and kn
-_kube_contexts() {
-  local current_arg
-  current_arg=${COMP_WORDS[COMP_CWORD]}
-  # shellcheck disable=SC2207
-  COMPREPLY=($(compgen -W "- $(kubectl config get-contexts --output='name')" -- "$current_arg"))
-}
-_kube_namespaces() {
-  local current_arg
-  current_arg=${COMP_WORDS[COMP_CWORD]}
-  # shellcheck disable=SC2207
-  COMPREPLY=($(compgen -W "- $(kubectl get namespaces -o=jsonpath='{range .items[*].metadata.name}{@}{"\n"}{end}')" -- "$current_arg"))
-}
-
-complete -F _kube_contexts kx
-complete -F _kube_namespaces kn
-
-# shellcheck source=/dev/null
-source <(helm completion zsh)
-complete -F __start_helm h
-complete -F __start_helm helm
 
 # Starship
 if [[ -z "${ZSH_THEME}" ]]; then
   eval "$(starship init zsh)"
 fi
+
+# Hashicorp
+alias tf="tofu"
+complete -o nospace -C tofu tofu tf
+alias v="vault"
+complete -C vault vault v
+alias p="packer"
+complete -o nospace -C packer packer p
 
 # Utils
 alias help="/usr/local/bin/help"
@@ -180,13 +173,23 @@ alias g=git
 fpath=($ZSH/custom/completions $fpath)
 
 # Add fzf auto completions and key bindings
-source "$HOME/.fzf-key-bindings.zsh"
-source "$HOME/.fzf-completion.zsh"
+source "${HOME}/.fzf-key-bindings.zsh"
+source "${HOME}/.fzf-completion.zsh"
 
 # Active mise
-eval "$(/usr/local/bin/mise activate zsh)"
-mise trust --all
-mise install --yes
+if command -v mise &>/dev/null; then
+  # Only activate mise if installation is complete to avoid warnings
+  if [[ -f "${HOME}/.mise_ready" ]]; then
+    eval "$(/usr/local/bin/mise activate zsh 2>/dev/null)"
+  else
+    # Add mise shims to PATH manually for basic functionality
+    export PATH="${HOME}/.local/share/mise/shims:$PATH"
+  fi
+fi
 
-# Run help screen on shell start.
+# Activate zoxide
+if command -v zoxide &>/dev/null; then
+  eval "$(zoxide init zsh --cmd cd)"
+fi
+
 help

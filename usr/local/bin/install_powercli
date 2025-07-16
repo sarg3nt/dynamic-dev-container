@@ -1,0 +1,34 @@
+#!/bin/bash
+# cspell:ignore CEIP pwsh xdev
+
+set -euo pipefail
+IFS=$'\n\t'
+
+main() {
+  source "/usr/bin/lib/sh/log.sh"
+
+  log "Installing PowerCLI" "blue"
+  cd /tmp/ || exit
+
+  if ! command -v pwsh &>/dev/null; then
+    log "pwsh not found, installing with mise" "yellow"
+    mise install powershell@latest
+  fi
+
+  log "Adding PSRepository PSGallery as Trusted" "green"
+  pwsh -c 'Set-PSRepository -Name PSGallery -InstallationPolicy Trusted'
+
+  log "Installing" "green"
+  pwsh -c "\$ProgressPreference = \"SilentlyContinue\"; Install-Module VMware.PowerCLI -Scope CurrentUser"
+
+  log "Removing unneeded net45 files" "green"
+  sudo find / -xdev -type d -name "net45" | sudo xargs rm -rf
+
+  log "Removing participation in in CEIP" "green"
+  pwsh -c "\$ProgressPreference = \"SilentlyContinue\"; Set-PowerCLIConfiguration -Scope User -Confirm:\$false -ParticipateInCEIP \$false"
+  cd - || exit
+}
+
+if ! (return 0 2>/dev/null); then
+  (main "$@")
+fi
