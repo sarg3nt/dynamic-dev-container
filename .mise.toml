@@ -1,4 +1,4 @@
-# cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr openbao
+# cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr openbao kubens
 
 #### Begin Environment ####
 [env]
@@ -10,11 +10,11 @@ MISE_PYTHON_COMPILE = false
 # https://github.com/opentofu/opentofu
 opentofu = "1.10.2"
 # https://github.com/openbao/openbao/releases
-openbao = "2.3.1"
-
+#openbao = "2.3.1"
 #### Begin Kubernetes/Helm ####
 kubectl = "1.32"
 kubectx = "latest"
+kubens = "latest"
 k9s = "latest"
 helm = "latest"
 #### End Kubernetes/Helm ####
@@ -25,28 +25,29 @@ dive = "latest"
 kubebench = "latest"
 popeye = "latest"
 trivy = "latest"
-cmctl = "latest"
-k3d = "latest"
+#cmctl = "latest"
+#k3d = "latest"
 #### End Kubernetes Utilities ####
 
 gitui = "latest"
-golang = 'latest'
-goreleaser = 'latest'
+#golang = 'latest'
+#goreleaser = 'latest'
 packer = "latest"
-tealdeer = "latest"
-powershell = "latest"
+#tealdeer = "latest"  # Temporarily disabled due to plugin issues
+openbao = "latest"
+#powershell = "latest"
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
 #### Begin Aliases ####
 [alias]
 kubebench = 'asdf:sarg3nt/asdf-kube-bench'
-tealdeer = 'asdf:sarg3nt/asdf-tealdeer'
+#tealdeer = 'asdf:sarg3nt/asdf-tealdeer'  # Temporarily disabled due to plugin issues
 #### End Aliases ####
 
 #### Begin Settings ####
 [settings]
 experimental = true
 http_timeout = "90s"
-jobs = 1
+#jobs = 1
 yes = true
 #### End Settings ####

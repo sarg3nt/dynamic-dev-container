@@ -11,37 +11,28 @@ main() {
   echo ""
   log "EXECUTING POST CREATE COMMAND..." "gray" "INFO"
 
-  log_success "Workspace path: ${WORKSPACE_PATH}"
-
-  if command -v mise &>/dev/null; then
-    log_success "Mise is already installed. Activating mise environment."
-    eval "$(/usr/local/bin/mise activate bash)"
-    log_success "Mise environment activated."
-    install_mise_applications
-    log_success "Mise applications installed successfully."
-  else
-    log_info "Mise is not installed. Skipping mise applications."
-    echo ""
-  fi
-
+  install_mise_applications
   install_python_dependencies
 }
 
 install_mise_applications() {
+  if ! command -v mise &>/dev/null; then
+    return
+  fi
+
   log_info "Installing mise applications."
   echo ""
-
+  mise trust -y
+  eval "$(/usr/local/bin/mise activate bash)"
   # Change to the workspace directory so mise can find .mise.toml
   cd "${WORKSPACE_PATH}"
-
+  mise trust -y
   # Check if .mise.toml exists
   if [[ -f ".mise.toml" ]]; then
     log_info "Found .mise.toml file:"
-    cat ".mise.toml"
     echo ""
 
     # Trust the configuration and install tools
-    mise trust -y
     if mise install -y; then
       echo ""
       # Re-activate mise environment after installing new tools

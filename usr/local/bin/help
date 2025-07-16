@@ -17,7 +17,7 @@ main() {
 
   # Get installed apps and versions from mise once
   local mise_json
-  mise_json=$(mise list --json 2>/dev/null)
+  mise_json=$(mise list --silent --json 2>/dev/null)
 
   # Parse aliases once and store in associative array
   local -A app_aliases
@@ -69,11 +69,11 @@ main() {
   echo -e " Install: ${BLUE}mise use -g argocd@latest${NC}"
   echo -e " Or add them to the .mise.toml file and run ${BLUE}mise install${NC}"
   echo -e ""
+
   # Only print Kubectl Plugins section if both kubectl and krew are installed
   if [[ -n "$mise_json" ]] && echo "$mise_json" | jq -e 'has("kubectl") and .kubectl[0].installed == true and has("krew") and .krew[0].installed == true' >/dev/null 2>&1; then
     echo -e "${GREEN}**** Kubectl Plugins:${NC}"
     echo -e "${CYAN}Invoke a plugin: 'kubectl <plugin>'  List plugins: 'krew list'${NC}"
-
     # Get plugin list dynamically from krew
     if command -v krew >/dev/null 2>&1 && krew list >/dev/null 2>&1; then
       local plugin_list
@@ -81,6 +81,7 @@ main() {
       echo -e " $plugin_list"
     else
       echo -e " (No krew plugins detected)"
+      echo -e "${YELLOW}If the container just started, mise may still be installing tools so the help output may be incorrect.${NC}"
     fi
   fi
 }

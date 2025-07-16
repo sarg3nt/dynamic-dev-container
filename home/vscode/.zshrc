@@ -77,7 +77,6 @@ export ZSH=${HOME}/.oh-my-zsh
 export DOTENV_PROMPT=0
 
 plugins=(
-  mise
   zsh-autosuggestions
   fast-syntax-highlighting
   zsh-autocomplete
@@ -149,7 +148,6 @@ alias d="docker"
 alias a="argocd"
 alias k="k9s"
 alias kc="kubectl"
-alias kga="kubectl_get_all"
 alias kx="kubectx"
 alias kn="kubens"
 alias l="linkerd"
@@ -172,10 +170,6 @@ complete -o nospace -C packer packer p
 alias help="/usr/local/bin/help"
 alias g=git
 
-# Trivy
-source <(trivy completion zsh)
-compdef _trivy trivy tr
-
 fpath=($ZSH/custom/completions $fpath)
 
 # Add fzf auto completions and key bindings
@@ -184,9 +178,7 @@ source "${HOME}/.fzf-completion.zsh"
 
 # Active mise
 if command -v mise &>/dev/null; then
-  eval "$(/usr/local/bin/mise activate zsh)"
-  mise trust --all
-  mise install --yes
+  eval "$(/usr/local/bin/mise activate zsh 2>/dev/null)"
 fi
 
 # Activate zoxide

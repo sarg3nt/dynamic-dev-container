@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Installs .devcontainer and other files into a project directory to use the dev container in a new project.
-# cspell:ignore openbao myapp sudermanjr 
+# cspell:ignore openbao myapp sudermanjr kubens
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -143,7 +143,7 @@ generate_mise_toml() {
   echo -e "${BLUE}Primary Tools and Languages:${NC}"
   
   # Start with the header and environment section from source
-  echo "# cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr" > "$temp_file"
+  echo "# cspell:ignore cmctl gitui krew kubebench kubectx kubens direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr" > "$temp_file"
   # shellcheck disable=SC2129
   extract_mise_section "#### Begin Environment ####" "#### End Environment ####" >> "$temp_file"
   echo "" >> "$temp_file"
@@ -186,6 +186,7 @@ generate_mise_toml() {
       echo "#### Begin Kubernetes/Helm ####"
       echo 'kubectl = "1.32"'
       echo 'kubectx = "latest"'
+      echo 'kubens = "latest"'
       echo 'k9s = "latest"'
       echo 'helm = "latest"'
       echo "#### End Kubernetes/Helm ####"
@@ -672,9 +673,11 @@ main() {
   [[ -n "$docker_exec_command" ]] && echo -e "  Docker Exec Command: ${docker_exec_command}"
   echo ""
   echo -e "${CYAN}Next steps:${NC}"
-  echo -e "1. Review and adjust settings in ${project_path}/.devcontainer/devcontainer.json if needed"
-  echo -e "2. Review and adjust tool versions in ${project_path}/.mise.toml if needed"
-  echo -e "3. See README.md for detailed configuration instructions"
+  echo -e "1. ${YELLOW}Recommended:${NC} Set GITHUB_TOKEN environment variable to avoid API rate limits"
+  echo -e "   export GITHUB_TOKEN=\"your_github_token_here\""
+  echo -e "2. Review and adjust settings in ${project_path}/.devcontainer/devcontainer.json if needed"
+  echo -e "3. Review and adjust tool versions in ${project_path}/.mise.toml if needed"
+  echo -e "4. See README.md for detailed configuration instructions"
   echo ""
   echo -e "${BLUE}You can now run:${NC} cd ${project_path} && ./dev.sh"
 }
