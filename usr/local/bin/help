@@ -20,10 +20,10 @@ main() {
     local spin=("-" "\\" "|" "/")
     local spin_idx=0
     
-    printf "${YELLOW}Mise tools are still being installed... "
+    echo -ne "${YELLOW}Mise tools installing   "
     
     while [[ ! -f "${HOME}/.mise_ready" ]] && [[ $wait_count -lt $max_wait ]]; do
-      printf "\b${spin[$spin_idx]}"
+      echo -ne "\b${spin[$spin_idx]}"
       sleep 1
       wait_count=$((wait_count + 1))
       spin_idx=$(( (spin_idx + 1) % 4 ))
@@ -31,7 +31,7 @@ main() {
     
     if [[ -f "${HOME}/.mise_ready" ]]; then
       # Clear the entire line and print completion message
-      printf "\r\033[K${GREEN}✓ Installation completed after %d seconds!${NC}\n" $wait_count
+      echo -e "\r\033[K${GREEN}✓ Installation completed after $wait_count seconds!${NC}"
       # Activate mise now that it's ready
       local mise_activate_output
       mise_activate_output=$(/usr/local/bin/mise activate bash 2>/dev/null || echo "FAILED")
@@ -48,7 +48,7 @@ main() {
         mise_json=$(mise list --silent --json 2>/dev/null)
       fi
     else
-      printf "\b${YELLOW}✗ Continuing without mise tools (timeout after %d seconds)${NC}\n" $max_wait
+      echo -e "\b${YELLOW}✗ Continuing without mise tools (timeout after $max_wait seconds)${NC}"
       mise_json=""
     fi
     echo ""
@@ -128,13 +128,48 @@ main() {
   if [[ -n "$mise_json" ]] && [[ "$mise_json" != "null" ]] && echo "$mise_json" | jq -e 'has("kubectl") and .kubectl[0].installed == true and has("krew") and .krew[0].installed == true' >/dev/null 2>&1; then
     echo -e "${GREEN}**** Kubectl Plugins:${NC}"
     echo -e "${CYAN}Invoke a plugin: 'kubectl <plugin>'  List plugins: 'krew list'${NC}"
-    # Get plugin list dynamically from krew
-    if command -v krew >/dev/null 2>&1 && krew list >/dev/null 2>&1; then
-      local plugin_list
-      plugin_list=$(krew list | awk 'NR>1 {print $1}' | paste -sd, - | sed 's/,/, /g')
-      echo -e " $plugin_list"
+    
+    # Check if krew plugins are ready
+    if [[ -f "${HOME}/.krew_plugins_ready" ]]; then
+      # Get plugin list dynamically from krew
+      if command -v krew >/dev/null 2>&1 && krew list >/dev/null 2>&1; then
+        local plugin_list
+        plugin_list=$(krew list | awk 'NR>1 {print $1}' | paste -sd, - | sed 's/,/, /g')
+        echo -e " $plugin_list"
+      else
+        echo -e " (No krew plugins detected)"
+      fi
     else
-      echo -e " (No krew plugins detected)"
+      # Plugins still being installed, show a message
+      echo -ne " ${YELLOW}Krew plugins installing   "
+      
+      # Wait for plugins to be ready (with a shorter timeout than mise)
+      local wait_count=0
+      local max_wait=60  # 60 seconds should be enough for krew plugins
+      local spin=("-" "\\" "|" "/")
+      local spin_idx=0
+      
+      while [[ ! -f "${HOME}/.krew_plugins_ready" ]] && [[ $wait_count -lt $max_wait ]]; do
+        echo -ne "\b${spin[$spin_idx]}"
+        sleep 1
+        wait_count=$((wait_count + 1))
+        spin_idx=$(( (spin_idx + 1) % 4 ))
+      done
+      
+      if [[ -f "${HOME}/.krew_plugins_ready" ]]; then
+        # Clear the line and show plugins in default color
+        echo -ne "\r\033[K${NC}"
+        if command -v krew >/dev/null 2>&1 && krew list >/dev/null 2>&1; then
+          local plugin_list
+          plugin_list=$(krew list | awk 'NR>1 {print $1}' | paste -sd, - | sed 's/,/, /g')
+          echo -e " $plugin_list"
+        else
+          echo -e " (No krew plugins detected)"
+        fi
+      else
+        # Timeout, show fallback message
+        echo -e "\r\033[K ${YELLOW}(Krew plugins still installing...)${NC}"
+      fi
     fi
   fi
 }

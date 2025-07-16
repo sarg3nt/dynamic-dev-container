@@ -154,8 +154,14 @@ install_kubectl_plugins() {
     log_info "Installing plugins" "green"
     krew install access-matrix blame get-all node-restart switch-config view-allocations
 
+    # Create a flag file to indicate krew plugins installation is complete
+    touch "${HOME}/.krew_plugins_ready"
+
     log_info "Deleting files from /tmp" "green"
     sudo rm -rf /tmp/* || true
+  else
+    # If krew is not available, still create the flag to avoid waiting
+    touch "${HOME}/.krew_plugins_ready"
   fi
 }
 
