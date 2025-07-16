@@ -1,3 +1,4 @@
+<!--cspell:ignore sarg trivy gitui kubectx Fira Firacode Caskaydia Consolas   -->
 # Generic Dev Container
 
 A comprehensive development container setup with intelligent tool selection and automatic configuration.

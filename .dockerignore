@@ -1,0 +1,8 @@
+.dockerignore
+.mise.toml
+cspell.sh
+dev.sh
+Dockerfile
+README.md
+images/**
+run.sh
