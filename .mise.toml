@@ -1,4 +1,5 @@
 # cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr openbao kubens
+# NOTE: The #### section #### headers below must not be altered or moved as they are used as markers for the install script.
 
 #### Begin Environment ####
 [env]
@@ -22,10 +23,10 @@ helm = "latest"
 #### Begin Kubernetes Utilities ####
 krew = "latest"
 dive = "latest"
-#kubebench = "latest"  # Temporarily disabled due to plugin issues
+kubebench = "latest"
 popeye = "latest"
 trivy = "latest"
-#cmctl = "latest"
+cmctl = "latest"
 #k3d = "latest"
 #### End Kubernetes Utilities ####
 
@@ -33,8 +34,7 @@ gitui = "latest"
 #golang = 'latest'
 #goreleaser = 'latest'
 packer = "latest"
-#tealdeer = "latest"  # Temporarily disabled due to plugin issues
-openbao = "latest"
+tealdeer = "latest"
 #powershell = "latest"
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
@@ -48,6 +48,5 @@ openbao = "latest"
 [settings]
 experimental = true
 http_timeout = "90s"
-#jobs = 1
 yes = true
 #### End Settings ####
