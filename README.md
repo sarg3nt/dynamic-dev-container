@@ -94,9 +94,25 @@ export GITHUB_TOKEN="your_github_token_here"
 - **k3d** (latest) - Lightweight Kubernetes for development
 - **cmctl** (latest) - cert-manager CLI tool
 
-### Programming Languages & Runtimes
+### Programming Languages & Development Environments
+
+#### Go Development
+- **Go** (latest) - Go programming language with modern toolchain
+- **GoReleaser** (latest) - Release automation tool for Go projects
+
+#### .NET Development  
+- **dotnet** (latest) - .NET SDK for C#, F#, and VB.NET development
+- Cross-platform development support for modern .NET applications
+
+#### JavaScript/Node.js Development
+- **Node.js** (latest) - JavaScript runtime for server-side development
+- **pnpm** (latest) - Fast, disk space efficient package manager
+- **yarn** (latest) - Package manager with workspaces and plug'n'play
+- **Deno** (latest) - Secure runtime for JavaScript and TypeScript
+- **Bun** (latest) - Fast all-in-one JavaScript runtime with built-in bundler
+
+#### General Purpose Languages
 - **Python** (v3.13) - Latest stable Python with comprehensive package management
-- **Go** (latest) - Go programming language with goreleaser for releases
 - **PowerShell** (latest) - Cross-platform PowerShell for automation
 
 ### Development Utilities
@@ -113,11 +129,17 @@ export GITHUB_TOKEN="your_github_token_here"
 - GitHub integration (Copilot, Pull Requests, Themes)
 - Git visualization tools
 
+**Language-Specific Extension Categories:**
+- **Go Development**: Go language support, Go nightly builds, debugging tools
+- **.NET Development**: C# language support, C# Dev Kit, .NET runtime installer, Interactive Notebooks
+- **JavaScript/Node.js Development**: TypeScript support, ESLint, Prettier, Tailwind CSS IntelliSense, auto-rename tags, path autocompletion
+- **Python Development**: Python language support, MyPy type checker, Ruff linter and formatter
+- **Infrastructure**: Kubernetes tools, Helm IntelliSense, OpenTofu/Terraform support, Packer tools
+
 **Optional Categories:**
-- Python development tools (if Python extensions selected)
 - Markdown editing and preview tools
-- Shell/Bash scripting support
-- JavaScript/TypeScript development tools
+- Shell/Bash scripting support with ShellCheck
+- Core development utilities (Docker, spell checker, TODO tree, etc.)
 
 ## How It Works
 

@@ -64,6 +64,8 @@
     "HOST_PATH": "${localWorkspaceFolder}", // Eg. '/home/my-user/src/my-project'
     "WORKSPACE_PATH": "${containerWorkspaceFolder}", // Eg. '/workspaces/my-project'
     "PYTHON_PATH": "/home/vscode/.local/share/mise/installs/python", // Location of our Python modules
+    "DOTNET_ROOT": "/home/vscode/.local/share/mise/installs/dotnet/latest", // Location of .NET installation
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1", // Disable .NET telemetry
     "ZSH_THEME": "${localEnv:ZSH_THEME}", // Will use local ZSH_THEME if set, otherwise will use Starship
     "KUBE_EDITOR": "vi",
     "TERM": "xterm-256color",
@@ -99,6 +101,23 @@
         "golang.go-nightly", // Go nightly builds support
         // #### End Go ####
 
+        // #### Begin .NET ####
+        "ms-dotnettools.csharp", // C# language support
+        "ms-dotnettools.csdevkit", // C# Dev Kit
+        "ms-dotnettools.vscode-dotnet-runtime", // .NET Runtime installer
+        "ms-dotnettools.dotnet-interactive-vscode", // .NET Interactive Notebooks
+        // #### End .NET ####
+
+        // #### Begin JavaScript/Node.js ####
+        "ms-vscode.vscode-typescript-next", // TypeScript and JavaScript support
+        "bradlc.vscode-tailwindcss", // Tailwind CSS IntelliSense
+        "esbenp.prettier-vscode", // Prettier code formatter
+        "dbaeumer.vscode-eslint", // ESLint for JavaScript/TypeScript
+        "ms-vscode.vscode-json", // JSON language support
+        "formulahendry.auto-rename-tag", // Auto rename paired HTML/XML tags
+        "christian-kohler.path-intellisense", // Path autocompletion
+        // #### End JavaScript/Node.js ####
+
         // #### Begin Python ####
         "ms-python.python", // Python language support
         "ms-python.mypy-type-checker", // MyPy type checker
@@ -124,11 +143,6 @@
         // #### Begin Terraform/OpenTofu ####
         "opentofu.vscode-opentofu", // OpenTofu/Terraform support
         // #### End Terraform/OpenTofu ####
-
-        // #### Begin JavaScript/TypeScript ####
-        "dbaeumer.vscode-eslint", // ESLint for JavaScript/TypeScript
-        "esbenp.prettier-vscode", // Prettier code formatter
-        // #### End JavaScript/TypeScript ####
 
         // #### Begin Packer ####
         "szTheory.vscode-packer-powertools", // Packer tools
@@ -192,7 +206,7 @@
         "terminal.integrated.defaultProfile.linux": "zsh",
         "reformat": true,
         // #### End Core VS Code Settings ####
-        
+
         // #### Begin Go Settings ####
         "go.buildTags": "",
         "go.toolsEnvVars": {
@@ -202,10 +216,7 @@
         "go.testEnvVars": {
           "CGO_ENABLED": "1"
         },
-        "go.testFlags": [
-          "-v",
-          "-race"
-        ],
+        "go.testFlags": ["-v", "-race"],
         "go.testTimeout": "30s",
         "go.coverOnSingleTest": true,
         "go.coverOnSingleTestFile": true,
@@ -223,6 +234,89 @@
           "formatting.gofumpt": true
         },
         // #### End Go Settings ####
+
+        // #### Begin .NET Settings ####
+        "dotnetAcquisitionExtension.allowInvalidPaths": true,
+        "dotnetAcquisitionExtension.existingDotnetPath": [
+          {
+            "extensionId": "ms-dotnettools.csharp",
+            "path": "/home/vscode/.local/share/mise/installs/dotnet/latest/dotnet"
+          },
+          {
+            "extensionId": "ms-dotnettools.csdevkit",
+            "path": "/home/vscode/.local/share/mise/installs/dotnet/latest/dotnet"
+          }
+        ],
+        "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+        "dotnet.inlayHints.enableInlayHintsForParameters": true,
+        "dotnet.inlayHints.enableInlayHintsForLiteralParameters": true,
+        "dotnet.inlayHints.enableInlayHintsForIndexerParameters": true,
+        "dotnet.inlayHints.enableInlayHintsForObjectCreationParameters": true,
+        "dotnet.inlayHints.enableInlayHintsForOtherParameters": true,
+        "dotnet.inlayHints.enableInlayHintsForTypes": true,
+        "dotnet.inlayHints.enableInlayHintsForImplicitVariableTypes": true,
+        "dotnet.inlayHints.enableInlayHintsForLambdaParameterTypes": true,
+        "dotnet.inlayHints.enableInlayHintsForImplicitObjectCreation": true,
+        "[csharp]": {
+          "editor.formatOnSave": true,
+          "editor.tabSize": 4,
+          "editor.insertSpaces": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+          }
+        },
+        "[json]": {
+          "editor.defaultFormatter": "vscode.json-language-features"
+        },
+        // #### End .NET Settings ####
+
+        // #### Begin JavaScript/Node.js Settings ####
+        "typescript.preferences.includePackageJsonAutoImports": "auto",
+        "typescript.suggest.autoImports": true,
+        "typescript.updateImportsOnFileMove.enabled": "always",
+        "javascript.updateImportsOnFileMove.enabled": "always",
+        "eslint.workingDirectories": ["./"],
+        "eslint.validate": [
+          "javascript",
+          "javascriptreact",
+          "typescript",
+          "typescriptreact"
+        ],
+        "prettier.requireConfig": false,
+        "prettier.useEditorConfig": false,
+        "[javascript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+          }
+        },
+        "[javascriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+          }
+        },
+        "[typescript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+          }
+        },
+        "[typescriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+          }
+        },
+        "[jsonc]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        // #### End JavaScript/Node.js Settings ####
 
         // #### Begin Python Settings ####
         "python.pythonPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
@@ -276,9 +370,7 @@
           "vscode-kubernetes.kubectl-path": "/home/vscode/.local/share/mise/installs/kubectl/latest/bin/kubectl"
         },
         "helm-intellisense.lintFileOnSave": true,
-        "helm-intellisense.customValueFileNames": [
-          "values.yaml"
-        ],
+        "helm-intellisense.customValueFileNames": ["values.yaml"],
         // #### End Kubernetes/Helm Settings ####
 
         // #### Begin JavaScript/TypeScript Settings ####
@@ -347,12 +439,7 @@
         // #### End Spell Checker Settings ####
 
         // #### Begin TODO Tree Settings ####
-        "todo-tree.general.tags": [
-          "TODO:",
-          "NOTE:",
-          "WARNING:",
-          "FIXME:"
-        ],
+        "todo-tree.general.tags": ["TODO:", "NOTE:", "WARNING:", "FIXME:"],
         "todo-tree.highlights.customHighlight": {
           "TODO:": {
             "hideFromTree": false,
@@ -390,9 +477,8 @@
             "type": "whole-line",
             "gutterIcon": true
           }
-        }
+        },
         // #### End TODO Tree Settings ####
-        ,
         // #### Begin PSI Header Settings ####
         "psi-header.config": {
           "company": "<Add your company name here>"
@@ -463,22 +549,15 @@
         "psi-header.templates": [
           {
             "language": "markdown",
-            "template": [
-              "Add your template text here"
-            ]
+            "template": ["Add your template text here"]
           },
           {
             "language": "powershell",
-            "template": [
-              ".DESCRIPTION",
-              "  Add your template text here"
-            ]
+            "template": [".DESCRIPTION", "  Add your template text here"]
           },
           {
             "language": "*",
-            "template": [
-              "  Add your template text here"
-            ]
+            "template": ["  Add your template text here"]
           }
         ]
         // #### End PSI Header Settings ####

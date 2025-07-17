@@ -30,9 +30,24 @@ cmctl = "latest"
 k3d = "latest"
 #### End Kubernetes Utilities ####
 
-gitui = "latest"
+#### Begin Go Development ####
 golang = 'latest'
 goreleaser = 'latest'
+#### End Go Development ####
+
+#### Begin .NET Development ####
+dotnet = "latest"
+#### End .NET Development ####
+
+#### Begin JavaScript/Node.js Development ####
+node = "latest"
+pnpm = "latest"
+yarn = "latest"
+deno = "latest"
+bun = "latest"
+#### End JavaScript/Node.js Development ####
+
+gitui = "latest"
 packer = "latest"
 tealdeer = "latest"
 micro = "latest"

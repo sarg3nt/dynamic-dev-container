@@ -10,6 +10,8 @@ IFS=$'\n\t'
 INSTALL_OPENTOFU=false
 INSTALL_KUBERNETES=false
 INSTALL_GO=false
+INSTALL_DOTNET=false
+INSTALL_JAVASCRIPT=false
 INSTALL_PACKER=false
 INSTALL_POWERSHELL=false
 INCLUDE_PYTHON_EXTENSIONS=false
@@ -173,8 +175,35 @@ generate_mise_toml() {
   if ask_yes_no "Install Go programming language?" "N"; then
     INSTALL_GO=true
     {
+      echo ""
+      echo "#### Begin Go Development ####"
       echo 'golang = "latest"'
       echo 'goreleaser = "latest"'
+      echo "#### End Go Development ####"
+    } >> "$temp_file"
+  fi
+
+  if ask_yes_no "Install .NET development tools?" "N"; then
+    INSTALL_DOTNET=true
+    {
+      echo ""
+      echo "#### Begin .NET Development ####"
+      echo 'dotnet = "latest"'
+      echo "#### End .NET Development ####"
+    } >> "$temp_file"
+  fi
+
+  if ask_yes_no "Install JavaScript/Node.js development tools?" "N"; then
+    INSTALL_JAVASCRIPT=true
+    {
+      echo ""
+      echo "#### Begin JavaScript/Node.js Development ####"
+      echo 'node = "latest"'
+      echo 'pnpm = "latest"'
+      echo 'yarn = "latest"'
+      echo 'deno = "latest"'
+      echo 'bun = "latest"'
+      echo "#### End JavaScript/Node.js Development ####"
     } >> "$temp_file"
   fi
 
@@ -349,6 +378,20 @@ generate_devcontainer_json() {
     extract_devcontainer_section "// #### Begin Go ####" "// #### End Go ####" >> "$temp_file"
   fi
   
+  # Include .NET extensions if .NET was installed
+  if [ "$INSTALL_DOTNET" = true ]; then
+    echo -e "${GREEN}✓ Including .NET development extensions (.NET tools were installed)${NC}"
+    echo "" >> "$temp_file"
+    extract_devcontainer_section "// #### Begin .NET ####" "// #### End .NET ####" >> "$temp_file"
+  fi
+  
+  # Include JavaScript/Node.js extensions if JavaScript tools were installed
+  if [ "$INSTALL_JAVASCRIPT" = true ]; then
+    echo -e "${GREEN}✓ Including JavaScript/Node.js development extensions (Node.js tools were installed)${NC}"
+    echo "" >> "$temp_file"
+    extract_devcontainer_section "// #### Begin JavaScript/Node.js ####" "// #### End JavaScript/Node.js ####" >> "$temp_file"
+  fi
+  
   # Ask about Python extensions (no corresponding tool installation)
   if ask_yes_no "Include Python development extensions?" "Y"; then
     INCLUDE_PYTHON_EXTENSIONS=true
@@ -422,6 +465,24 @@ generate_devcontainer_json() {
     # shellcheck disable=SC2129
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin Go Settings ####" "// #### End Go Settings ####" >> "$temp_file"
+    echo "," >> "$temp_file"
+  fi
+  
+  # Include .NET settings if .NET was installed
+  if [ "$INSTALL_DOTNET" = true ]; then
+    echo -e "${GREEN}✓ Including .NET language settings${NC}"
+    # shellcheck disable=SC2129
+    echo "" >> "$temp_file"
+    extract_devcontainer_section "// #### Begin .NET Settings ####" "// #### End .NET Settings ####" >> "$temp_file"
+    echo "," >> "$temp_file"
+  fi
+  
+  # Include JavaScript/Node.js settings if JavaScript tools were installed
+  if [ "$INSTALL_JAVASCRIPT" = true ]; then
+    echo -e "${GREEN}✓ Including JavaScript/Node.js language settings${NC}"
+    # shellcheck disable=SC2129
+    echo "" >> "$temp_file"
+    extract_devcontainer_section "// #### Begin JavaScript/Node.js Settings ####" "// #### End JavaScript/Node.js Settings ####" >> "$temp_file"
     echo "," >> "$temp_file"
   fi
   
