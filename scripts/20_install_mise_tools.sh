@@ -10,7 +10,7 @@ main() {
 }
 
 install_mise_packages() {
-  log "20_install_mise_packages.sh" "blue"
+  log "20_install_mise_tools.sh" "blue"
 
   # Mise is installed in the docker file from it's master docker branch.
   log "Configuring mise" "green"
@@ -22,8 +22,23 @@ install_mise_packages() {
   log "Trusting configuration files" "green"
   mise trust "$HOME/.config/mise/config.toml"
 
+  #export MISE_VERBOSE=1
+  
   log "Installing tools with mise" "green"
-  mise install --yes
+  local retries=5
+  local count=0
+  until mise install --yes; do
+    exit_code=$?
+    count=$((count + 1))
+    if [ $count -lt $retries ]; then
+      log "mise install failed. Retrying ($count/$retries)..." "yellow"
+      sleep 2
+    else
+      log "mise install failed after $retries attempts." "red"
+      return $exit_code
+    fi
+  done
+  
   log "Mise tool install complete" "green"
 }
 
@@ -34,26 +49,12 @@ cleanup() {
   sudo rm -rfv /tmp/*
   echo ""
 
-  log "Cleaning go caches" "green"
-  go clean -cache
-  go clean -testcache
-  go clean -fuzzcache
-  go clean -modcache
-  echo ""
-
   log "Deleting all .git directories." "green"
-  find / -path /proc -prune -o -type d -name ".git" -not -path '/.git' -exec rmv -rf {} + 2>/dev/null || true
+  find / -path /proc -prune -o -type d -name ".git" -not -path '/.git' -exec rm -rf {} + 2>/dev/null || true
   echo ""
 
   log "Clearing mise cache." "green"
   mise cache clear
-  echo ""
-
-  log "Deleting go cache files" "green"
-  sudo rm -rfv /home/vscode/.cache/go-build/trim.txt
-  sudo rm -rfv /home/vscode/.cache/go-build/testexpire.txt
-  sudo rm -rfv /home/vscode/.config/go/telemetry/*
-  sudo rm -rfv /home/vscode/go/pkg/sumdb/sum.golang.org/latest
   echo ""
 
   log "Deleting all data in /var/log" "green"

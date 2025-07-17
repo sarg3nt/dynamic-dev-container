@@ -152,29 +152,19 @@ exec_into_container() {
   local -r spin=("-" "\\" "|" "/")
   local count=0 rot=0 docker_id
   
+  # Check if container exists and is running
   docker_id=$(docker container ls -f "name=${container_name}" -q)
   
   if [[ -z "$docker_id" ]]; then
-    echo -e "${BLUE}Waiting up to 10 minutes for the dev container to start"
-    echo -ne "${spin[0]}"
+    echo -ne "${YELLOW}Waiting up to 10 minutes for the dev container to start   ${NC}"
   fi
 
   while [[ -z "$docker_id" && $count -lt $max_wait ]]; do
     sleep 1
     docker_id=$(docker container ls -f "name=${container_name}" -q)
-    ((count++))
-
-    if ((count == 20)); then
-      echo -ne "\r\033[K"  # Clear line and return to beginning
-      echo -e "${YELLOW}The dev container is taking a while to start, VS Code could be downloading a new version or you may need to manually open it from within VS Code."
-      echo -ne "${BLUE}${spin[$rot]}"
-    fi
-    
-    # Only show spinner if container not found yet
-    if [[ -z "$docker_id" ]]; then
-      rot=$(( (rot + 1) % 4 ))
-      echo -ne "\r${spin[$rot]}"
-    fi
+    count=$((count + 1))
+    rot=$(( (rot + 1) % 4 ))
+    echo -ne "\b${spin[$rot]}"
   done
   
   if [[ -z "$docker_id" ]]; then
@@ -193,14 +183,129 @@ exec_into_container() {
   docker exec -u "${container_user}" -w "/workspaces/${project_name}" -it "${container_name}" zsh
 }
 
+# Clean up VS Code server processes
+cleanup_vscode_processes() {
+  # Kill VS Code server processes related to remote containers
+  pkill -f "vscode-remote-containers" 2>/dev/null || true
+  # Also kill any VS Code server processes that might be hanging around
+  pkill -f "vscode-server.*node.*--dns-result-order" 2>/dev/null || true
+  sleep 3
+}
+
+# Check if VS Code might be in an orphaned state
+check_vscode_orphaned_state() {
+  # Check if VS Code server with remote containers extension is running
+  local vscode_remote_containers_processes
+  vscode_remote_containers_processes=$(pgrep -f "vscode-remote-containers" 2>/dev/null || true)
+  
+  # Check if container exists
+  local docker_id
+  docker_id=$(docker container ls -f "name=${container_name}" -q)
+  
+  # If VS Code remote containers processes are running but container doesn't exist
+  if [[ -n "$vscode_remote_containers_processes" && -z "$docker_id" ]]; then
+    echo -e "${YELLOW}Warning: VS Code appears to be running with remote containers extension, but the container '${container_name}' doesn't exist.${NC}"
+    echo -e "${YELLOW}This usually happens when the container was manually removed while VS Code was still connected.${NC}"
+    echo ""
+    
+    # Show the orphaned processes for debugging
+    echo -e "${YELLOW}Found these VS Code remote container processes:${NC}"
+    ps -f -p ${vscode_remote_containers_processes} 2>/dev/null || true
+    echo ""
+    
+    echo -e "${YELLOW}Options:${NC}"
+    echo -e "${YELLOW}1. Close VS Code windows manually on Windows and run this script again${NC}"
+    echo -e "${YELLOW}2. Clean up server processes and continue. VS Code will display a dialog asking if you want to \"Reload Window\" or \"Cancel\", select \"Reload Window\"${NC}"
+    echo ""
+    
+    read -r -p "Choose option [1/2]: " response
+    
+    case "$response" in
+      1)
+        echo -e "${BLUE}Please close VS Code windows on Windows and run this script again.${NC}"
+        exit 0
+        ;;
+      2|*)
+        if [[ "$response" == "2" ]]; then
+          echo -e "${BLUE}Cleaning up server processes...${NC}"
+        else
+          echo "Invalid response. Cleaning up server processes..."
+        fi
+        cleanup_vscode_processes
+        return 0  # Start fresh
+        ;;
+    esac
+  fi
+  
+  return 1  # No orphaned state detected
+}
+
 # Main function
 main() {
+  local force_restart=false
+  
+  # Parse command line arguments
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --force|--restart|-f)
+        force_restart=true
+        shift
+        ;;
+      --help|-h)
+        echo "Usage: $0 [OPTIONS]"
+        echo ""
+        echo "Options:"
+        echo "  --force, --restart, -f    Force restart by removing container and cleaning server processes"
+        echo "                           (Note: VS Code windows on Windows need to be closed manually)"
+        echo "  --help, -h                Show this help message"
+        echo ""
+        echo "This script manages a VS Code dev container in WSL. When the container is manually"
+        echo "removed while VS Code is connected, use --force to clean up and start fresh."
+        exit 0
+        ;;
+      *)
+        echo "Unknown option: $1"
+        echo "Use --help for usage information"
+        exit 1
+        ;;
+    esac
+  done
+  
   source_colors
   add_docker_exec_command
 
-  # If the dev container is not running, open VS Code
-  if ! docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
+  # Check if the dev container is already running
+  local docker_id
+  docker_id=$(docker container ls -f "name=${container_name}" -q)
+  
+  if [[ "$force_restart" == true ]]; then
+    echo -e "${BLUE}Force restart requested.${NC}"
+    echo -e "${YELLOW}Note: You may need to manually close VS Code windows on Windows.${NC}"
+    echo -e "${BLUE}Cleaning up any existing container and server processes...${NC}"
+    
+    # Remove existing container if it exists
+    if docker container ls -a -f "name=${container_name}" -q | grep -q .; then
+      echo -e "${BLUE}Removing existing container '${container_name}'...${NC}"
+      docker rm -f "${container_name}" 2>/dev/null || true
+    fi
+    
+    # Clean up any lingering server processes
+    cleanup_vscode_processes
+    
+    echo -e "${BLUE}Starting VS Code with fresh container...${NC}"
     open_vs_code
+  elif [[ -n "$docker_id" ]]; then
+    echo -e "${GREEN}Dev container '${container_name}' is already running.${NC}"
+    echo -e "${BLUE}Connecting to existing container...${NC}"
+  else
+    # Check for orphaned VS Code state and handle it
+    if check_vscode_orphaned_state; then
+      echo -e "${BLUE}Starting VS Code fresh after cleanup...${NC}"
+      open_vs_code
+    else
+      echo -e "${BLUE}Dev container '${container_name}' not found. Starting VS Code...${NC}"
+      open_vs_code
+    fi
   fi
 
   exec_into_container
