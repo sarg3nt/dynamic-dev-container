@@ -10,7 +10,7 @@
   //   * your-repo-plugins
   // - "containerEnv" = Add any "containerEnv" variables the list.
   //   These are variables that you want to be able to set on the host and passed into the container.
-  "name": "Generic Dev Container",
+  "name": "Dynamic Dev Container",
   // Using the latest version of the dynamic-dev-container image
   "image": "ghcr.io/sarg3nt/dynamic-dev-container:latest",
   "runArgs": ["--name=dynamic-dev-container"],

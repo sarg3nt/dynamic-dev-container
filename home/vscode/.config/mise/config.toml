@@ -17,5 +17,4 @@ zoxide = "latest"
 [settings]
 experimental = true
 http_timeout = "90s"
-jobs = 1
 yes = true

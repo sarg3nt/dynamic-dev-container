@@ -39,7 +39,8 @@ USER vscode
 # Copy the mise binary from the mise container
 COPY --from=mise /usr/local/bin/mise /usr/local/bin/mise
 COPY --chown=vscode:vscode home/vscode/.config/mise /home/vscode/.config/mise
-RUN --mount=type=bind,source=scripts/20_install_mise_apps.sh,target=/20.sh,ro bash -c "/20.sh"
+
+RUN --mount=type=bind,source=scripts/20_install_mise_tools.sh,target=/20.sh,ro bash -c "/20.sh"
 RUN --mount=type=bind,source=scripts/30_install_other_apps.sh,target=/30.sh,ro bash -c "/30.sh"
 RUN --mount=type=bind,source=scripts/40_setup_ssh_known_hosts.sh,target=/40.sh,ro bash -c "/40.sh"
 

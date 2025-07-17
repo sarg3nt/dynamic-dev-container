@@ -45,6 +45,9 @@ package_install() {
   log "Installing docker-buildx-plugin" "green"
   dnf install -y docker-buildx-plugin
 
+  # Clean cache after Docker packages (they're large)
+  dnf clean all
+
   log "Installing expect" "green"
   dnf install -y expect
 
@@ -95,6 +98,10 @@ package_install() {
 
   log "Installing xz zip unzip" "green"
   dnf install -y xz zip unzip
+  
+  # Final cleanup after all packages
+  log "Final package cache cleanup" "green"
+  dnf clean all
 }
 
 install_dev_container_features() {
@@ -110,17 +117,30 @@ install_dev_container_features() {
 }
 
 cleanup() {
-  log "Running dnf autoremove" "green"
+  log "Running comprehensive cleanup" "green"
+  
+  # Package manager cleanup
   dnf autoremove -y
-
-  log "Running dnf clean all" "green"
   dnf clean all
-
-  log "Removing /tmp/source directory" "green"
-  rm -rf /tmp/source
-
-  log "Deleting files from /tmp" "green"
+  
+  # Clear package caches that might remain
+  rm -rf /var/cache/dnf/*
+  rm -rf /var/cache/yum/*
+  
+  # Clear log files
+  rm -rf /var/log/*
+  
+  # Clear temporary directories
   rm -rf /tmp/*
+  rm -rf /var/tmp/*
+  
+  # Clear source directories if they exist
+  rm -rf /tmp/source
+  
+  # Clear any leftover installation files
+  find /var -name "*.rpm" -delete 2>/dev/null || true
+  
+  log "Cleanup completed" "green"
 }
 
 main() {
