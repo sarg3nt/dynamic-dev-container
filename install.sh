@@ -625,6 +625,10 @@ main() {
   echo -e "  ${GREEN}Copying${NC} cspell.json"
   cp "cspell.json" "${project_path}/"
   
+  # Copy krew plugins configuration
+  echo -e "  ${GREEN}Copying${NC} .krew_plugins"
+  cp ".krew_plugins" "${project_path}/"
+  
   # Always copy run.sh
   echo -e "  ${GREEN}Copying${NC} run.sh"
   cp "run.sh" "${project_path}/"

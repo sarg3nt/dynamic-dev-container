@@ -138,6 +138,7 @@ export GITHUB_TOKEN="your_github_token_here"
 The installation script copies and configures:
 - **`.devcontainer/`** - VS Code dev container configuration with lifecycle scripts
 - **`.mise.toml`** - Tool version management configuration (customized per project)
+- **`.krew_plugins`** - kubectl plugin configuration for krew (customize which plugins to install)
 - **`dev.sh`** - Container management script (customized with project settings)
 - **`run.sh`** - Standalone container runner (uses pre-built images)
 - **`cspell.json`** - Spell checker configuration for consistent documentation
@@ -214,6 +215,29 @@ MISE_PYTHON_COMPILE = false
 1. **Modify your project's `.mise.toml`**: Add new tools after initial setup
 2. **Rebuild container**: Run `./dev.sh` to rebuild with new tools
 3. **VS Code Extensions**: Add corresponding extensions to `.devcontainer/devcontainer.json`
+
+### kubectl Plugin Configuration
+Customize which kubectl plugins are installed via krew by editing `.krew_plugins`:
+
+```bash
+# Default plugins (one per line)
+access-matrix
+blame
+get-all
+node-restart
+switch-config
+view-allocations
+
+# Add your own plugins
+ctx
+ns
+score
+```
+
+- **Comments**: Lines starting with `#` are ignored
+- **Empty Lines**: Blank lines are ignored
+- **Plugin Names**: Use the exact names from `krew search`
+- **Fallback**: If the file is missing, a default set of plugins is installed
 
 ### Environment Customization
 - **Timezone**: Set `TZ` environment variable in `devcontainer.json`

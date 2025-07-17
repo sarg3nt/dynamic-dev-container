@@ -12,6 +12,11 @@ main() {
   echo ""
   log "EXECUTING POST START COMMAND..." "gray" "INFO"
   eval "$(/usr/local/bin/mise activate bash 2>/dev/null)" || true
+  
+  # Set workspace path for configuration files
+  WORKSPACE_PATH="${WORKSPACE_PATH:-/workspaces/$(basename "$(pwd)")}"
+  export WORKSPACE_PATH
+  
   link_pylintrc_file
   echo ""
   git_update_diff_tool
@@ -140,7 +145,7 @@ copy_docker_config() {
 #######################################
 # Install any kubectl plugins using krew.
 # Globals:
-#   HOME
+#   HOME, WORKSPACE_PATH
 # Arguments:
 #   None
 #######################################
@@ -149,10 +154,29 @@ install_kubectl_plugins() {
     log_info "Adding krew to the path" "green"
     export_statement="export PATH=\"\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH\""
     echo "$export_statement" >>~/.zshrc
-    echo "$export_statement" >>~/.bashrc
 
     log_info "Installing plugins" "green"
-    krew install access-matrix blame get-all node-restart switch-config view-allocations
+    
+    # Read plugins from configuration file
+    local krew_config="${WORKSPACE_PATH}/.krew_plugins"
+    if [[ -f "$krew_config" ]]; then
+      # Read plugin names from file, ignoring comments and empty lines, into an array
+      local plugins_array=()
+      while IFS= read -r plugin; do
+        [[ -n "$plugin" ]] && plugins_array+=("$plugin")
+      done < <(grep -v '^#' "$krew_config" | grep -v '^[[:space:]]*$')
+      
+      if [[ ${#plugins_array[@]} -gt 0 ]]; then
+        log_info "Installing plugins from config: ${plugins_array[*]}" "green"
+        krew install "${plugins_array[@]}"
+      else
+        log_warning "No plugins found in config file, skipping installation"
+      fi
+    else
+      # Fallback to hardcoded list if config file not found
+      log_warning "Config file not found at $krew_config, using fallback list" "yellow"
+      krew install access-matrix blame get-all node-restart switch-config view-allocations
+    fi
 
     # Create a flag file to indicate krew plugins installation is complete
     touch "${HOME}/.krew_plugins_ready"
