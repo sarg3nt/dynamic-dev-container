@@ -29,7 +29,7 @@ IFS=$'\n\t'
 #######################################
 wait_for_mise_installation() {
   local wait_count=0
-  local max_wait=200  # 200 seconds should be enough
+  local max_wait=120  # 2 minutes should be sufficient for mise tools
   local -a spin=("-" "\\" "|" "/")
   local spin_idx=0
   
@@ -47,7 +47,11 @@ wait_for_mise_installation() {
     echo -e "\r\033[K${GREEN}✓ Installation completed after $wait_count seconds!${NC}"
     activate_mise_environment
   else
-    echo -e "\b${YELLOW}✗ Continuing without mise tools (timeout after $max_wait seconds)${NC}"
+    # Clear the entire line and show timeout message
+    echo -e "\r\033[K${RED}✗ Mise installation timeout after $max_wait seconds${NC}"
+    echo -e "${YELLOW}  The mise tool installation may have failed or been canceled.${NC}"
+    echo -e "${YELLOW}  Check VS Code for any installation prompts or errors.${NC}"
+    echo -e "${YELLOW}  If needed, restart the dev container to retry installation.${NC}"
     mise_json=""
   fi
   echo ""
