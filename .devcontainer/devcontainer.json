@@ -14,7 +14,12 @@
   // Build from Dockerfile to pre-install mise tools
   "build": {
     "dockerfile": "Dockerfile",
-    "context": ".."
+    "context": "../",
+    "args": {
+      "BUILDKIT_PROGRESS": "plain",
+      "DOCKER_BUILDKIT": "1"
+    },
+    "options": ["--progress=plain", "--no-cache"]
   },
   "runArgs": ["--name=dynamic-dev-container"],
   // Mounts

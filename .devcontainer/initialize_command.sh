@@ -5,7 +5,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-source "$(dirname "$0")/utils/log.sh"
+source "$(dirname "$0")/log.sh"
 
 main() {
   echo ""

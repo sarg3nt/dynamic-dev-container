@@ -8,12 +8,11 @@ FROM ghcr.io/sarg3nt/dynamic-dev-container:0.0.1
 # Switch to vscode user for tool installation
 USER vscode
 
-# Copy mise configuration from workspace root
-COPY .mise.toml /tmp/.mise.toml
-COPY .krew_plugins /tmp/.krew_plugins
+# Install mise tools - requires .mise.toml in the working directory
+RUN --mount=type=bind,source=.,target=/tmp/src,ro --mount=type=bind,source=.devcontainer,target=/tmp/src/.devcontainer,ro bash -c "cd /tmp/src && ls -alh && .devcontainer/10_install_mise_tools.sh"
 
-# Run the devcontainer build script to install mise tools and krew plugins.
-RUN --mount=type=bind,source=scripts/devcontainer_dockerfile_build.sh,target=/build.sh,ro bash -c "/build.sh"
+# Install krew plugins - requires krew to be installed from mise
+RUN --mount=type=bind,source=.,target=/tmp/src,ro --mount=type=bind,source=.devcontainer,target=/tmp/src/.devcontainer,ro bash -c "cd /tmp/src && .devcontainer/20_install_krew_plugins.sh"
 
-# Activate mise environment for all future shells
-RUN echo 'eval "$(/usr/local/bin/mise activate zsh)"' >> /home/vscode/.zshrc
+# Install Python packages - requires Python and pip from mise
+RUN --mount=type=bind,source=.,target=/tmp/src,ro --mount=type=bind,source=.devcontainer,target=/tmp/src/.devcontainer,ro bash -c "cd /tmp/src && .devcontainer/30_install_python_packages.sh"

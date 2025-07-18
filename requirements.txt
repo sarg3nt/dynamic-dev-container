@@ -3,25 +3,25 @@
 # An example requirements file.
 
 # https://pypi.org/project/fabric/
-# fabric~=3.2.2
+fabric~=3.2.2
 # https://pypi.org/project/GitPython/
-# gitpython~=3.1.44
+gitpython~=3.1.44
 # https://pypi.org/project/hatch/
-# hatch~=1.14.0
+hatch~=1.14.0
 # https://pypi.org/project/keeper-secrets-manager-core/
-# keeper-secrets-manager-core~=16.6
+keeper-secrets-manager-core~=16.6
 # https://pypi.org/project/kubernetes/
-# kubernetes~=32.0
+kubernetes~=32.0
 # https://pypi.org/project/kubernetes-typed/
-# kubernetes-typed~=18.20
+kubernetes-typed~=18.20
 # https://pypi.org/project/loguru/
-# loguru~=0.7.3
+loguru~=0.7.3
 # https://pypi.org/project/orjson/
-# orjson~=3.10.15
+orjson~=3.10.15
 # https://pypi.org/project/prettytable/
-# prettytable~=3.14.0
+prettytable~=3.14.0
 # https://pypi.org/project/pytest/
-# pytest~=8.3.4
+pytest~=8.3.4
 # https://pypi.org/project/python-hcl2/
 # python-hcl2~=6.1.0
 # https://pypi.org/project/PyYAML/
