@@ -1,5 +1,4 @@
 .dockerignore
-.mise.toml
 cspell.sh
 dev.sh
 Dockerfile

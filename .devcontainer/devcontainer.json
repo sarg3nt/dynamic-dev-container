@@ -11,8 +11,11 @@
   // - "containerEnv" = Add any "containerEnv" variables the list.
   //   These are variables that you want to be able to set on the host and passed into the container.
   "name": "Dynamic Dev Container",
-  // Using the latest version of the dynamic-dev-container image
-  "image": "ghcr.io/sarg3nt/dynamic-dev-container:latest",
+  // Build from Dockerfile to pre-install mise tools
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
   "runArgs": ["--name=dynamic-dev-container"],
   // Mounts
   "mounts": [
@@ -64,7 +67,7 @@
     "HOST_PATH": "${localWorkspaceFolder}", // Eg. '/home/my-user/src/my-project'
     "WORKSPACE_PATH": "${containerWorkspaceFolder}", // Eg. '/workspaces/my-project'
     "PYTHON_PATH": "/home/vscode/.local/share/mise/installs/python", // Location of our Python modules
-    "DOTNET_ROOT": "/home/vscode/.local/share/mise/installs/dotnet/latest", // Location of .NET installation
+    "DOTNET_ROOT": "/home/vscode/.local/share/mise/installs/dotnet/9.0.302", // Location of .NET installation (will be updated during build)
     "DOTNET_CLI_TELEMETRY_OPTOUT": "1", // Disable .NET telemetry
     "ZSH_THEME": "${localEnv:ZSH_THEME}", // Will use local ZSH_THEME if set, otherwise will use Starship
     "KUBE_EDITOR": "vi",
@@ -240,11 +243,11 @@
         "dotnetAcquisitionExtension.existingDotnetPath": [
           {
             "extensionId": "ms-dotnettools.csharp",
-            "path": "/home/vscode/.local/share/mise/installs/dotnet/latest/dotnet"
+            "path": "/home/vscode/.local/share/mise/installs/dotnet/9.0.302/dotnet"
           },
           {
             "extensionId": "ms-dotnettools.csdevkit",
-            "path": "/home/vscode/.local/share/mise/installs/dotnet/latest/dotnet"
+            "path": "/home/vscode/.local/share/mise/installs/dotnet/9.0.302/dotnet"
           }
         ],
         "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
@@ -319,8 +322,8 @@
         // #### End JavaScript/Node.js Settings ####
 
         // #### Begin Python Settings ####
-        "python.pythonPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
-        "python.defaultInterpreterPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
+        "python.pythonPath": "/home/vscode/.local/share/mise/installs/python/3.13.5/bin/python",
+        "python.defaultInterpreterPath": "/home/vscode/.local/share/mise/installs/python/3.13.5/bin/python",
         "autopep8.args": ["--max-line-length=180"],
         "python.analysis.ignore": ["*"],
         "[python]": {
@@ -367,7 +370,7 @@
 
         // #### Begin Kubernetes/Helm Settings ####
         "vs-kubernetes": {
-          "vscode-kubernetes.kubectl-path": "/home/vscode/.local/share/mise/installs/kubectl/latest/bin/kubectl"
+          "vscode-kubernetes.kubectl-path": "/home/vscode/.local/share/mise/installs/kubectl/1.33.2/bin/kubectl"
         },
         "helm-intellisense.lintFileOnSave": true,
         "helm-intellisense.customValueFileNames": ["values.yaml"],
@@ -386,7 +389,7 @@
 
         // #### Begin PowerShell Settings ####
         "powershell.powerShellAdditionalExePaths": {
-          "Powershell7": "/home/vscode/.local/share/mise/installs/powershell/latest/pwsh"
+          "Powershell7": "/home/vscode/.local/share/mise/installs/powershell/7.5.2/pwsh"
         },
         "powershell.powerShellDefaultVersion": "Powershell7",
         "omnisharp.autoStart": false,
