@@ -12,6 +12,9 @@ main() {
   log "EXECUTING INITIALIZE COMMAND..." "gray" "INFO"
   get_latest_dev_container_version
   create_required_folders
+  echo ""
+  log_info "Dev Container is now building, this might take a while the first time or after a 'Rebuild Container' command."
+  log_info "To view the progress of the build click 'Connecting to Dev Container (show log)' in the bottom right corner of VS Code."
 }
 
 #######################################

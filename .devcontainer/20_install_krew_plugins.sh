@@ -33,12 +33,6 @@ install_kubectl_plugins() {
     log_info "Adding krew to PATH..."
     export_statement="export PATH=\"\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH\""
     echo "$export_statement" >>~/.zshrc
-    
-    log_info "Current directory:"
-    pwd
-
-    log_info "Current directory contents:"
-    ls -alh
 
     # Read plugins from configuration file
     local krew_config=".krew_plugins"

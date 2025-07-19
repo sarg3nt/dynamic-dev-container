@@ -16,8 +16,12 @@ main() {
   # Set workspace path for configuration files
   WORKSPACE_PATH="${WORKSPACE_PATH:-/workspaces/$(basename "$(pwd)")}"
   export WORKSPACE_PATH
-  
+
+  log_info "Home is set to: $HOME"
+
   link_pylintrc_file
+  echo ""
+  copy_gitconfig
   echo ""
   git_update_diff_tool
   echo ""
@@ -27,9 +31,6 @@ main() {
   echo ""
   copy_docker_config
   echo ""
-  install_kubectl_plugins
-  echo ""
-  install_kubectx_kubens_completions
   # Uncomment to install PowerCLI
   # bash usr/local/bin/install_powercli
 }
@@ -43,6 +44,28 @@ link_pylintrc_file() {
   log_info "Linking '.pylintrc' from Home to Workspace folder."
   ln -f -s "${HOME}/.pylintrc" "${WORKSPACE_PATH}/.pylintrc"
   log_success "Link added successfully."
+}
+
+#######################################
+# Copy in the user's '.gitconfig' so modifications to it in the devcontainer do not affect the host's version.
+# Globals:
+#   HOME
+# Arguments:
+#   None
+#######################################
+copy_gitconfig() {
+  log_info "Git Config Setup:"
+  REMOTE_CONFIG="${HOME}/.gitconfig-localhost"
+  CONFIG="${HOME}/.gitconfig"
+  if [[ -f "$REMOTE_CONFIG" ]]; then
+    log_info "Remote '.gitconfig' detected, copying in."
+    cp "$REMOTE_CONFIG" "$CONFIG"
+    sudo chown "$(id -u)" "$CONFIG"
+    log_success "Copied '.gitconfig' successfully."
+
+  else
+    log_warning "No remote '.gitconfig' file detected. You need to set up Git."
+  fi
 }
 
 #######################################
@@ -139,73 +162,6 @@ copy_docker_config() {
   else
     log_warning "No remote Docker config detected, using defaults."
     log_info "You should run 'docker login' to your private repos if you want to be able to push images to them."
-  fi
-}
-
-#######################################
-# Install any kubectl plugins using krew.
-# Globals:
-#   HOME, WORKSPACE_PATH
-# Arguments:
-#   None
-#######################################
-install_kubectl_plugins() {
-  if command -v krew >/dev/null 2>&1; then
-    log_info "Adding krew to the path" "green"
-    export_statement="export PATH=\"\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH\""
-    echo "$export_statement" >>~/.zshrc
-
-    log_info "Installing plugins" "green"
-    
-    # Read plugins from configuration file
-    local krew_config="${WORKSPACE_PATH}/.krew_plugins"
-    if [[ -f "$krew_config" ]]; then
-      # Read plugin names from file, ignoring comments and empty lines, into an array
-      local plugins_array=()
-      while IFS= read -r plugin; do
-        [[ -n "$plugin" ]] && plugins_array+=("$plugin")
-      done < <(grep -v '^#' "$krew_config" | grep -v '^[[:space:]]*$')
-      
-      if [[ ${#plugins_array[@]} -gt 0 ]]; then
-        log_info "Installing plugins from config: ${plugins_array[*]}" "green"
-        krew install "${plugins_array[@]}"
-      else
-        log_warning "No plugins found in config file, skipping installation"
-      fi
-    else
-      # Fallback to hardcoded list if config file not found
-      log_warning "Config file not found at $krew_config, using fallback list" "yellow"
-      krew install access-matrix blame get-all node-restart switch-config view-allocations
-    fi
-
-    # Create a flag file to indicate krew plugins installation is complete
-    touch "${HOME}/.krew_plugins_ready"
-
-    log_info "Deleting files from /tmp" "green"
-    sudo rm -rf /tmp/* || true
-  else
-    # If krew is not available, still create the flag to avoid waiting
-    touch "${HOME}/.krew_plugins_ready"
-  fi
-}
-
-#######################################
-# Install kubectx and kubens completions.
-# Globals:
-#   HOME
-# Arguments:
-#   None
-#######################################
-install_kubectx_kubens_completions() {
-  if command -v kubectl >/dev/null 2>&1; then
-    log "Installing kubectx and kubens completions" "green"
-    mkdir -p "$HOME/.oh-my-zsh/custom/completions"
-    chmod -R 755 "$HOME/.oh-my-zsh/custom/completions"
-
-    log "Installing kubectx completions" "green"
-    curl -sL https://raw.githubusercontent.com/ahmetb/kubectx/master/completion/_kubectx.zsh --output "$HOME/.oh-my-zsh/custom/completions/_kubectx.zsh"
-    log "Installing kubens completions" "green"
-    curl -sL https://raw.githubusercontent.com/ahmetb/kubectx/master/completion/_kubens.zsh --output "$HOME/.oh-my-zsh/custom/completions/_kubens.zsh"
   fi
 }
 

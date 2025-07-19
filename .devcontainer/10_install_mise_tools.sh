@@ -4,9 +4,9 @@
 #
 # cSpell:ignore krew mise 
 
-IFS=$'\n\t'
+#IFS=$'\n\t'
 
-set -euo pipefail
+#set -euo pipefail
 
 # Source the logging utility
 source ".devcontainer/log.sh"
@@ -14,7 +14,7 @@ source ".devcontainer/log.sh"
 # Set up mise environment for all functions
 setup_mise_env() {
   eval "$(/usr/local/bin/mise activate bash)"
-  export PATH="$HOME/.local/share/mise/shims:$PATH"
+  #export PATH="$HOME/.local/share/mise/shims:$PATH"
 }
 
 #######################################
@@ -25,24 +25,18 @@ setup_mise_env() {
 install_mise_tools() {
   log_info "Starting mise tools installation..."
   
-  log_info "Current directory:"
-  pwd
-
-  log_info "Current directory contents:"
-  ls -alh
-
   # Trust the mise configuration in the current directory
   log_info "Trusting mise configuration..."
   mise trust .mise.toml
-  
+
   log_info "Installing mise tools from .mise.toml..."
-  mise install
+  mise install -y
 
   # Activate mise environment and set up .NET environment variables
   log_info "Activating mise environment..."
   setup_mise_env
 
-  # Set up .NET environment variables
+  # # Set up .NET environment variables
   if [ -n "${DOTNET_ROOT:-}" ] && [ -d "${DOTNET_ROOT}" ]; then 
     log_info "Setting up .NET environment variables..."
     # Find and set MSBuildSDKsPath
@@ -57,17 +51,11 @@ install_mise_tools() {
     echo "export DOTNET_CLI_TELEMETRY_OPTOUT=1" >> /home/vscode/.zshrc; 
   fi
 
+  unset NODE_OPTIONS
   log_success "Mise tools installation completed!"
 }
 
 main() {
-  # Debug: Show what files are available
-  log_info "Checking available files..."
-  log_info "Files in current directory (.devcontainer):"
-  for file in ./*.{toml,txt,plugins} ./.*{toml,txt,plugins}; do
-    [ -e "$file" ] && log_info "  $(basename "$file")"
-  done
-  
   install_mise_tools
 }
 

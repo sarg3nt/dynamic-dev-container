@@ -178,10 +178,7 @@ source "${HOME}/.fzf-completion.zsh"
 
 # Active mise
 if command -v mise &>/dev/null; then
-  # Only activate mise if installation is complete to avoid warnings
   eval "$(/usr/local/bin/mise activate zsh 2>/dev/null)"
-  # Add mise shims to PATH manually for basic functionality
-  export PATH="${HOME}/.local/share/mise/shims:$PATH"
 fi
 
 # Activate zoxide

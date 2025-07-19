@@ -46,11 +46,3 @@ RUN --mount=type=bind,source=scripts/40_setup_ssh_known_hosts.sh,target=/40.sh,r
 
 COPY --chown=vscode:vscode home /home/
 COPY usr /usr 
-
-# VS Code by default overrides ENTRYPOINT and CMD with default values when executing `docker run`.
-# Setting the ENTRYPOINT to docker_init.sh will configure non-root access to
-# the Docker socket if "overrideCommand": false is set in devcontainer.json.
-# The script will also execute CMD if you need to alter startup behaviors.
-ENTRYPOINT [ "/usr/local/bin/docker_init.sh" ]
-CMD [ "sleep", "infinity" ]
-

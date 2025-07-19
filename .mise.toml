@@ -7,7 +7,6 @@ MISE_PYTHON_COMPILE = false
 #### End Environment ####
 
 [tools]
-
 # https://github.com/opentofu/opentofu
 opentofu = "latest"
 # https://github.com/openbao/openbao/releases
@@ -40,7 +39,8 @@ dotnet = "latest"
 #### End .NET Development ####
 
 #### Begin JavaScript/Node.js Development ####
-node = "latest"
+# WARNING: Node 20 and above break Dev Container initialization.
+node = "19"
 pnpm = "latest"
 yarn = "latest"
 deno = "latest"

@@ -50,43 +50,46 @@
       "type": "bind"
     },
     {
-      // SSH
       "source": "${localEnv:HOME}/.ssh",
       "target": "/home/vscode/.ssh-localhost",
+      "type": "bind"
+    },
+    {
+      "source": "${localEnv:HOME}/.gitconfig",
+      "target": "/home/vscode/.gitconfig-localhost",
       "type": "bind"
     },
     {
       "source": "/var/run/docker.sock",
       "target": "/var/run/docker-host.sock",
       "type": "bind"
-    }
-    /* {
+    },
+    {
       // Workspace Mount
       "source": "${localWorkspaceFolder}/..",
       "target": "/workspaces",
       "type": "bind"
-    } */
+    }
   ],
   "containerEnv": {
     "TZ": "America/Los_Angeles", // Timezone
     "HOST_PATH": "${localWorkspaceFolder}", // Eg. '/home/my-user/src/my-project'
     "WORKSPACE_PATH": "${containerWorkspaceFolder}", // Eg. '/workspaces/my-project'
+    "MISE_TRUSTED_CONFIG_PATHS": "${containerWorkspaceFolder}", // Path to the trusted mise config file
     "PYTHON_PATH": "/home/vscode/.local/share/mise/installs/python", // Location of our Python modules
-    "DOTNET_ROOT": "/home/vscode/.local/share/mise/installs/dotnet/9.0.302", // Location of .NET installation (will be updated during build)
+    "DOTNET_ROOT": "/home/vscode/.local/share/mise/installs/dotnet/latest", // Location of .NET installation (will be updated during build)
     "DOTNET_CLI_TELEMETRY_OPTOUT": "1", // Disable .NET telemetry
     "ZSH_THEME": "${localEnv:ZSH_THEME}", // Will use local ZSH_THEME if set, otherwise will use Starship
     "KUBE_EDITOR": "vi",
     "TERM": "xterm-256color",
-    "NODE_EXTRA_CA_CERTS": "/etc/pki/ca-trust/source/anchors/zscaler.crt",
     "TYPE_CHECKING": "true", // Enable type checking for Python
     "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}", // GitHub API token for rate limiting (optional)
     // CUSTOM USER ENVIRONMENT VARIABLES
     "MY_CUSTOM_VAR": "my_custom_value" // Example of a custom environment variable
   },
   // Custom scripts for Dev Container environment (modifying Docker image)
-  "initializeCommand": [".devcontainer/initialize_command.sh"],
-  "postStartCommand": [".devcontainer/post_start_command.sh"],
-  "postCreateCommand": [".devcontainer/post_create_command.sh"],
+  "initializeCommand": ".devcontainer/initialize_command.sh",
+  "postStartCommand": ".devcontainer/post_start_command.sh",
   "remoteUser": "vscode",
   "init": true, // Ensures the container is initialized with the default entrypoint.
   "overrideCommand": false, // Prevents overriding the container's default command.
