@@ -4,17 +4,17 @@
 #
 # cSpell:ignore krew mise 
 
-#IFS=$'\n\t'
+IFS=$'\n\t'
 
-#set -euo pipefail
+set -euo pipefail
 
 # Source the logging utility
+# shellcheck disable=SC1091
 source ".devcontainer/log.sh"
 
 # Set up mise environment for all functions
 setup_mise_env() {
   eval "$(/usr/local/bin/mise activate bash)"
-  #export PATH="$HOME/.local/share/mise/shims:$PATH"
 }
 
 #######################################

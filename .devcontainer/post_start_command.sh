@@ -17,8 +17,6 @@ main() {
   WORKSPACE_PATH="${WORKSPACE_PATH:-/workspaces/$(basename "$(pwd)")}"
   export WORKSPACE_PATH
 
-  log_info "Home is set to: $HOME"
-
   link_pylintrc_file
   echo ""
   copy_gitconfig
