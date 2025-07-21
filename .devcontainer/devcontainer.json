@@ -390,7 +390,7 @@
         },
         "[jenkinsfile]": {
           "editor.tabSize": 2,
-          "editor.insertSpaces": true
+          "insertSpaces": true
         },
         // #### End JavaScript/TypeScript Settings ####
 
