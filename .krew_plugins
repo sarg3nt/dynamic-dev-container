@@ -1,0 +1,12 @@
+# Krew kubectl plugins configuration
+# This file defines which kubectl plugins should be installed via krew
+# 
+# Format: One plugin name per line (comments starting with # are ignored)
+# Add new plugins by adding their names on separate lines
+
+access-matrix
+blame
+get-all
+node-restart
+switch-config
+view-allocations

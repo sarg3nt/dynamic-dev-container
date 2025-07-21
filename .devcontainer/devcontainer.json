@@ -1,5 +1,5 @@
 // Dev Container Configuration File
-// cspell: ignore pwsh Gruntfuggly darkriszty ciiqr sarg3nt dbaeumer docomment doesnt esbenp euskadi githd hediet huizhou kato koehler mhutchie mypy naumovs omnisharp psioniq tamasfe tftpl tomoki yzhang gofumpt gopls
+// cspell: ignore pwsh Gruntfuggly darkriszty ciiqr sarg3nt dbaeumer docomment doesnt esbenp euskadi githd hediet huizhou kato koehler mhutchie mypy naumovs omnisharp psioniq tamasfe tftpl tomoki yzhang gofumpt gopls csdevkit bradlc kohler hverlin
 {
   // See the root README.md file for more detailed instructions!
   // You must change the following when using this file in a new project:
@@ -11,8 +11,16 @@
   // - "containerEnv" = Add any "containerEnv" variables the list.
   //   These are variables that you want to be able to set on the host and passed into the container.
   "name": "Dynamic Dev Container",
-  // Using the latest version of the dynamic-dev-container image
-  "image": "ghcr.io/sarg3nt/dynamic-dev-container:latest",
+  // Build from Dockerfile to pre-install mise tools
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "../",
+    "args": {
+      "BUILDKIT_PROGRESS": "plain",
+      "DOCKER_BUILDKIT": "1"
+    },
+    "options": ["--progress=plain"]
+  },
   "runArgs": ["--name=dynamic-dev-container"],
   // Mounts
   "mounts": [
@@ -42,41 +50,45 @@
       "type": "bind"
     },
     {
-      // SSH
       "source": "${localEnv:HOME}/.ssh",
       "target": "/home/vscode/.ssh-localhost",
+      "type": "bind"
+    },
+    {
+      "source": "${localEnv:HOME}/.gitconfig",
+      "target": "/home/vscode/.gitconfig-localhost",
       "type": "bind"
     },
     {
       "source": "/var/run/docker.sock",
       "target": "/var/run/docker-host.sock",
       "type": "bind"
-    }
-    /* {
-      // Workspace Mount
+    },
+    {
       "source": "${localWorkspaceFolder}/..",
       "target": "/workspaces",
       "type": "bind"
-    } */
+    }
   ],
   "containerEnv": {
     "TZ": "America/Los_Angeles", // Timezone
     "HOST_PATH": "${localWorkspaceFolder}", // Eg. '/home/my-user/src/my-project'
     "WORKSPACE_PATH": "${containerWorkspaceFolder}", // Eg. '/workspaces/my-project'
+    "MISE_TRUSTED_CONFIG_PATHS": "${containerWorkspaceFolder}", // Path to the trusted mise config file
     "PYTHON_PATH": "/home/vscode/.local/share/mise/installs/python", // Location of our Python modules
+    "DOTNET_ROOT": "/home/vscode/.local/share/mise/installs/dotnet/latest", // Location of .NET installation (will be updated during build)
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1", // Disable .NET telemetry
     "ZSH_THEME": "${localEnv:ZSH_THEME}", // Will use local ZSH_THEME if set, otherwise will use Starship
     "KUBE_EDITOR": "vi",
     "TERM": "xterm-256color",
-    "NODE_EXTRA_CA_CERTS": "/etc/pki/ca-trust/source/anchors/zscaler.crt",
     "TYPE_CHECKING": "true", // Enable type checking for Python
     "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}", // GitHub API token for rate limiting (optional)
     // CUSTOM USER ENVIRONMENT VARIABLES
     "MY_CUSTOM_VAR": "my_custom_value" // Example of a custom environment variable
   },
   // Custom scripts for Dev Container environment (modifying Docker image)
-  "initializeCommand": [".devcontainer/initialize_command.sh"],
-  "postStartCommand": [".devcontainer/post_start_command.sh"],
-  "postCreateCommand": [".devcontainer/post_create_command.sh"],
+  "initializeCommand": ".devcontainer/initialize_command.sh",
+  "postStartCommand": ".devcontainer/post_start_command.sh",
   "remoteUser": "vscode",
   "init": true, // Ensures the container is initialized with the default entrypoint.
   "overrideCommand": false, // Prevents overriding the container's default command.
@@ -96,8 +108,24 @@
 
         // #### Begin Go ####
         "golang.go", // Go language support
-        "golang.go-nightly", // Go nightly builds support
         // #### End Go ####
+
+        // #### Begin .NET ####
+        "ms-dotnettools.csharp", // C# language support
+        "ms-dotnettools.csdevkit", // C# Dev Kit
+        "ms-dotnettools.vscode-dotnet-runtime", // .NET Runtime installer
+        "ms-dotnettools.dotnet-interactive-vscode", // .NET Interactive Notebooks
+        // #### End .NET ####
+
+        // #### Begin JavaScript/Node.js ####
+        "ms-vscode.vscode-typescript-next", // TypeScript and JavaScript support
+        "bradlc.vscode-tailwindcss", // Tailwind CSS IntelliSense
+        "esbenp.prettier-vscode", // Prettier code formatter
+        "dbaeumer.vscode-eslint", // ESLint for JavaScript/TypeScript
+        "ms-vscode.vscode-json", // JSON language support
+        "formulahendry.auto-rename-tag", // Auto rename paired HTML/XML tags
+        "christian-kohler.path-intellisense", // Path autocompletion
+        // #### End JavaScript/Node.js ####
 
         // #### Begin Python ####
         "ms-python.python", // Python language support
@@ -125,11 +153,6 @@
         "opentofu.vscode-opentofu", // OpenTofu/Terraform support
         // #### End Terraform/OpenTofu ####
 
-        // #### Begin JavaScript/TypeScript ####
-        "dbaeumer.vscode-eslint", // ESLint for JavaScript/TypeScript
-        "esbenp.prettier-vscode", // Prettier code formatter
-        // #### End JavaScript/TypeScript ####
-
         // #### Begin Packer ####
         "szTheory.vscode-packer-powertools", // Packer tools
         // #### End Packer ####
@@ -143,6 +166,7 @@
         "hediet.vscode-drawio", // Draw.io integration
         "IronGeek.vscode-env", // Environment variables support
         "k--kato.docomment", // Documentation comment generator
+        "hverlin.mise-vscode", // Mise VS Code integration
         "ms-azuretools.vscode-docker", // Docker support
         "naumovs.color-highlight", // Color highlighting
         "psioniq.psi-header", // File header management
@@ -192,7 +216,7 @@
         "terminal.integrated.defaultProfile.linux": "zsh",
         "reformat": true,
         // #### End Core VS Code Settings ####
-        
+
         // #### Begin Go Settings ####
         "go.buildTags": "",
         "go.toolsEnvVars": {
@@ -202,10 +226,7 @@
         "go.testEnvVars": {
           "CGO_ENABLED": "1"
         },
-        "go.testFlags": [
-          "-v",
-          "-race"
-        ],
+        "go.testFlags": ["-v", "-race"],
         "go.testTimeout": "30s",
         "go.coverOnSingleTest": true,
         "go.coverOnSingleTestFile": true,
@@ -224,9 +245,92 @@
         },
         // #### End Go Settings ####
 
+        // #### Begin .NET Settings ####
+        "dotnetAcquisitionExtension.allowInvalidPaths": true,
+        "dotnetAcquisitionExtension.existingDotnetPath": [
+          {
+            "extensionId": "ms-dotnettools.csharp",
+            "path": "/home/vscode/.local/share/mise/installs/dotnet/9.0.302/dotnet"
+          },
+          {
+            "extensionId": "ms-dotnettools.csdevkit",
+            "path": "/home/vscode/.local/share/mise/installs/dotnet/9.0.302/dotnet"
+          }
+        ],
+        "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+        "dotnet.inlayHints.enableInlayHintsForParameters": true,
+        "dotnet.inlayHints.enableInlayHintsForLiteralParameters": true,
+        "dotnet.inlayHints.enableInlayHintsForIndexerParameters": true,
+        "dotnet.inlayHints.enableInlayHintsForObjectCreationParameters": true,
+        "dotnet.inlayHints.enableInlayHintsForOtherParameters": true,
+        "dotnet.inlayHints.enableInlayHintsForTypes": true,
+        "dotnet.inlayHints.enableInlayHintsForImplicitVariableTypes": true,
+        "dotnet.inlayHints.enableInlayHintsForLambdaParameterTypes": true,
+        "dotnet.inlayHints.enableInlayHintsForImplicitObjectCreation": true,
+        "[csharp]": {
+          "editor.formatOnSave": true,
+          "editor.tabSize": 4,
+          "editor.insertSpaces": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+          }
+        },
+        "[json]": {
+          "editor.defaultFormatter": "vscode.json-language-features"
+        },
+        // #### End .NET Settings ####
+
+        // #### Begin JavaScript/Node.js Settings ####
+        "typescript.preferences.includePackageJsonAutoImports": "auto",
+        "typescript.suggest.autoImports": true,
+        "typescript.updateImportsOnFileMove.enabled": "always",
+        "javascript.updateImportsOnFileMove.enabled": "always",
+        "eslint.workingDirectories": ["./"],
+        "eslint.validate": [
+          "javascript",
+          "javascriptreact",
+          "typescript",
+          "typescriptreact"
+        ],
+        "prettier.requireConfig": false,
+        "prettier.useEditorConfig": false,
+        "[javascript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+          }
+        },
+        "[javascriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+          }
+        },
+        "[typescript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+          }
+        },
+        "[typescriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.eslint": "explicit"
+          }
+        },
+        "[jsonc]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        // #### End JavaScript/Node.js Settings ####
+
         // #### Begin Python Settings ####
-        "python.pythonPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
-        "python.defaultInterpreterPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
+        "python.pythonPath": "/home/vscode/.local/share/mise/installs/python/3.13.5/bin/python",
+        "python.defaultInterpreterPath": "/home/vscode/.local/share/mise/installs/python/3.13.5/bin/python",
         "autopep8.args": ["--max-line-length=180"],
         "python.analysis.ignore": ["*"],
         "[python]": {
@@ -273,12 +377,10 @@
 
         // #### Begin Kubernetes/Helm Settings ####
         "vs-kubernetes": {
-          "vscode-kubernetes.kubectl-path": "/home/vscode/.local/share/mise/installs/kubectl/latest/bin/kubectl"
+          "vscode-kubernetes.kubectl-path": "/home/vscode/.local/share/mise/installs/kubectl/1.33.2/bin/kubectl"
         },
         "helm-intellisense.lintFileOnSave": true,
-        "helm-intellisense.customValueFileNames": [
-          "values.yaml"
-        ],
+        "helm-intellisense.customValueFileNames": ["values.yaml"],
         // #### End Kubernetes/Helm Settings ####
 
         // #### Begin JavaScript/TypeScript Settings ####
@@ -288,13 +390,13 @@
         },
         "[jenkinsfile]": {
           "editor.tabSize": 2,
-          "editor.insertSpaces": true
+          "insertSpaces": true
         },
         // #### End JavaScript/TypeScript Settings ####
 
         // #### Begin PowerShell Settings ####
         "powershell.powerShellAdditionalExePaths": {
-          "Powershell7": "/home/vscode/.local/share/mise/installs/powershell/latest/pwsh"
+          "Powershell7": "/home/vscode/.local/share/mise/installs/powershell/7.5.2/pwsh"
         },
         "powershell.powerShellDefaultVersion": "Powershell7",
         "omnisharp.autoStart": false,
@@ -347,12 +449,7 @@
         // #### End Spell Checker Settings ####
 
         // #### Begin TODO Tree Settings ####
-        "todo-tree.general.tags": [
-          "TODO:",
-          "NOTE:",
-          "WARNING:",
-          "FIXME:"
-        ],
+        "todo-tree.general.tags": ["TODO:", "NOTE:", "WARNING:", "FIXME:"],
         "todo-tree.highlights.customHighlight": {
           "TODO:": {
             "hideFromTree": false,
@@ -390,9 +487,8 @@
             "type": "whole-line",
             "gutterIcon": true
           }
-        }
+        },
         // #### End TODO Tree Settings ####
-        ,
         // #### Begin PSI Header Settings ####
         "psi-header.config": {
           "company": "<Add your company name here>"
@@ -463,22 +559,15 @@
         "psi-header.templates": [
           {
             "language": "markdown",
-            "template": [
-              "Add your template text here"
-            ]
+            "template": ["Add your template text here"]
           },
           {
             "language": "powershell",
-            "template": [
-              ".DESCRIPTION",
-              "  Add your template text here"
-            ]
+            "template": [".DESCRIPTION", "  Add your template text here"]
           },
           {
             "language": "*",
-            "template": [
-              "  Add your template text here"
-            ]
+            "template": ["  Add your template text here"]
           }
         ]
         // #### End PSI Header Settings ####

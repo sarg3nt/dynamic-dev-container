@@ -13,6 +13,8 @@ lsd = "latest"
 starship = "latest"
 yq = "latest"
 zoxide = "latest"
+# Used for git
+bat = "latest"
 
 [settings]
 experimental = true

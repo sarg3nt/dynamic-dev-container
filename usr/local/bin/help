@@ -8,7 +8,7 @@ IFS=$'\n\t'
 #######################################
 # Display container tooling information with progress indicators
 # Shows installed tools, available applications, and kubectl plugins
-# Handles mise tool installation progress and krew plugin installation
+# Reads directly from configuration files instead of waiting for installations
 # Globals:
 #   HOME, DEV_CONTAINER_VERSION
 # Arguments:
@@ -18,70 +18,28 @@ IFS=$'\n\t'
 #######################################
 
 #######################################
-# Wait for mise tools to be installed with progress indicator
-# Shows spinner animation during installation process
+# Parse TOML files to extract tools from [tools] sections
 # Globals:
-#   HOME, YELLOW, GREEN, NC
+#   HOME
 # Arguments:
-#   None
+#   $1 - Path to TOML file
 # Returns:
-#   0 if successful, sets mise_json variable
+#   Echoes tool names and versions
 #######################################
-wait_for_mise_installation() {
-  local wait_count=0
-  local max_wait=120  # 2 minutes should be sufficient for mise tools
-  local -a spin=("-" "\\" "|" "/")
-  local spin_idx=0
+parse_mise_tools_from_toml() {
+  local toml_file="$1"
+  [[ ! -f "$toml_file" ]] && return 0
   
-  echo -ne "${YELLOW}Mise tools installing   "
-  
-  while [[ ! -f "${HOME}/.mise_ready" ]] && [[ $wait_count -lt $max_wait ]]; do
-    echo -ne "\b${spin[$spin_idx]}"
-    sleep 1
-    wait_count=$((wait_count + 1))
-    spin_idx=$(( (spin_idx + 1) % 4 ))
-  done
-  
-  if [[ -f "${HOME}/.mise_ready" ]]; then
-    # Clear the entire line and print completion message
-    echo -e "\r\033[K${GREEN}✓ Installation completed after $wait_count seconds!${NC}"
-    activate_mise_environment
-  else
-    # Clear the entire line and show timeout message
-    echo -e "\r\033[K${RED}✗ Mise installation timeout after $max_wait seconds${NC}"
-    echo -e "${YELLOW}  The mise tool installation may have failed or been canceled.${NC}"
-    echo -e "${YELLOW}  Check VS Code for any installation prompts or errors.${NC}"
-    echo -e "${YELLOW}  If needed, restart the dev container to retry installation.${NC}"
-    mise_json=""
-  fi
-  echo ""
-}
-
-#######################################
-# Activate mise environment and get tool list
-# Attempts multiple activation methods as fallback
-# Globals:
-#   HOME, mise_json
-# Arguments:
-#   None
-# Returns:
-#   Sets mise_json variable with tool information
-#######################################
-activate_mise_environment() {
-  local mise_activate_output
-  mise_activate_output=$(/usr/local/bin/mise activate bash 2>/dev/null || echo "FAILED")
-  
-  if [[ "$mise_activate_output" != "FAILED" ]] && [[ -n "$mise_activate_output" ]]; then
-    if eval "$mise_activate_output"; then
-      mise_json=$(mise list --silent --json 2>/dev/null)
-    else
-      export PATH="${HOME}/.local/share/mise/shims:$PATH"
-      mise_json=$(mise list --silent --json 2>/dev/null)
-    fi
-  else
-    export PATH="${HOME}/.local/share/mise/shims:$PATH"
-    mise_json=$(mise list --silent --json 2>/dev/null)
-  fi
+  # Extract tools from [tools] section using awk
+  awk '
+    /^\[tools\]/ { in_tools = 1; next }
+    /^\[/ && !/^\[tools\]/ { in_tools = 0; next }
+    in_tools && /^[a-zA-Z0-9_-]+[[:space:]]*=/ {
+      gsub(/[[:space:]]*=.*/, "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      if ($0 != "") print $0
+    }
+  ' "$toml_file"
 }
 
 #######################################
@@ -114,10 +72,10 @@ parse_shell_aliases() {
 }
 
 #######################################
-# Build comprehensive utilities list from installed tools
-# Combines system tools with mise-managed applications
+# Build comprehensive utilities list from configuration files
+# Combines system tools with mise-configured applications
 # Globals:
-#   mise_json, app_aliases
+#   app_aliases
 # Arguments:
 #   None
 # Returns:
@@ -126,113 +84,77 @@ parse_shell_aliases() {
 build_utilities_list() {
   utilities="docker $(docker version --format '{{.Client.Version}}' 2>/dev/null || echo 'N/A') (d), git $(git --version 2>/dev/null | awk '{print $3}' || echo 'N/A') (g)"
 
-  if [[ -n "$mise_json" ]] && [[ "$mise_json" != "null" ]] && [[ "$mise_json" != "" ]]; then
+  # Collect all mise tools from both config files
+  local all_tools=""
+  local workspace_path
+  workspace_path="/workspaces/$(basename "$(pwd)")"
+  
+  # Parse global mise config
+  local global_tools
+  global_tools=$(parse_mise_tools_from_toml "$HOME/.config/mise/config.toml")
+  
+  # Parse workspace mise config
+  local workspace_tools
+  workspace_tools=$(parse_mise_tools_from_toml "$workspace_path/.mise.toml")
+  
+  # Combine and deduplicate tools
+  all_tools=$(echo -e "$global_tools\n$workspace_tools" | sort -u | grep -v '^$')
+  
+  if [[ -n "$all_tools" ]]; then
     local tools_list=""
-    # Check if mise_json is valid JSON before processing
-    if echo "$mise_json" | jq . >/dev/null 2>&1; then
-      local jq_output
-      jq_output=$(echo "$mise_json" | jq -r 'to_entries[] | select(.value[0].installed == true) | "\(.key) \(.value[0].version)"' 2>/dev/null || echo "")
-      
-      if [[ -n "$jq_output" ]]; then
-        while IFS= read -r line || [[ -n "$line" ]]; do
-          [[ -z "$line" ]] && continue
-          local app version alias_str=""
-          app=$(echo "$line" | cut -d' ' -f1)
-          version=$(echo "$line" | cut -d' ' -f2-)  # Handle versions with spaces
-          local app_lc="${app,,}"
-
-          [[ -n "${app_aliases[$app_lc]:-}" ]] && alias_str=" (${app_aliases[$app_lc]})"
-          tools_list="${tools_list:+$tools_list, }$app $version$alias_str"
-        done <<< "$jq_output"
-      fi
-    fi
-
+    while IFS= read -r tool; do
+      [[ -z "$tool" ]] && continue
+      local tool_lc="${tool,,}"
+      local alias_str=""
+      [[ -n "${app_aliases[$tool_lc]:-}" ]] && alias_str=" (${app_aliases[$tool_lc]})"
+      tools_list="${tools_list:+$tools_list, }$tool$alias_str"
+    done <<< "$all_tools"
+    
     [[ -n "$tools_list" ]] && utilities="$utilities, $tools_list"
   fi
 }
 
 #######################################
-# Display kubectl plugins with installation progress
-# Handles krew plugin installation status and listing
+# Display kubectl plugins from configuration
+# Reads plugin list from .krew_plugins file
 # Globals:
-#   HOME, YELLOW, NC, mise_json
+#   None
 # Arguments:
 #   None
 # Outputs:
-#   Kubectl plugins section if applicable
+#   Kubectl plugins section if krew is configured
 #######################################
 display_kubectl_plugins() {
-  # Only show section if both kubectl and krew are installed
-  if [[ -n "$mise_json" ]] && [[ "$mise_json" != "null" ]] && 
-     echo "$mise_json" | jq -e 'has("kubectl") and .kubectl[0].installed == true and has("krew") and .krew[0].installed == true' >/dev/null 2>&1; then
-    
+  local workspace_path
+  workspace_path="/workspaces/$(basename "$(pwd)")"
+  local krew_config="$workspace_path/.krew_plugins"
+  
+  # Check if krew is configured in mise tools and .krew_plugins exists
+  local has_krew=false
+  if parse_mise_tools_from_toml "$HOME/.config/mise/config.toml" | grep -q "^krew$" || 
+     parse_mise_tools_from_toml "$workspace_path/.mise.toml" | grep -q "^krew$"; then
+    has_krew=true
+  fi
+  
+  if [[ "$has_krew" == true ]] && [[ -f "$krew_config" ]]; then
     echo -e "${GREEN}**** Kubectl Plugins:${NC}"
-    echo -e "${CYAN}Invoke a plugin: 'kubectl <plugin>'  List plugins: 'krew list'${NC}"
+    echo -e "${CYAN}Invoke a plugin: 'kubectl <plugin>'  List plugins: 'krew list'  To change or add to the plugin list edit the .krew_plugins file.${NC}"
     
-    if [[ -f "${HOME}/.krew_plugins_ready" ]]; then
-      show_installed_plugins
+    # Read plugins from config file
+    local plugins
+    plugins=$(grep -v '^#' "$krew_config" | grep -v '^[[:space:]]*$' | paste -sd, - | sed 's/,/, /g')
+    
+    if [[ -n "$plugins" ]]; then
+      echo -e " $plugins"
     else
-      wait_for_krew_plugins
+      echo -e " (No plugins configured in .krew_plugins)"
     fi
   fi
 }
 
 #######################################
-# Show currently installed krew plugins
-# Displays formatted list of available kubectl plugins
-# Arguments:
-#   None
-# Outputs:
-#   Comma-separated list of plugins or fallback message
-#######################################
-show_installed_plugins() {
-  if command -v krew >/dev/null 2>&1 && krew list >/dev/null 2>&1; then
-    local plugin_list
-    plugin_list=$(krew list 2>/dev/null | awk 'NR>1 {print $1}' | paste -sd, - | sed 's/,/, /g')
-    echo -e " $plugin_list"
-  else
-    echo -e " (No krew plugins detected)"
-  fi
-}
-
-#######################################
-# Wait for krew plugins installation with progress indicator
-# Shows spinner during plugin installation process
-# Globals:
-#   HOME, YELLOW, NC
-# Arguments:
-#   None
-# Outputs:
-#   Installation progress and final plugin list
-#######################################
-wait_for_krew_plugins() {
-  echo -ne " ${YELLOW}Krew plugins installing   "
-  
-  local wait_count=0
-  local max_wait=60  # 60 seconds should be enough for krew plugins
-  local -a spin=("-" "\\" "|" "/")
-  local spin_idx=0
-  
-  while [[ ! -f "${HOME}/.krew_plugins_ready" ]] && [[ $wait_count -lt $max_wait ]]; do
-    echo -ne "\b${spin[$spin_idx]}"
-    sleep 1
-    wait_count=$((wait_count + 1))
-    spin_idx=$(( (spin_idx + 1) % 4 ))
-  done
-  
-  if [[ -f "${HOME}/.krew_plugins_ready" ]]; then
-    # Clear the line and show plugins in default color
-    echo -ne "\r\033[K${NC}"
-    show_installed_plugins
-  else
-    # Timeout, show fallback message
-    echo -e "\r\033[K ${YELLOW}(Krew plugins still installing...)${NC}"
-  fi
-}
-
-#######################################
 # Main function to display container tooling information
-# Orchestrates the display of all sections with progress handling
+# Orchestrates the display of all sections using configuration files
 # Globals:
 #   HOME, DEV_CONTAINER_VERSION, color variables
 # Arguments:
@@ -245,15 +167,8 @@ main() {
   source /usr/bin/lib/sh/colors.sh
   
   # Initialize global variables
-  local mise_json utilities
+  local utilities
   local -A app_aliases
-  
-  # Check mise installation status and wait if needed
-  if [[ -f "${HOME}/.mise_ready" ]]; then
-    mise_json=$(mise list --silent --json 2>/dev/null)
-  else
-    wait_for_mise_installation
-  fi
 
   # Display header
   echo -e "${BLUE}********************************************************************"

@@ -7,7 +7,6 @@ MISE_PYTHON_COMPILE = false
 #### End Environment ####
 
 [tools]
-
 # https://github.com/opentofu/opentofu
 opentofu = "latest"
 # https://github.com/openbao/openbao/releases
@@ -30,9 +29,25 @@ cmctl = "latest"
 k3d = "latest"
 #### End Kubernetes Utilities ####
 
-gitui = "latest"
+#### Begin Go Development ####
 golang = 'latest'
 goreleaser = 'latest'
+#### End Go Development ####
+
+#### Begin .NET Development ####
+dotnet = "latest"
+#### End .NET Development ####
+
+#### Begin JavaScript/Node.js Development ####
+# WARNING: Node 20 and above break Dev Container initialization.
+node = "19"
+pnpm = "latest"
+yarn = "latest"
+deno = "latest"
+bun = "latest"
+#### End JavaScript/Node.js Development ####
+
+gitui = "latest"
 packer = "latest"
 tealdeer = "latest"
 micro = "latest"

@@ -5,13 +5,16 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-source "$(dirname "$0")/utils/log.sh"
+source "$(dirname "$0")/log.sh"
 
 main() {
   echo ""
   log "EXECUTING INITIALIZE COMMAND..." "gray" "INFO"
   get_latest_dev_container_version
   create_required_folders
+  echo ""
+  log_info "Dev Container is now building, this might take a while the first time or after a 'Rebuild Container' command."
+  log_info "To view the progress of the build click 'Connecting to Dev Container (show log)' in the bottom right corner of VS Code."
 }
 
 #######################################
@@ -30,7 +33,7 @@ main() {
 get_latest_dev_container_version() {
   log_info "Pulling latest 'dynamic-dev-container' image from GitHub Container Registry."
   echo ""
-  if docker pull ghcr.io/sarg3nt/dynamic-dev-container:latest; then
+  if docker pull ghcr.io/sarg3nt/dynamic-dev-container:0.0.1; then
     echo ""
     log_success "Latest dynamic-dev-container image pulled successfully."
   else

@@ -10,12 +10,48 @@ IFS=$'\n\t'
 INSTALL_OPENTOFU=false
 INSTALL_KUBERNETES=false
 INSTALL_GO=false
+INSTALL_DOTNET=false
+INSTALL_JAVASCRIPT=false
 INSTALL_PACKER=false
 INSTALL_POWERSHELL=false
 INCLUDE_PYTHON_EXTENSIONS=false
 INCLUDE_MARKDOWN_EXTENSIONS=false
 INCLUDE_SHELL_EXTENSIONS=false
 INCLUDE_JS_EXTENSIONS=false
+
+# Individual tool flags (default false)
+INSTALL_OPENBAO=false
+INSTALL_KUBECTL=false
+INSTALL_KUBECTX=false
+INSTALL_KUBENS=false
+INSTALL_K9S=false
+INSTALL_HELM=false
+INSTALL_KREW=false
+INSTALL_DIVE=false
+INSTALL_KUBEBENCH=false
+INSTALL_POPEYE=false
+INSTALL_TRIVY=false
+INSTALL_CMCTL=false
+INSTALL_K3D=false
+INSTALL_GOLANG=false
+INSTALL_GORELEASER=false
+INSTALL_DOTNET_SDK=false
+INSTALL_NODE=false
+INSTALL_PNPM=false
+INSTALL_YARN=false
+INSTALL_DENO=false
+INSTALL_BUN=false
+INSTALL_GITUI=false
+INSTALL_TEALDEER=false
+INSTALL_MICRO=false
+
+# Version variables for tools
+GOLANG_VERSION="latest"
+DOTNET_SDK_VERSION="latest"
+KUBECTL_VERSION="latest"
+OPENBAO_VERSION="latest"
+OPENTOFU_VERSION="latest"
+PACKER_VERSION="latest"
 
 # Source colors library
 source_colors() {
@@ -71,6 +107,36 @@ ask_with_default() {
   local response
   read -r -p "$(echo -e "${CYAN}${prompt} [${default}]: ${NC}")" response
   echo "${response:-$default}"
+}
+
+# Get latest major versions for a tool
+get_latest_major_versions() {
+  local tool_name="$1"
+  local versions
+  
+  # Fetch remote versions using mise, handle potential errors, and filter out pre-release versions
+  versions=$(mise ls-remote "$tool_name" 2>/dev/null | grep -v -E 'rc|alpha|beta' || echo "")
+  
+  if [[ -z "$versions" ]]; then
+    echo ""
+    return
+  fi
+  
+  local major_versions
+  # Parse versions to get unique major versions, sorted numerically
+  if [[ "$tool_name" == "kubectl" || "$tool_name" == "go" || "$tool_name" == "opentofu" || "$tool_name" == "openbao" || "$tool_name" == "packer" ]]; then
+    # For versions like 1.31.2, major is 1.31
+    major_versions=$(echo "$versions" | awk -F. '{print $1"."$2}' | sort -rV | uniq | head -n 5 | tr '\n' ',' | sed 's/,$//')
+  else
+    # For versions like 22.10.0, major is 22
+    major_versions=$(echo "$versions" | awk -F. '{print $1}' | sort -rV | uniq | head -n 5 | tr '\n' ',' | sed 's/,$//')
+  fi
+  
+  if [[ -n "$major_versions" ]]; then
+    echo -e "${CYAN} (e.g., ${major_versions})${NC}"
+  else
+    echo ""
+  fi
 }
 
 # Ask for user input (required)
@@ -140,8 +206,6 @@ generate_mise_toml() {
   local project_path="$1"
   local temp_file="${project_path}/.mise.toml.tmp"
   
-  echo -e "${BLUE}Primary Tools and Languages:${NC}"
-  
   # Start with the header and environment section from source
   echo "# cspell:ignore cmctl gitui krew kubebench kubectx kubens direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr" > "$temp_file"
   # shellcheck disable=SC2129
@@ -150,141 +214,77 @@ generate_mise_toml() {
   echo "[tools]" >> "$temp_file"
   echo "" >> "$temp_file"
 
-  if ask_yes_no "Install OpenTofu (Terraform alternative)?" "N"; then
-    INSTALL_OPENTOFU=true
-    {
-      echo "# https://github.com/opentofu/opentofu"
-      echo 'opentofu = "1.10.2"'
-    } >> "$temp_file"
+  # HashiCorp tools
+  if [ "$INSTALL_OPENTOFU" = true ]; then
+    echo "opentofu = \"${OPENTOFU_VERSION}\"" >> "$temp_file"
+  fi
+  if [ "$INSTALL_OPENBAO" = true ]; then
+    echo "openbao = \"${OPENBAO_VERSION}\"" >> "$temp_file"
+  fi
+  if [ "$INSTALL_PACKER" = true ]; then
+    echo "packer = \"${PACKER_VERSION}\"" >> "$temp_file"
   fi
 
-  if ask_yes_no "Install OpenBao (Vault alternative)?" "N"; then
-    {
-      echo "# https://github.com/openbao/openbao/releases"
-      echo 'openbao = "2.3.1"'
-    } >> "$temp_file"
+  # Go
+  if [ "$INSTALL_GOLANG" = true ] || [ "$INSTALL_GORELEASER" = true ]; then
+    echo "" >> "$temp_file"
+    echo "#### Begin Go Development ####" >> "$temp_file"
+    [ "$INSTALL_GOLANG" = true ] && echo "golang = \"${GOLANG_VERSION}\"" >> "$temp_file"
+    [ "$INSTALL_GORELEASER" = true ] && echo 'goreleaser = "latest"' >> "$temp_file"
+    echo "#### End Go Development ####" >> "$temp_file"
   fi
 
-  if ask_yes_no "Install Packer (HashiCorp image builder)?" "N"; then
-    INSTALL_PACKER=true
-    echo 'packer = "latest"' >> "$temp_file"
+  # .NET
+  if [ "$INSTALL_DOTNET_SDK" = true ]; then
+    echo "" >> "$temp_file"
+    echo "#### Begin .NET Development ####" >> "$temp_file"
+    echo "dotnet = \"${DOTNET_SDK_VERSION}\"" >> "$temp_file"
+    echo "#### End .NET Development ####" >> "$temp_file"
   fi
 
-  if ask_yes_no "Install Go programming language?" "N"; then
-    INSTALL_GO=true
-    {
-      echo 'golang = "latest"'
-      echo 'goreleaser = "latest"'
-    } >> "$temp_file"
+  # JavaScript/Node
+  if [ "$INSTALL_NODE" = true ] || [ "$INSTALL_PNPM" = true ] || [ "$INSTALL_YARN" = true ] || [ "$INSTALL_DENO" = true ] || [ "$INSTALL_BUN" = true ]; then
+    echo "" >> "$temp_file"
+    echo "#### Begin JavaScript/Node.js Development ####" >> "$temp_file"
+    [ "$INSTALL_NODE" = true ] && echo 'node = "19"' >> "$temp_file"
+    [ "$INSTALL_PNPM" = true ] && echo 'pnpm = "latest"' >> "$temp_file"
+    [ "$INSTALL_YARN" = true ] && echo 'yarn = "latest"' >> "$temp_file"
+    [ "$INSTALL_DENO" = true ] && echo 'deno = "latest"' >> "$temp_file"
+    [ "$INSTALL_BUN" = true ] && echo 'bun = "latest"' >> "$temp_file"
+    echo "#### End JavaScript/Node.js Development ####" >> "$temp_file"
   fi
 
-  # Ask about Kubernetes/Helm tools
-  if ask_yes_no "Install Kubernetes/Helm tools (kubectl, helm, k9s, kubectx)?" "N"; then
-    INSTALL_KUBERNETES=true
-    {
-      echo ""
-      echo "#### Begin Kubernetes/Helm ####"
-      echo 'kubectl = "1.32"'
-      echo 'kubectx = "latest"'
-      echo 'kubens = "latest"'
-      echo 'k9s = "latest"'
-      echo 'helm = "latest"'
-      echo "#### End Kubernetes/Helm ####"
-    } >> "$temp_file"
-    
-    # Ask about individual Kubernetes utilities
-    echo ""
-    echo -e "${BLUE}Additional Kubernetes utilities:${NC}"
-    
-    local kube_utils_added=false
-    
-    if ask_yes_no "Install krew (kubectl plugin manager)?" "N"; then
-      if [ "$kube_utils_added" = false ]; then
-        {
-          echo ""
-          echo "#### Begin Kubernetes Utilities ####"
-        } >> "$temp_file"
-        kube_utils_added=true
-      fi
-      echo 'krew = "latest"' >> "$temp_file"
-    fi
-    
-    if ask_yes_no "Install dive (Docker image explorer)?" "N"; then
-      if [ "$kube_utils_added" = false ]; then
-        {
-          echo ""
-          echo "#### Begin Kubernetes Utilities ####"
-        } >> "$temp_file"
-        kube_utils_added=true
-      fi
-      echo 'dive = "latest"' >> "$temp_file"
-    fi
-    
-    if ask_yes_no "Install popeye (Kubernetes cluster sanitizer)?" "N"; then
-      if [ "$kube_utils_added" = false ]; then
-        {
-          echo ""
-          echo "#### Begin Kubernetes Utilities ####"
-        } >> "$temp_file"
-        kube_utils_added=true
-      fi
-      echo 'popeye = "latest"' >> "$temp_file"
-    fi
-    
-    if ask_yes_no "Install trivy (vulnerability scanner)?" "N"; then
-      if [ "$kube_utils_added" = false ]; then
-        {
-          echo ""
-          echo "#### Begin Kubernetes Utilities ####"
-        } >> "$temp_file"
-        kube_utils_added=true
-      fi
-      echo 'trivy = "latest"' >> "$temp_file"
-    fi
-    
-    if ask_yes_no "Install k3d (lightweight Development Kubernetes)?" "N"; then
-      if [ "$kube_utils_added" = false ]; then
-        {
-          echo ""
-          echo "#### Begin Kubernetes Utilities ####"
-        } >> "$temp_file"
-        kube_utils_added=true
-      fi
-      echo 'k3d = "latest"' >> "$temp_file"
-    fi
-    
-    if ask_yes_no "Install cmctl (cert-manager CLI)?" "N"; then
-      if [ "$kube_utils_added" = false ]; then
-        {
-          echo ""
-          echo "#### Begin Kubernetes Utilities ####"
-        } >> "$temp_file"
-        kube_utils_added=true
-      fi
-      echo 'cmctl = "latest"' >> "$temp_file"
-    fi
-    
-    if [ "$kube_utils_added" = true ]; then
-      echo "#### End Kubernetes Utilities ####" >> "$temp_file"
-    fi
-  fi
-  
-  # Ask about individual tools
-  echo ""
-  echo -e "${BLUE}Other utilities and languages:${NC}"
-
-  if ask_yes_no "Install Git UI (gitui)?" "N"; then
-    echo 'gitui = "latest"' >> "$temp_file"
+  # Kubernetes/Helm
+  if [ "$INSTALL_KUBECTL" = true ] || [ "$INSTALL_KUBECTX" = true ] || [ "$INSTALL_KUBENS" = true ] || [ "$INSTALL_K9S" = true ] || [ "$INSTALL_HELM" = true ]; then
+    echo "" >> "$temp_file"
+    echo "#### Begin Kubernetes/Helm ####" >> "$temp_file"
+    [ "$INSTALL_KUBECTL" = true ] && echo "kubectl = \"${KUBECTL_VERSION}\"" >> "$temp_file"
+    [ "$INSTALL_KUBECTX" = true ] && echo 'kubectx = "latest"' >> "$temp_file"
+    [ "$INSTALL_KUBENS" = true ] && echo 'kubens = "latest"' >> "$temp_file"
+    [ "$INSTALL_K9S" = true ] && echo 'k9s = "latest"' >> "$temp_file"
+    [ "$INSTALL_HELM" = true ] && echo 'helm = "latest"' >> "$temp_file"
+    echo "#### End Kubernetes/Helm ####" >> "$temp_file"
   fi
 
-  if ask_yes_no "Install TealDeer (fast tldr client)?" "N"; then
-    echo 'tealdeer = "latest"' >> "$temp_file"
+  # Kubernetes Utilities
+  if [ "$INSTALL_KREW" = true ] || [ "$INSTALL_DIVE" = true ] || [ "$INSTALL_KUBEBENCH" = true ] || [ "$INSTALL_POPEYE" = true ] || [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_CMCTL" = true ] || [ "$INSTALL_K3D" = true ]; then
+    echo "" >> "$temp_file"
+    echo "#### Begin Kubernetes Utilities ####" >> "$temp_file"
+    [ "$INSTALL_KREW" = true ] && echo 'krew = "latest"' >> "$temp_file"
+    [ "$INSTALL_DIVE" = true ] && echo 'dive = "latest"' >> "$temp_file"
+    [ "$INSTALL_KUBEBENCH" = true ] && echo 'kubebench = "latest"' >> "$temp_file"
+    [ "$INSTALL_POPEYE" = true ] && echo 'popeye = "latest"' >> "$temp_file"
+    [ "$INSTALL_TRIVY" = true ] && echo 'trivy = "latest"' >> "$temp_file"
+    [ "$INSTALL_CMCTL" = true ] && echo 'cmctl = "latest"' >> "$temp_file"
+    [ "$INSTALL_K3D" = true ] && echo 'k3d = "latest"' >> "$temp_file"
+    echo "#### End Kubernetes Utilities ####" >> "$temp_file"
   fi
 
-  if ask_yes_no "Install PowerShell?" "N"; then
-    INSTALL_POWERSHELL=true
-    echo 'powershell = "latest"' >> "$temp_file"
-  fi
+  # Miscellaneous
+  [ "$INSTALL_GITUI" = true ] && echo 'gitui = "latest"' >> "$temp_file"
+  [ "$INSTALL_TEALDEER" = true ] && echo 'tealdeer = "latest"' >> "$temp_file"
+  [ "$INSTALL_MICRO" = true ] && echo 'micro = "latest"' >> "$temp_file"
+  [ "$INSTALL_POWERSHELL" = true ] && echo 'powershell = "latest"' >> "$temp_file"
 
   # Add aliases and settings sections from source
   # shellcheck disable=SC2129
@@ -349,6 +349,20 @@ generate_devcontainer_json() {
     extract_devcontainer_section "// #### Begin Go ####" "// #### End Go ####" >> "$temp_file"
   fi
   
+  # Include .NET extensions if .NET was installed
+  if [ "$INSTALL_DOTNET" = true ]; then
+    echo -e "${GREEN}✓ Including .NET development extensions (.NET tools were installed)${NC}"
+    echo "" >> "$temp_file"
+    extract_devcontainer_section "// #### Begin .NET ####" "// #### End .NET ####" >> "$temp_file"
+  fi
+  
+  # Include JavaScript/Node.js extensions if JavaScript tools were installed
+  if [ "$INSTALL_JAVASCRIPT" = true ]; then
+    echo -e "${GREEN}✓ Including JavaScript/Node.js development extensions (Node.js tools were installed)${NC}"
+    echo "" >> "$temp_file"
+    extract_devcontainer_section "// #### Begin JavaScript/Node.js ####" "// #### End JavaScript/Node.js ####" >> "$temp_file"
+  fi
+  
   # Ask about Python extensions (no corresponding tool installation)
   if ask_yes_no "Include Python development extensions?" "Y"; then
     INCLUDE_PYTHON_EXTENSIONS=true
@@ -370,8 +384,8 @@ generate_devcontainer_json() {
     extract_devcontainer_section "// #### Begin Shell/Bash ####" "// #### End Shell/Bash ####" >> "$temp_file"
   fi
   
-  # Include Kubernetes extensions if Kubernetes tools were installed
-  if [ "$INSTALL_KUBERNETES" = true ]; then
+  # Include Kubernetes extensions if any Kubernetes tools were installed
+  if [ "$INSTALL_KUBERNETES" = true ] || [ "$INSTALL_KREW" = true ]; then
     echo -e "${GREEN}✓ Including Kubernetes/Helm extensions (Kubernetes tools were installed)${NC}"
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin Kubernetes/Helm ####" "// #### End Kubernetes/Helm ####" >> "$temp_file"
@@ -384,9 +398,10 @@ generate_devcontainer_json() {
     extract_devcontainer_section "// #### Begin Terraform/OpenTofu ####" "// #### End Terraform/OpenTofu ####" >> "$temp_file"
   fi
   
-  # Ask about JavaScript/TypeScript extensions (no corresponding tool installation)
-  if ask_yes_no "Include JavaScript/TypeScript development extensions?" "N"; then
+  # Include JavaScript/TypeScript extensions if Node.js was installed
+  if [ "$INSTALL_NODE" = true ]; then
     INCLUDE_JS_EXTENSIONS=true
+    echo -e "${GREEN}✓ Including JavaScript/TypeScript development extensions (Node.js was installed)${NC}"
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin JavaScript/TypeScript ####" "// #### End JavaScript/TypeScript ####" >> "$temp_file"
   fi
@@ -402,16 +417,21 @@ generate_devcontainer_json() {
   # shellcheck disable=SC2129
   echo "" >> "$temp_file"
   extract_devcontainer_section "// #### Begin Core Extensions ####" "// #### End Core Extensions ####" >> "$temp_file"
-  
+
+  # Remove trailing comma from the last extension entry
+  last_ext_line=$(grep -n '^\s*".*",' "$temp_file" | tail -n 1 | cut -d: -f1)
+  if [[ -n "$last_ext_line" ]]; then
+    sed -i "${last_ext_line}s/,$//" "$temp_file"
+  fi
+
   # Close extensions array and add settings
   echo "      ]," >> "$temp_file"
-  
+
   # Add settings section
   echo '      "settings": {' >> "$temp_file"
-  
+
   # Always include Core VS Code Settings
   extract_devcontainer_section "// #### Begin Core VS Code Settings ####" "// #### End Core VS Code Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
-  echo "," >> "$temp_file"
   
   # Add settings based on user choices (automatically include for installed tools)
   echo -e "${BLUE}Now configuring VS Code settings...${NC}"
@@ -420,81 +440,80 @@ generate_devcontainer_json() {
   if [ "$INSTALL_GO" = true ]; then
     echo -e "${GREEN}✓ Including Go language settings${NC}"
     # shellcheck disable=SC2129
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin Go Settings ####" "// #### End Go Settings ####" >> "$temp_file"
-    echo "," >> "$temp_file"
+    extract_devcontainer_section "// #### Begin Go Settings ####" "// #### End Go Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
+  fi
+  
+  # Include .NET settings if .NET was installed
+  if [ "$INSTALL_DOTNET" = true ]; then
+    echo -e "${GREEN}✓ Including .NET language settings${NC}"
+    # shellcheck disable=SC2129
+    extract_devcontainer_section "// #### Begin .NET Settings ####" "// #### End .NET Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
+  fi
+  
+  # Include JavaScript/Node.js settings if JavaScript tools were installed
+  if [ "$INSTALL_JAVASCRIPT" = true ]; then
+    echo -e "${GREEN}✓ Including JavaScript/Node.js language settings${NC}"
+    # shellcheck disable=SC2129
+    extract_devcontainer_section "// #### Begin JavaScript/Node.js Settings ####" "// #### End JavaScript/Node.js Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   fi
   
   # Include Python settings if Python extensions were selected
   if [ "$INCLUDE_PYTHON_EXTENSIONS" = true ]; then
     echo -e "${GREEN}✓ Including Python language settings${NC}"
     # shellcheck disable=SC2129
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin Python Settings ####" "// #### End Python Settings ####" >> "$temp_file"
-    echo "," >> "$temp_file"
+    extract_devcontainer_section "// #### Begin Python Settings ####" "// #### End Python Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   fi
   
   # Include Markdown settings if Markdown extensions were selected
   if [ "$INCLUDE_MARKDOWN_EXTENSIONS" = true ]; then
     echo -e "${GREEN}✓ Including Markdown settings${NC}"
     # shellcheck disable=SC2129
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin Markdown Settings ####" "// #### End Markdown Settings ####" >> "$temp_file"
-    echo "," >> "$temp_file"
+    extract_devcontainer_section "// #### Begin Markdown Settings ####" "// #### End Markdown Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   fi
   
   # Include Shell/Bash settings if Shell extensions were selected
   if [ "$INCLUDE_SHELL_EXTENSIONS" = true ]; then
     echo -e "${GREEN}✓ Including Shell/Bash settings${NC}"
     # shellcheck disable=SC2129
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin Shell/Bash Settings ####" "// #### End Shell/Bash Settings ####" >> "$temp_file"
-    echo "," >> "$temp_file"
+    extract_devcontainer_section "// #### Begin Shell/Bash Settings ####" "// #### End Shell/Bash Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   fi
   
-  # Include Kubernetes settings if Kubernetes tools were installed
-  if [ "$INSTALL_KUBERNETES" = true ]; then
+  # Include Kubernetes settings if any Kubernetes tools were installed
+  if [ "$INSTALL_KUBERNETES" = true ] || [ "$INSTALL_KREW" = true ]; then
     echo -e "${GREEN}✓ Including Kubernetes/Helm settings${NC}"
     # shellcheck disable=SC2129
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin Kubernetes/Helm Settings ####" "// #### End Kubernetes/Helm Settings ####" >> "$temp_file"
-    echo "," >> "$temp_file"
+    extract_devcontainer_section "// #### Begin Kubernetes/Helm Settings ####" "// #### End Kubernetes/Helm Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   fi
   
   # Include JavaScript/TypeScript settings if JS extensions were selected
   if [ "$INCLUDE_JS_EXTENSIONS" = true ]; then
     echo -e "${GREEN}✓ Including JavaScript/TypeScript settings${NC}"
     # shellcheck disable=SC2129
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin JavaScript/TypeScript Settings ####" "// #### End JavaScript/TypeScript Settings ####" >> "$temp_file"
-    echo "," >> "$temp_file"
+    extract_devcontainer_section "// #### Begin JavaScript/TypeScript Settings ####" "// #### End JavaScript/TypeScript Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   fi
   
   # Include PowerShell settings if PowerShell was installed
   if [ "$INSTALL_POWERSHELL" = true ]; then
     echo -e "${GREEN}✓ Including PowerShell settings${NC}"
     # shellcheck disable=SC2129
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin PowerShell Settings ####" "// #### End PowerShell Settings ####" >> "$temp_file"
-    echo "," >> "$temp_file"
+    extract_devcontainer_section "// #### Begin PowerShell Settings ####" "// #### End PowerShell Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   fi
   
-  # Always include Spell Checker, TODO Tree, and PSI Header settings
-  # shellcheck disable=SC2129
-  echo "" >> "$temp_file"
-  extract_devcontainer_section "// #### Begin Spell Checker Settings ####" "// #### End Spell Checker Settings ####" >> "$temp_file"
-  echo "," >> "$temp_file"
-  echo "" >> "$temp_file"
-  extract_devcontainer_section "// #### Begin TODO Tree Settings ####" "// #### End TODO Tree Settings ####" >> "$temp_file"
-  echo "," >> "$temp_file"
-  echo "" >> "$temp_file"
-  extract_devcontainer_section "// #### Begin PSI Header Settings ####" "// #### End PSI Header Settings ####" >> "$temp_file"
+  # Always include the final settings blocks
+  extract_devcontainer_section "// #### Begin Spell Checker Settings ####" "// #### End PSI Header Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   
+  # Remove trailing comma from the last settings entry
+  # Find the last line containing a comma that is not a comment or part of an array
+  last_setting_line=$(grep -n '^\s*".*":.*,' "$temp_file" | tail -n 1 | cut -d: -f1)
+  if [[ -n "$last_setting_line" ]]; then
+      sed -i "${last_setting_line}s/,$//" "$temp_file"
+  fi
+
   # Close settings and customizations
-  echo "      }" >> "$temp_file"
-  echo "    }" >> "$temp_file"
-  echo "  }" >> "$temp_file"
-  echo "}" >> "$temp_file"
+  echo '      }' >> "$temp_file"
+  echo '    }' >> "$temp_file"
+  echo '  }' >> "$temp_file"
+  echo '}' >> "$temp_file"
   
   mv "$temp_file" "${project_path}/.devcontainer/devcontainer.json"
 }
@@ -526,7 +545,7 @@ main() {
   create_project_directory "$project_path"
 
   echo -e "${BLUE}This script will configure and copy the following files into${NC} ${project_path}"
-  echo -e "  .devcontainer/ (customized based on your choices)"
+  echo -e "  All files from .devcontainer/ (devcontainer.json will be customized)"
   echo -e "  .mise.toml (customized based on your choices)"
   echo -e "  cspell.json"
   echo -e "  dev.sh (customized with your project settings)"
@@ -606,64 +625,158 @@ main() {
   fi
   echo ""
 
-  echo -e "${BLUE}Starting interactive configuration...${NC}"
+  echo -e "${BLUE}Starting tool and language configuration...${NC}"
+  echo ""
+
+  echo -e "${BLUE}Go Development Tools:${NC}"
+  if ask_yes_no "Install Go programming language?" "N"; then
+    INSTALL_GO=true
+    INSTALL_GOLANG=true
+    version_examples=$(get_latest_major_versions "go")
+    GOLANG_VERSION=$(ask_with_default "    Enter Go version to install${version_examples}" "latest")
+    if ask_yes_no "Install GoReleaser?" "Y"; then
+      INSTALL_GORELEASER=true
+    fi
+  fi
+  echo ""
+
+  echo -e "${BLUE}.NET Development Tools:${NC}"
+  if ask_yes_no "Install .NET SDK?" "N"; then
+    INSTALL_DOTNET=true
+    INSTALL_DOTNET_SDK=true
+    version_examples=$(get_latest_major_versions "dotnet")
+    DOTNET_SDK_VERSION=$(ask_with_default "    Enter .NET SDK version to install${version_examples}" "latest")
+  fi
+  echo ""
+
+  echo -e "${BLUE}JavaScript/Node.js Development Tools:${NC}"
+  echo -e "${YELLOW}Note:${NC} Node.js is fixed to v19 due to compatibility issues."
+  echo -e "See the project's README.md for more details on customizing the Node.js version."
+  if ask_yes_no "Install Node.js (v19)?" "N"; then
+    INSTALL_JAVASCRIPT=true
+    INSTALL_NODE=true
+    if ask_yes_no "Install pnpm?" "Y"; then
+      INSTALL_PNPM=true
+    fi
+    if ask_yes_no "Install yarn?" "Y"; then
+      INSTALL_YARN=true
+    fi
+    if ask_yes_no "Install Deno?" "Y"; then
+      INSTALL_DENO=true
+    fi
+    if ask_yes_no "Install Bun?" "Y"; then
+      INSTALL_BUN=true
+    fi
+  fi
+  echo ""
+
+  echo -e "${BLUE}Kubernetes/Helm Tools:${NC}"
+  if ask_yes_no "Install kubectl?" "N"; then
+    INSTALL_KUBERNETES=true
+    INSTALL_KUBECTL=true
+    version_examples=$(get_latest_major_versions "kubectl")
+    KUBECTL_VERSION=$(ask_with_default "    Enter kubectl version to install${version_examples}" "latest")
+    if ask_yes_no "Install Helm?" "Y"; then
+      INSTALL_HELM=true
+    fi
+    if ask_yes_no "Install k9s?" "Y"; then
+      INSTALL_K9S=true
+    fi
+    if ask_yes_no "Install kubectx/kubens?" "Y"; then
+      INSTALL_KUBECTX=true
+      INSTALL_KUBENS=true
+    fi
+  fi
+  echo ""
+
+  echo -e "${BLUE}Kubernetes Utilities:${NC}"
+  if ask_yes_no "Install krew (kubectl plugin manager)?" "N"; then
+    INSTALL_KREW=true
+    if ask_yes_no "Install dive (Docker image explorer)?" "Y"; then
+      INSTALL_DIVE=true
+    fi
+    if ask_yes_no "Install kubebench (Kubernetes benchmark tool)?" "Y"; then
+      INSTALL_KUBEBENCH=true
+    fi
+    if ask_yes_no "Install popeye (Kubernetes cluster sanitizer)?" "Y"; then
+      INSTALL_POPEYE=true
+    fi
+    if ask_yes_no "Install trivy (vulnerability scanner)?" "Y"; then
+      INSTALL_TRIVY=true
+    fi
+    if ask_yes_no "Install cmctl (cert-manager CLI)?" "Y"; then
+      INSTALL_CMCTL=true
+    fi
+    if ask_yes_no "Install k3d (lightweight Development Kubernetes)?" "Y"; then
+      INSTALL_K3D=true
+    fi
+  fi
+  echo ""
+
+  echo -e "${BLUE}HashiCorp Tools:${NC}"
+  if ask_yes_no "Install OpenTofu (Terraform alternative)?" "N"; then
+    INSTALL_OPENTOFU=true
+    version_examples=$(get_latest_major_versions "opentofu")
+    OPENTOFU_VERSION=$(ask_with_default "    Enter OpenTofu version to install${version_examples}" "latest")
+  fi
+  if ask_yes_no "Install OpenBao (Vault alternative)?" "N"; then
+    INSTALL_OPENBAO=true
+    version_examples=$(get_latest_major_versions "openbao")
+    OPENBAO_VERSION=$(ask_with_default "    Enter OpenBao version to install${version_examples}" "latest")
+  fi
+  if ask_yes_no "Install Packer (HashiCorp image builder)?" "N"; then
+    INSTALL_PACKER=true
+    version_examples=$(get_latest_major_versions "packer")
+    PACKER_VERSION=$(ask_with_default "    Enter Packer version to install${version_examples}" "latest")
+  fi
+  echo ""
+
+  echo -e "${BLUE}Miscellaneous Tools:${NC}"
+  if ask_yes_no "Install gitui (terminal-based git client)?" "N"; then
+    INSTALL_GITUI=true
+  fi
+  if ask_yes_no "Install tealdeer (fast tldr client)?" "N"; then
+    INSTALL_TEALDEER=true
+  fi
+  if ask_yes_no "Install micro (terminal-based text editor)?" "N"; then
+    INSTALL_MICRO=true
+  fi
+  if ask_yes_no "Install PowerShell?" "N"; then
+    INSTALL_POWERSHELL=true
+  fi
   echo ""
 
   # Create .devcontainer directory
   mkdir -p "${project_path}/.devcontainer"
 
-  # Generate customized files
+  # First, copy all source files to the destination
+  echo -e "${BLUE}Copying template files...${NC}"
+  cp -r .devcontainer/* "${project_path}/.devcontainer/"
+  cp -r ./* "${project_path}/"
+  # We need to copy hidden files like .gitignore as well
+  cp .gitignore "${project_path}/.gitignore"
+  cp .krew_plugins "${project_path}/.krew_plugins"
+  echo ""
+
+  # Now, generate the customized configuration files, overwriting the copied templates
+  echo -e "${BLUE}Generating custom configuration files...${NC}"
   generate_mise_toml "$project_path"
   generate_devcontainer_json "$project_path" "$project_name" "$container_name" "$display_name"
+  echo ""
 
-  # Copy and update dev.sh
+  # Update dev.sh with project settings
   echo -e "${BLUE}Updating dev.sh with project settings...${NC}"
   update_dev_sh "$project_path" "$docker_exec_command" "$project_name" "$container_name"
-
-  # Copy remaining files as-is
-  echo -e "${BLUE}Copying remaining files...${NC}"
-  echo -e "  ${GREEN}Copying${NC} cspell.json"
-  cp "cspell.json" "${project_path}/"
-  
-  # Always copy run.sh
-  echo -e "  ${GREEN}Copying${NC} run.sh"
-  cp "run.sh" "${project_path}/"
-  chmod +x "${project_path}/run.sh"
-  
-  # Copy .gitignore if it doesn't already exist
-  if [[ ! -f "${project_path}/.gitignore" ]]; then
-    echo -e "  ${GREEN}Copying${NC} .gitignore"
-    cp ".gitignore" "${project_path}/"
-  else
-    echo -e "  ${YELLOW}Skipping${NC} .gitignore (already exists)"
-  fi
-  
-  # Copy Python files if Python extensions were selected and files don't exist
-  if [ "$INCLUDE_PYTHON_EXTENSIONS" = true ]; then
-    if [[ ! -f "${project_path}/pyproject.toml" ]]; then
-      echo -e "  ${GREEN}Copying${NC} pyproject.toml (Python extensions selected)"
-      cp "pyproject.toml" "${project_path}/"
-    else
-      echo -e "  ${YELLOW}Skipping${NC} pyproject.toml (already exists)"
-    fi
-    
-    if [[ ! -f "${project_path}/requirements.txt" ]]; then
-      echo -e "  ${GREEN}Copying${NC} requirements.txt (Python extensions selected)"
-      cp "requirements.txt" "${project_path}/"
-    else
-      echo -e "  ${YELLOW}Skipping${NC} requirements.txt (already exists)"
-    fi
-  fi
-  
-  # Copy devcontainer scripts
-  echo -e "  ${GREEN}Copying${NC} .devcontainer scripts"
-  cp .devcontainer/*.sh "${project_path}/.devcontainer/"
-  
-  # Copy devcontainer utils directory
-  echo -e "  ${GREEN}Copying${NC} .devcontainer/utils directory"
-  cp -r .devcontainer/utils "${project_path}/.devcontainer/"
-
   echo ""
+
+  # Remove files that are not needed in the new project
+  echo -e "${BLUE}Cleaning up installation files...${NC}"
+  rm -f "${project_path}/install.sh"
+  rm -f "${project_path}/LICENSE"
+  rm -f "${project_path}/README.md"
+  rm -f "${project_path}/SECURITY.md"
+  echo ""
+
   echo -e "${GREEN}Installation completed successfully!${NC}"
   echo ""
   echo -e "${CYAN}Project Settings Applied:${NC}"
