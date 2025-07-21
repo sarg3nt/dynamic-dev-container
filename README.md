@@ -1,293 +1,109 @@
-<!--cspell:ignore sarg trivy gitui kubectx Fira Firacode Caskaydia Consolas openbao mise -->
+<!-- cspell:ignore sarg trivy gitui kubectx Fira Firacode Caskaydia Consolas openbao mise zoxide lsd devcontainer krew kubens kubebench popeye cmctl tealdeer goreleaser pnpm devcontainers -->
+
 # Dynamic Dev Container
 
-A comprehensive, production-ready development container built on Rocky Linux 10 with intelligent tool selection using [mise](https://mise.jdx.dev/) and automatic configuration. This container is regularly built and maintained to ensure security and up-to-date tooling.
+Welcome to the Dynamic Dev Container, a comprehensive, production-ready development environment designed for consistency, security, and flexibility. Built on Rocky Linux 10 and powered by the [mise](https://mise.jdx.dev/) tool manager, this project provides an intelligent, interactive setup to create the perfect containerized workspace for any project.
+
+## Why Choose This Dev Container?
+
+- **Eliminate "It Works on My Machine"**: Get a consistent, reproducible environment for your entire team, ending configuration drift.
+- **Intelligent & Lean Setup**: The interactive installer asks you what you need, so you only install the tools required for your project. No bloat.
+- **Security-First Approach**: Built on an enterprise-grade Rocky Linux 10 base, with container images that are regularly rebuilt to incorporate the latest security patches.
+- **Production-Ready Tooling**: Comes packed with optional, industry-standard tools for modern cloud-native development, including Kubernetes, OpenTofu (Terraform), and Go.
+- **Smart Defaults & Automation**: The installer automatically includes the right VS Code extensions based on the tools you select, saving you setup time.
+
+## What is a Dev Container?
+
+For those new to the concept, a VS Code Dev Container is a running Docker container with a well-defined tool and runtime stack. It allows you to use a container as a full-featured development environment.
+
+- **Isolation**: Your project's environment is completely isolated from your local machine. You can have different versions of tools (like Node.js or Python) for different projects without conflicts.
+- **Consistency**: Everyone on the team uses the exact same environment, libraries, and tools, which are defined in code (`.devcontainer/devcontainer.json`).
+- **Reproducibility**: You can quickly and reliably reproduce a development environment on any machine that has VS Code and Docker.
+
+This project takes the dev container concept to the next level by providing a powerful, customizable base and an interactive installer to tailor it to your specific needs.
 
 ## Quick Start
 
-1. **Clone or download** this repository to your local machine
-2. **Run the installation script** to set up a new project:
-   ```bash
-   ./install.sh /path/to/your/project
-   ```
-3. **Follow the interactive prompts** to customize your development environment
-4. **Navigate to your project** and start the dev container:
-   ```bash
-   cd /path/to/your/project
-   ./dev.sh
-   ```
+Get your custom development environment running in minutes.
 
-## Key Benefits
+1.  **Clone or Download**: Get a local copy of this repository.
+    ```bash
+    git clone https://github.com/sarg3nt/dynamic-dev-container.git
+    cd dynamic-dev-container
+    ```
+2.  **Run the Installer**: Execute the `install.sh` script, pointing it to your project's directory.
+    ```bash
+    # This will create a new project directory with the dev container files
+    ./install.sh /path/to/your/new-project
+    ```
+3.  **Follow the Prompts**: The script will guide you through an interactive setup. Choose the tools and languages you need.
+4.  **Launch the Dev Container**: Open your new project in VS Code. When prompted to "Reopen in Container", click it. If you aren't prompted, open the command palette (`Ctrl+Shift+P`) and select `Dev Containers: Reopen in Container`.
 
-- **Zero Configuration Drift**: Containerized environment ensures consistent development experience across all machines
-- **Intelligent Tool Selection**: Interactive setup installs only what you need - no bloat
-- **Security First**: Built on Rocky Linux 10 with regular automated builds to maintain security updates
-- **Production Ready**: Includes enterprise-grade tools for cloud infrastructure, Kubernetes, and modern development
-- **Smart Defaults**: Minimal installation by default with sensible version pinning for stability
-- **Project Isolation**: Each project gets its own customized container configuration
+That's it! VS Code will build the container and connect to your new, fully configured development environment.
 
-## Environment Variables
+## The Installation Process (`install.sh`)
 
-### GitHub Token (Highly Recommended)
+The `install.sh` script is the heart of this project. It turns a generic template into a specific, customized development environment.
 
-To avoid GitHub API rate limiting when installing tools, set a GitHub personal access token:
+1.  **Project Configuration**: It starts by asking for key details about your project, like its name and the desired Docker container name. It even generates smart defaults to save you time.
+2.  **Interactive Tool Selection**: The script then walks you through a series of yes/no questions, allowing you to select toolsets by category. If you say no to a primary tool (like `kubectl`), it's smart enough to skip questions about related sub-tools (like `helm`).
+3.  **Version Selection**: For key tools like Go, .NET, and `kubectl`, the script asks which version you want to install, showing you the latest available major versions as examples.
+4.  **Dynamic File Generation**: Based on your selections, the script generates two critical files:
+    -   `.mise.toml`: Defines the tools and versions that `mise` will install inside the container.
+    -   `.devcontainer/devcontainer.json`: Configures every aspect of the VS Code environment, from which extensions to install to editor settings.
+5.  **File Copy & Cleanup**: The script copies all the necessary template files into your project directory, overwrites the templates with your customized versions, and then cleans up the installer script itself, leaving your project clean.
 
-```bash
-# Add to your shell profile (.bashrc, .zshrc, etc.)
-export GITHUB_TOKEN="your_github_token_here"
-```
+## Available Tools & Languages
 
-**Creating a GitHub Token:**
-1. Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-2. Generate new token with `public_repo` scope (no additional permissions needed)
-3. Copy the token and set it as an environment variable
+You can choose to install any combination of the following tools.
 
-**Why This Matters:** Many tools are downloaded from GitHub releases. Without a token, you may hit rate limits (60 requests/hour), causing installation failures. With a token, you get 5,000 requests/hour.
+### Core Development Environments
 
-**Security Note:** The token is only used during container builds and tool installation - it's not stored in any configuration files.
-
-### Other Optional Environment Variables
-
-- `ZSH_THEME`: Set a custom Zsh theme (defaults to Starship if not set)
-- `TZ`: Timezone setting (defaults to America/Los_Angeles)
-
-## Features
-
-### Container Infrastructure
-- **Base OS**: Rocky Linux 10 (Red Quartz) - Enterprise-grade stability
-- **Built with GitHub Actions**: Regularly updated container images ensure security and latest tooling
-- **Multi-stage Build**: Optimized for size and security using Docker best practices
-- **Tool Management**: [mise](https://mise.jdx.dev/) for consistent, reproducible tool installations
-
-### Smart Setup Process
-- **Interactive Setup**: Choose only the tools and extensions you need
-- **Smart Defaults**: Minimal installation by default with "No" as default for all optional tools
-- **Automatic Correlation**: Installing tools automatically includes relevant VS Code extensions
-- **Project Customization**: Container names, display names, and shortcuts customized per project
-- **File Management**: Intelligently copies configuration files without overwriting existing ones
-- **Command Shortcuts**: Creates personalized Docker exec shortcuts for quick container access
-
-### Version Management
-- **Pinned Critical Tools**: Specific versions for stability (Python 3.13, OpenTofu 1.10.2, kubectl 1.32)
-- **Latest Stable Tools**: Auto-updating for non-critical utilities (helm, k9s, gitui, etc.)
-- **Security Focus**: Base tools updated with each container build
-
-## Tool Categories
+-   **Go**: The Go programming language, with an option to include **GoReleaser** for release automation.
+-   **.NET**: The .NET SDK for building applications with C#, F#, and Visual Basic.
+-   **JavaScript/Node.js**: A comprehensive JS ecosystem, including:
+    -   **Node.js** (v19 for compatibility, see project README for customization)
+    -   **pnpm**, **yarn**: Popular alternative package managers.
+    -   **Deno**, **Bun**: Modern, fast JavaScript runtimes.
+-   **Python**: Python v3.13 is included by default, along with the necessary VS Code extensions.
 
 ### Infrastructure & Cloud Tools
-- **OpenTofu** (v1.10.2) - Open-source Terraform alternative for infrastructure as code
-- **OpenBao** (v2.3.1) - Open-source Vault alternative for secrets management  
-- **Packer** (latest) - HashiCorp image builder for automated machine images
+
+-   **OpenTofu**: The open-source successor to Terraform for infrastructure as code.
+-   **OpenBao**: The open-source, community-driven fork of HashiCorp's Vault for secrets management.
+-   **Packer**: The standard for building automated machine images.
 
 ### Kubernetes Ecosystem
-**Core Tools:**
-- **kubectl** (v1.32) - Kubernetes command-line tool
-- **helm** (latest) - Package manager for Kubernetes
-- **k9s** (latest) - Terminal-based UI for Kubernetes clusters
-- **kubectx/kubens** (latest) - Fast way to switch between clusters and namespaces
 
-**Additional Utilities:**
-- **krew** (latest) - kubectl plugin manager
-- **dive** (latest) - Docker image layer explorer
-- **popeye** (latest) - Kubernetes cluster sanitizer
-- **trivy** (latest) - Vulnerability scanner for containers and dependencies
-- **k3d** (latest) - Lightweight Kubernetes for development
-- **cmctl** (latest) - cert-manager CLI tool
+-   **Core Tools**:
+    -   **kubectl**: The essential command-line tool for interacting with Kubernetes clusters.
+    -   **Helm**: The package manager for Kubernetes.
+    -   **k9s**: A powerful terminal-based UI for managing your clusters.
+    -   **kubectx / kubens**: Quickly switch between Kubernetes clusters and namespaces.
+-   **Utilities (requires `krew` installation)**:
+    -   **krew**: The plugin manager for `kubectl`.
+    -   **dive**: A tool for exploring Docker image layers.
+    -   **kubebench**: A Kubernetes benchmark tool.
+    -   **popeye**: A utility that scans clusters for potential issues.
+    -   **trivy**: A comprehensive vulnerability scanner.
+    -   **cmctl**: A command-line tool for managing cert-manager.
+    -   **k3d**: A lightweight wrapper to run k3s (Rancher's minimal Kubernetes) in Docker.
 
-### Programming Languages & Development Environments
+### General Command-Line Utilities
 
-#### Go Development
-- **Go** (latest) - Go programming language with modern toolchain
-- **GoReleaser** (latest) - Release automation tool for Go projects
+-   **gitui**: A blazingly fast, terminal-based UI for Git.
+-   **tealdeer**: A fast and simple client for `tldr` pages (simplified man pages).
+-   **micro**: A modern and intuitive terminal-based text editor.
+-   **PowerShell**: Microsoft's cross-platform automation and configuration tool.
 
-#### .NET Development  
-- **dotnet** (latest) - .NET SDK for C#, F#, and VB.NET development
-- Cross-platform development support for modern .NET applications
+## Baked-In Goodness
 
-#### JavaScript/Node.js Development
-- **Node.js** (latest) - JavaScript runtime for server-side development
-- **pnpm** (latest) - Fast, disk space efficient package manager
-- **yarn** (latest) - Package manager with workspaces and plug'n'play
-- **Deno** (latest) - Secure runtime for JavaScript and TypeScript
-- **Bun** (latest) - Fast all-in-one JavaScript runtime with built-in bundler
+Every container comes with these powerful utilities pre-installed and configured for an enhanced shell experience.
 
-#### General Purpose Languages
-- **Python** (v3.13) - Latest stable Python with comprehensive package management
-- **PowerShell** (latest) - Cross-platform PowerShell for automation
-
-### Development Utilities
-- **Git UI (gitui)** (latest) - Fast terminal-based Git interface
-- **TealDeer** (latest) - Fast implementation of tldr (simplified man pages)
-- **Starship** (built-in) - Modern, fast shell prompt
-- **Zoxide** (built-in) - Smarter cd command with frecency
-- **fzf** (built-in) - Command-line fuzzy finder
-- **lsd** (built-in) - Modern ls replacement with icons and colors
-
-### VS Code Extensions
-**Automatically Included:**
-- Language-specific extensions are automatically included when related tools are installed
-- GitHub integration (Copilot, Pull Requests, Themes)
-- Git visualization tools
-
-**Language-Specific Extension Categories:**
-- **Go Development**: Go language support, Go nightly builds, debugging tools
-- **.NET Development**: C# language support, C# Dev Kit, .NET runtime installer, Interactive Notebooks
-- **JavaScript/Node.js Development**: TypeScript support, ESLint, Prettier, Tailwind CSS IntelliSense, auto-rename tags, path autocompletion
-- **Python Development**: Python language support, MyPy type checker, Ruff linter and formatter
-- **Infrastructure**: Kubernetes tools, Helm IntelliSense, OpenTofu/Terraform support, Packer tools
-
-**Optional Categories:**
-- Markdown editing and preview tools
-- Shell/Bash scripting support with ShellCheck
-- Core development utilities (Docker, spell checker, TODO tree, etc.)
-
-## How It Works
-
-### Installation Process
-1. **Interactive Configuration**: The `install.sh` script guides you through tool selection with smart defaults
-2. **File Generation**: Creates customized `.devcontainer/devcontainer.json` and `.mise.toml` files
-3. **Project Setup**: Copies necessary scripts and configuration files to your project directory
-4. **Container Naming**: Generates unique container names and optional command shortcuts
-
-### Container Lifecycle
-1. **Build Phase**: Container is built from Rocky Linux 10 base with mise tool manager
-2. **Tool Installation**: Selected tools are installed using mise during container creation
-3. **Post-Create**: Python dependencies and additional configurations are applied
-4. **Ready**: Development environment is fully configured and ready to use
-
-### File Structure
-
-The installation script copies and configures:
-- **`.devcontainer/`** - VS Code dev container configuration with lifecycle scripts
-- **`.mise.toml`** - Tool version management configuration (customized per project)
-- **`.krew_plugins`** - kubectl plugin configuration for krew (customize which plugins to install)
-- **`dev.sh`** - Container management script (customized with project settings)
-- **`run.sh`** - Standalone container runner (uses pre-built images)
-- **`cspell.json`** - Spell checker configuration for consistent documentation
-- **`.gitignore`** - Git ignore rules (only if not already present)
-- **`pyproject.toml` & `requirements.txt`** - Python configuration (only if Python extensions selected)
-
-### Version-Locked Tools
-
-For stability and reproducibility, certain critical tools are pinned to specific versions:
-
-- **Python**: 3.13 (latest stable with enhanced performance)
-- **OpenTofu**: 1.10.2 (infrastructure-as-code stability)
-- **kubectl**: 1.32 (Kubernetes API compatibility)
-- **Base Container Tools**: cosign, fzf, lsd, starship, yq, zoxide (managed via mise)
-
-All other tools use "latest" versions and are updated with each container build.
-
-## Container Images & Updates
-
-### Automated Builds
-- **Container Registry**: `ghcr.io/sarg3nt/dynamic-dev-container`
-- **Build Process**: Containers are built regularly using GitHub Actions to ensure:
-  - Latest security patches from Rocky Linux 10 base
-  - Updated system packages and dependencies
-  - Current versions of all "latest" tagged tools
-  - Validation of tool installations and compatibility
-
-### Image Versioning
-- **Latest Tag**: `ghcr.io/sarg3nt/dynamic-dev-container:latest` (recommended for most users)
-- **Version Tags**: Specific versions available for reproducible builds
-- **Branch Tags**: Development branches get their own tags for testing
-
-### Security & Maintenance
-- **Base OS**: Rocky Linux 10 provides enterprise-grade security and stability
-- **Regular Updates**: Automated builds ensure timely security patches
-- **Minimal Attack Surface**: Only essential packages are installed
-- **Non-root User**: Container runs as `vscode` user for enhanced security
-
-## Usage Scenarios
-
-### Local Development
-Use the `dev.sh` script for full VS Code integration with your local project:
-```bash
-cd /path/to/your/project
-./dev.sh  # Opens VS Code with the dev container
-```
-
-### Standalone CLI Usage
-Use the `run.sh` script for command-line work without VS Code:
-```bash
-./run.sh              # Uses latest tag
-./run.sh 1.0.4         # Uses specific version
-```
-
-### CI/CD Pipelines
-Reference the container directly in your workflows:
-```yaml
-container: ghcr.io/sarg3nt/dynamic-dev-container:latest
-```
-
-## Customization & Extension
-
-### Template Extraction System
-All template sections in `.mise.toml` and `.devcontainer/devcontainer.json` are extracted from source files using special markers, ensuring consistency and easy maintenance across projects:
-
-```toml
-#### Begin Environment ####
-[env]
-MISE_PYTHON_COMPILE = false
-#### End Environment ####
-```
-
-### Adding Custom Tools
-1. **Modify your project's `.mise.toml`**: Add new tools after initial setup
-2. **Rebuild container**: Run `./dev.sh` to rebuild with new tools
-3. **VS Code Extensions**: Add corresponding extensions to `.devcontainer/devcontainer.json`
-
-### kubectl Plugin Configuration
-Customize which kubectl plugins are installed via krew by editing `.krew_plugins`:
-
-```bash
-# Default plugins (one per line)
-access-matrix
-blame
-get-all
-node-restart
-switch-config
-view-allocations
-
-# Add your own plugins
-ctx
-ns
-score
-```
-
-- **Comments**: Lines starting with `#` are ignored
-- **Empty Lines**: Blank lines are ignored
-- **Plugin Names**: Use the exact names from `krew search`
-- **Fallback**: If the file is missing, a default set of plugins is installed
-
-### Environment Customization
-- **Timezone**: Set `TZ` environment variable in `devcontainer.json`
-- **Shell Theme**: Set `ZSH_THEME` environment variable (defaults to Starship)
-- **Python Path**: Automatically configured for mise-installed Python
-- **Custom Variables**: Add your own environment variables to the `containerEnv` section
-
-## Troubleshooting
-
-### Common Issues
-1. **GitHub Rate Limiting**: Set `GITHUB_TOKEN` environment variable before running installation
-2. **Permission Denied**: Ensure Docker daemon is running and your user has Docker permissions
-3. **Container Won't Start**: Check Docker Desktop is running and has sufficient resources
-4. **Tool Installation Fails**: Verify internet connectivity and GitHub token (if using one)
-
-### Getting Help
-- Check the container logs: `docker logs <container-name>`
-- Verify tool installation: `mise list` inside the container
-- Test connectivity: `curl -s https://api.github.com/rate_limit` (with GITHUB_TOKEN set)
-
-## Contributing
-
-This project follows infrastructure-as-code principles. To contribute:
-1. Fork the repository
-2. Test changes in a local development environment
-3. Submit pull requests with clear descriptions
-4. Ensure all tools install successfully and containers build properly
-
----
-
-**Built with ❤️ for modern development workflows**
+-   **mise**: The ultimate tool for managing tool versions.
+-   **Starship**: A minimal, fast, and infinitely customizable prompt for any shell.
+-   **Zoxide**: A smarter `cd` command that learns your habits.
+-   **fzf**: A general-purpose command-line fuzzy finder.
+-   **lsd**: A modern `ls` replacement with icons, colors, and more.
+-   **zsh + plugins**: A powerful shell with auto-suggestions and syntax highlighting.
+-   **Docker**: The Docker CLI is available inside the container to manage sibling containers.
