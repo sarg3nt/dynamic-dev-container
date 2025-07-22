@@ -3,7 +3,7 @@
 # See: https://hub.docker.com/r/docker/dockerfile.  Syntax directive must be first line
 # cspell:ignore
 
-# VER=1.0.0-dev1 && IMAGE="ghcr.io/sarg3nt/dynamic-dev-container" && docker build . -t ${IMAGE}:${VER} --build-arg "VER=${VER}"
+# VER=0.0.2 && IMAGE="ghcr.io/sarg3nt/dynamic-dev-container" && docker build . -t ${IMAGE}:${VER} --build-arg "VER=${VER}" && docker push ${IMAGE}:${VER}
 
 # Mise application list and versions are located in
 # home/vscode/.config/mise/config.toml

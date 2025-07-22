@@ -11,7 +11,7 @@ setup() {
   echo "install_weak_deps=False" >>/etc/dnf/dnf.conf
 
   log "Installing epel release" "green"
-  dnf install -y epel-release && dnf clean all
+  dnf install -y epel-release
 
   log "Installing dnf plugins core" "green"
   dnf install -y dnf-plugins-core
@@ -27,54 +27,41 @@ setup() {
 }
 
 package_install() {
-  log "Installing bash completion" "green"
-  dnf install -y bash-completion
-
-  log "Installing ca-certificates" "green"
-  dnf install -y ca-certificates
-
-  log "Installin docker-ce-cli" "green"
-  dnf install -y docker-ce-cli
-
-  log "Installing docker-buildx-plugin" "green"
-  dnf install -y docker-buildx-plugin
-
-  log "Installing git" "green"
-  dnf install -y git
-
-  log "Installing gnupg2" "green"
-  dnf install -y gnupg2
-
-  log "Installing jq" "green"
-  dnf install -y jq
-
-  log "Installing util-linux-user" "green"
-  dnf install -y util-linux-user
-
-  log "Installing xz" "green"
-  dnf install -y xz
-  
-  # Final cleanup after all packages
-  log "Final package cache cleanup" "green"
-  dnf clean all
+  log "Installing essential system packages in batch" "green"
+  dnf install -y \
+    bash-completion \
+    ca-certificates \
+    docker-ce-cli \
+    docker-buildx-plugin \
+    git \
+    gnupg2 \
+    jq \
+    util-linux-user \
+    xz
 }
 
 install_dev_container_features() {
   log "Installing Microsoft Dev Container Features" "green"
 
-  cd /tmp/
-  log "Cloning devcontainers features repository" "green"
-  git clone --depth 1 -- https://github.com/devcontainers/features.git
+  # Use temporary directory and clean up after
+  local temp_dir
+  temp_dir=$(mktemp -d)
+  
+  log "Cloning devcontainers features repository to $temp_dir" "green"
+  git clone --depth 1 https://github.com/devcontainers/features.git "$temp_dir/features"
 
-  log "Running install script" "green"
-  cd /tmp/features/src/common-utils/
+  log "Running common-utils install script" "green"
+  cd "$temp_dir/features/src/common-utils/"
   ./install.sh
+  
+  # Return to original directory
+  cd - > /dev/null
 }
 
 cleanup() {
   log "Running comprehensive cleanup" "green"
   
-  # Package manager cleanup
+  # Package manager cleanup (autoremove first, then clean)
   dnf autoremove -y
   dnf clean all
   
