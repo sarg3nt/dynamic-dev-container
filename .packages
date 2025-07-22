@@ -1,25 +1,25 @@
-> Add your template text here
 # User system packages
-# This file defines which system packages the user wants installed for this project
+# This file defines which system packages the user wants installed for this project.
+# They will be installed when the dev container starts.
 # 
 # Format: One package per line.
 # Comment out packages by adding # in front of them.
 
-bind-utils
-btop
-genisoimage
-graphviz
-iputils
-ncdu
-net-snmp-utils
-nmap
-sshpass
-socat
-traceroute
-unzip
-vim
-vim-enhanced
-vim-common
-vim-filesystem
-wget
-zip
+# bind-utils
+# btop
+# genisoimage
+# graphviz
+# iputils
+# ncdu
+# net-snmp-utils
+# nmap
+# sshpass
+# socat
+# traceroute
+# unzip
+# vim
+# vim-enhanced
+# vim-common
+# vim-filesystem
+# wget
+# zip

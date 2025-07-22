@@ -8,17 +8,17 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Parse packages from /.packages file
+# Parse packages from .packages file
 parse_packages() {
-  local packages_file="/.packages"
+  local packages_file=".packages"
   local packages=()
   
   if [[ ! -f "$packages_file" ]]; then
-    log "No /.packages file found, skipping package installation" "yellow"
+    log "No /.packages file found, skipping package installation" "yellow" >&2
     return 0
   fi
   
-  log "Reading packages from $packages_file" "green"
+  log "Reading packages from $packages_file" "green" >&2
   
   # Read file line by line, skip comments and empty lines
   while IFS= read -r line; do
@@ -31,12 +31,12 @@ parse_packages() {
   done < "$packages_file"
   
   if [[ ${#packages[@]} -eq 0 ]]; then
-    log "No packages found in $packages_file" "yellow"
+    log "No packages found in $packages_file" "yellow" >&2
     return 0
   fi
   
-  log "Found ${#packages[@]} packages to install: ${packages[*]}" "green"
-  echo "${packages[@]}"
+  log "Found ${#packages[@]} packages to install: ${packages[*]}" "green" >&2
+  printf '%s\n' "${packages[@]}"
 }
 
 # Install packages efficiently
@@ -52,13 +52,13 @@ install_packages() {
   
   # Install all packages in one command for efficiency
   # Note: EPEL, CRB, and dnf-plugins-core already configured in base system
-  if ! dnf install -y "${packages[@]}"; then
+  if ! sudo dnf install -y "${packages[@]}"; then
     log "Package installation failed, trying individual installation" "yellow"
     
     # If batch install fails, try individual packages
     for package in "${packages[@]}"; do
       log "Installing $package individually" "green"
-      if ! dnf install -y "$package"; then
+      if ! sudo dnf install -y "$package"; then
         log "Failed to install $package, skipping" "red"
       fi
     done
@@ -76,26 +76,30 @@ cleanup() {
 }
 
 main() {
-  # Source logging functions (should be available from base system)
-  if [[ -f "/usr/bin/lib/sh/log.sh" ]]; then
+  # Source logging functions from the local .devcontainer directory
+  if [[ -f ".devcontainer/log.sh" ]]; then
+    source ".devcontainer/log.sh"
+  elif [[ -f "/usr/bin/lib/sh/log.sh" ]]; then
     source "/usr/bin/lib/sh/log.sh"
   else
     # Fallback logging if not available
     log() {
       local message="$1"
       local color="${2:-white}"
-      echo "[$color] $message"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') $message"
     }
   fi
   
   log "10-install-packages.sh (dynamic installer)" "blue"
   
   # Parse packages from file
-  local packages
-  readarray -t packages < <(parse_packages)
+  local packages=()
+  while IFS= read -r package; do
+    [[ -n "$package" ]] && packages+=("$package")
+  done < <(parse_packages)
   
-  # Install packages if any found
   if [[ ${#packages[@]} -gt 0 ]]; then
+    # Install packages if any found
     install_packages "${packages[@]}"
     cleanup
   else

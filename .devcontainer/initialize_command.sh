@@ -33,7 +33,7 @@ main() {
 get_latest_dev_container_version() {
   log_info "Pulling latest 'dynamic-dev-container' image from GitHub Container Registry."
   echo ""
-  if docker pull ghcr.io/sarg3nt/dynamic-dev-container:0.0.1; then
+  if docker pull ghcr.io/sarg3nt/dynamic-dev-container:0.0.3; then
     echo ""
     log_success "Latest dynamic-dev-container image pulled successfully."
   else

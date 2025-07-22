@@ -1059,8 +1059,9 @@ generate_devcontainer_json() {
   extract_devcontainer_section "// #### Begin Spell Checker Settings ####" "// #### End PSI Header Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   
   # Remove trailing comma from the last settings entry
-  # Find the last line containing a comma that is not a comment or part of an array
-  last_setting_line=$(grep -n '^\s*".*":.*,' "$temp_file" | tail -n 1 | cut -d: -f1)
+  # Find the last line that's a top-level setting property (8 spaces indentation + quoted property)
+  # This ensures we only target direct properties of the "settings" object, not nested properties
+  last_setting_line=$(grep -n '^        "[^"]*":.*,$' "$temp_file" | tail -n 1 | cut -d: -f1)
   if [[ -n "$last_setting_line" ]]; then
       sed -i "${last_setting_line}s/,$//" "$temp_file"
   fi

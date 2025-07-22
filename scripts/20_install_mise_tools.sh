@@ -43,27 +43,26 @@ install_mise_packages() {
 }
 
 cleanup() {
-  log "Running cleanup" "blue"
+  log "Running cleanup for container size optimization" "blue"
 
   log "Deleting files from /tmp" "green"
   sudo rm -rfv /tmp/*
-  echo ""
 
-  log "Deleting all .git directories." "green"
+  log "Deleting all .git directories" "green"
   find / -path /proc -prune -o -type d -name ".git" -not -path '/.git' -exec rm -rf {} + 2>/dev/null || true
-  echo ""
-
-  log "Clearing mise cache." "green"
-  mise cache clear
-  echo ""
 
   log "Deleting all data in /var/log" "green"
   sudo rm -rfv /var/log/*
-  echo ""
 
   log "Delete Python cache files" "green"
   sudo find / -name "__pycache__" -type d -exec rm -rfv {} + 2>/dev/null || true
   sudo find / -name "*.pyc" -exec rm -fv {} + 2>/dev/null || true
+  
+  log "Remove pip cache (if accessible)" "green"
+  rm -rf /home/vscode/.cache/pip/* 2>/dev/null || true
+  
+  # Note: Skipping mise cache clear since we're using Docker cache mount
+  log "Skipping mise cache clear (using Docker cache mount)" "yellow"
 }
 
 # Run main

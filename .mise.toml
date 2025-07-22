@@ -52,6 +52,7 @@ packer = "latest"
 tealdeer = "latest"
 micro = "latest"
 powershell = "latest"
+cosign = "latest"
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
 #### Begin Aliases ####

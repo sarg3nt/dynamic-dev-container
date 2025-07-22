@@ -3,7 +3,7 @@
 # all tools defined in .mise.toml during the build process and any krew plugins defined.
 # cspell:ignore krew
 
-FROM ghcr.io/sarg3nt/dynamic-dev-container:0.0.1
+FROM ghcr.io/sarg3nt/dynamic-dev-container:0.0.3
 
 # Switch to vscode user for tool installation
 USER vscode
