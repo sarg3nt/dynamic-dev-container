@@ -2,7 +2,7 @@
 #
 # TUI version of install.sh using dialog for a better user experience.
 # Installs .devcontainer and other files into a project directory to use the dev container in a new project.
-# cspell:ignore openbao myapp sudermanjr kubens
+# cspell:ignore openbao myapp sudermanjr kubens DIALOGRC defaultno noconfirm pyproject sles
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -54,10 +54,26 @@ OPENBAO_VERSION="latest"
 OPENTOFU_VERSION="latest"
 PACKER_VERSION="latest"
 
+# Files and directories to copy to new projects
+FILES_TO_COPY=(
+  ".gitignore"
+  ".krew_plugins"
+  ".packages"
+  "cspell.json"
+  "dev.sh"
+  "pyproject.toml"
+  "requirements.txt"
+  "run.sh"
+  ".mise.toml"
+)
+
+DIRECTORIES_TO_COPY=(
+  ".devcontainer"
+)
+
 # TUI Configuration
 DIALOG_HEIGHT=25
 DIALOG_WIDTH=85
-DIALOG_LIST_HEIGHT=15
 DIALOG_CHECKLIST_HEIGHT=20
 
 # Colors for dialog
@@ -1170,35 +1186,24 @@ main() {
   # Create .devcontainer directory
   mkdir -p "${project_path}/.devcontainer"
 
-  # Copy specific files to the destination
-  # 1. Everything in the .devcontainer folder
-  cp -r .devcontainer/* "${project_path}/.devcontainer/"
+  # Copy directories to the destination
+  for dir in "${DIRECTORIES_TO_COPY[@]}"; do
+    if [[ -d "$dir" ]]; then
+      cp -r "$dir"/* "${project_path}/$dir/" 2>/dev/null || true
+    fi
+  done
   
-  # 2. .gitignore if it does not already exist in destination
-  if [[ ! -f "${project_path}/.gitignore" ]]; then
-    cp .gitignore "${project_path}/.gitignore" 2>/dev/null || true
-  fi
-  
-  # 3. .krew_plugins
-  cp .krew_plugins "${project_path}/.krew_plugins" 2>/dev/null || true
-  
-  # 4. cspell.json
-  cp cspell.json "${project_path}/cspell.json" 2>/dev/null || true
-  
-  # 5. dev.sh
-  cp dev.sh "${project_path}/dev.sh" 2>/dev/null || true
-  
-  # 6. pyproject.toml
-  cp pyproject.toml "${project_path}/pyproject.toml" 2>/dev/null || true
-  
-  # 7. requirements.txt
-  cp requirements.txt "${project_path}/requirements.txt" 2>/dev/null || true
-  
-  # 8. run.sh
-  cp run.sh "${project_path}/run.sh" 2>/dev/null || true
-  
-  # 9. .mise.toml (will be overwritten by generate_mise_toml)
-  cp .mise.toml "${project_path}/.mise.toml" 2>/dev/null || true
+  # Copy files to the destination
+  for file in "${FILES_TO_COPY[@]}"; do
+    # Special handling for .gitignore - don't overwrite if it exists
+    if [[ "$file" == ".gitignore" && -f "${project_path}/.gitignore" ]]; then
+      continue
+    fi
+    
+    if [[ -f "$file" ]]; then
+      cp "$file" "${project_path}/$file" 2>/dev/null || true
+    fi
+  done
 
   # Generate the customized configuration files
   generate_mise_toml "$project_path"
@@ -1206,13 +1211,6 @@ main() {
 
   # Update dev.sh with project settings
   update_dev_sh "$project_path" "$DOCKER_EXEC_COMMAND" "$PROJECT_NAME" "$CONTAINER_NAME"
-
-  # Remove files that are not needed in the new project
-  rm -f "${project_path}/install.sh"
-  rm -f "${project_path}/install-tui.sh"
-  rm -f "${project_path}/LICENSE"
-  rm -f "${project_path}/README.md"
-  rm -f "${project_path}/SECURITY.md"
 
   # Clean up dialog config
   rm -f $DIALOGRC
