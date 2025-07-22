@@ -1195,13 +1195,15 @@ main() {
   
   # Copy files to the destination
   for file in "${FILES_TO_COPY[@]}"; do
-    # Special handling for .gitignore - don't overwrite if it exists
-    if [[ "$file" == ".gitignore" && -f "${project_path}/.gitignore" ]]; then
+    # Skip if file already exists in the target directory
+    if [[ -f "${project_path}/$file" ]]; then
+      echo "Skipping $file - already exists in target directory"
       continue
     fi
     
     if [[ -f "$file" ]]; then
       cp "$file" "${project_path}/$file" 2>/dev/null || true
+      echo "Copied $file"
     fi
   done
 
