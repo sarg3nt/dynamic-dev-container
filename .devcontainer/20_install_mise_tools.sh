@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Script to build the dynamic container with the mise tools defined in the root .mise.toml file.
+# Script to to add Mise tools to the dynamic dev container.
 #
 # cSpell:ignore krew mise 
 
