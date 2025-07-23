@@ -1,5 +1,3 @@
-<!-- cspell:ignore sarg trivy gitui kubectx Fira Firacode Caskaydia Consolas openbao mise zoxide lsd devcontainer krew kubens kubebench popeye cmctl tealdeer goreleaser pnpm devcontainers -->
-
 # Dynamic Dev Container
 
 Welcome to the Dynamic Dev Container, a comprehensive, production-ready development environment designed for consistency, security, and flexibility. Built on Rocky Linux 10 and powered by the [mise](https://mise.jdx.dev/) tool manager, this project provides an intelligent, **Terminal User Interface (TUI)** setup to create the perfect containerized workspace for any project.
@@ -24,6 +22,18 @@ Welcome to the Dynamic Dev Container, a comprehensive, production-ready developm
   - [Kubernetes Ecosystem](#kubernetes-ecosystem)
   - [General Command-Line Utilities](#general-command-line-utilities)
 - [Baked-In Goodness](#baked-in-goodness)
+- [Using Kubernetes Tools](#using-kubernetes-tools)
+  - [kubectl Version Guidance](#kubectl-version-guidance)
+  - [k9s: Terminal UI for Kubernetes](#k9s-terminal-ui-for-kubernetes)
+    - [Most Useful Keyboard Shortcuts](#most-useful-keyboard-shortcuts)
+- [Python Library Development](#python-library-development)
+  - [Getting Started with Hatch](#getting-started-with-hatch)
+- [Managing Configuration Files After Installation](#managing-configuration-files-after-installation)
+  - [Discovering New Packages and Tools](#discovering-new-packages-and-tools)
+- [Using `run.sh`](#using-runsh)
+- [Contributing, Reporting Bugs, and Requesting Features](#contributing-reporting-bugs-and-requesting-features)
+  - [Report Bugs or Request Features:](#report-bugs-or-request-features)
+  - [Contribute Changes](#contribute-changes)
 
 
 ## Why Choose This Dev Container?
@@ -282,3 +292,193 @@ Every container comes with these powerful utilities pre-installed and configured
 -   **lsd**: A modern `ls` replacement with icons, colors, and more.
 -   **zsh + plugins**: A powerful shell with auto-suggestions and syntax highlighting.
 -   **Docker**: The Docker CLI is available inside the container to manage sibling containers.
+
+## Using Kubernetes Tools
+
+This dev container includes a suite of Kubernetes tools to help you manage clusters efficiently and securely.
+
+### kubectl Version Guidance
+
+**Important:** The version of `kubectl` you use should be no more than one minor version different from your Kubernetes cluster. For example, if your cluster is running v1.29, you should use `kubectl` v1.28, v1.29, or v1.30. Using a version outside this range may result in unexpected errors or missing features. You can select your preferred version during the TUI installation, or update it later in `.mise.toml` and run `mise install`.
+
+### k9s: Terminal UI for Kubernetes
+
+**k9s** is a powerful, terminal-based UI for managing and troubleshooting Kubernetes clusters. It provides a fast, keyboard-driven interface to view resources, logs, events, and perform common operations without leaving your terminal.
+
+- **Documentation:** [k9s official docs](https://k9s.dev/)
+
+#### Most Useful Keyboard Shortcuts
+
+- `?` or `Shift+?`: Show in-program help and all shortcuts
+- `/`: Filter resources by name
+- `d`: Describe selected resource
+- `l`: View logs for selected pod
+- `e`: Edit resource YAML (requires permissions)
+- `s`: Shell into a pod (if enabled)
+- `Ctrl+c`: Exit k9s
+- `g`: Jump to top of list
+- `Shift+g`: Jump to bottom of list
+- `:q`: Quit (Vim-style)
+
+**Tip:** Press `Shift+?` at any time in k9s to view the full help menu and all available shortcuts.
+
+Other included Kubernetes tools:
+- **Helm**: Package manager for Kubernetes charts
+- **kubectx / kubens**: Quickly switch clusters and namespaces
+- **krew**: Plugin manager for kubectl
+- **Advanced utilities**: dive, kubebench, popeye, trivy, cmctl, k3d
+
+See the [Kubernetes Ecosystem](#kubernetes-ecosystem) section above for a full list of available tools.
+
+## Python Library Development
+
+If you are developing a Python library, this project supports modern Python workflows using `pyproject.toml` and recommends using **Hatch** for building, testing, and publishing your package.
+
+**Hatch** is a next-generation Python project manager that simplifies builds, dependency management, testing, and publishing. Learn more at the [Hatch documentation](https://hatch.pypa.io/latest/).
+
+### Getting Started with Hatch
+
+1. **Uncomment `hatch` in `requirements.txt`**: By default, `hatch` may be commented out in your `requirements.txt`. Remove the `#` to enable automatic installation:
+   ```text
+   hatch
+   ```
+
+2. **Edit `pyproject.toml`**: Add your project metadata, dependencies, and build system requirements. For example:
+   ```toml
+   [project]
+   name = "your-library"
+   version = "0.1.0"
+   description = "A short description of your library."
+   authors = ["Your Name <your@email.com>"]
+   dependencies = ["requests", "numpy"]
+
+   [build-system]
+   requires = ["hatchling"]
+   build-backend = "hatchling.build"
+   ```
+
+3. **Install dependencies**: The dev container will automatically detect and install dependencies listed in `pyproject.toml` and `requirements.txt` when you open the project in VS Code. You can also run:
+   ```bash
+   pip install -e .
+   ```
+   to install your library in editable mode for development.
+
+4. **Build, Test, and Publish with Hatch**:
+   - **Build your package:**
+     ```bash
+     hatch build
+     ```
+   - **Run tests:**
+     ```bash
+     hatch test
+     ```
+   - **Publish to PyPI:**
+     ```bash
+     hatch publish
+     ```
+
+See the [Hatch documentation](https://hatch.pypa.io/latest/) for advanced usage, configuration, and troubleshooting.
+
+## Managing Configuration Files After Installation
+
+This dev container uses several configuration files to control installed tools and packages. You can update these files at any time to customize your environment:
+
+- **`.mise.toml`**: Defines tool versions and aliases for the [mise](https://mise.jdx.dev/) tool manager. Edit this file to add, remove, or update tools and their versions. After editing, run:
+  ```bash
+  mise install
+  ```
+  to apply changes.
+- **`.packages`**: Lists system packages to be installed in the container. Add or remove package names (one per line, `#` for comments). To install new packages, update `.packages` and run:
+  ```bash
+  ./dev.sh
+  ```
+  or restart the container.
+- **`requirements.txt`**: Standard Python requirements file. Add Python packages here for installation via `pip`. The container will install these automatically, or you can run:
+  ```bash
+  pip install -r requirements.txt
+  ```
+- **`.krew_plugins`**: Lists Kubernetes plugins to be installed via [krew](https://krew.sigs.k8s.io/). Edit this file and run the krew installer script or restart the container to apply changes.
+
+### Discovering New Packages and Tools
+
+- **Mise**: Use `mise search <tool>` to discover new tools and versions. Visit [mise plugins](https://mise.jdx.dev/dev-tools/) for a full list.
+- **Krew**: Use `kubectl krew search` to find Kubernetes plugins. See [Krew Index](https://krew.sigs.k8s.io/plugins/) for more info.
+- **System Packages**: Search for packages using your OS package manager (`dnf search <package>` for Rocky Linux). Visit [Rocky Linux Packages](https://pkgs.org/download/rocky-linux/) for more.
+- **Python Packages**: Search on [PyPI](https://pypi.org/) or use `pip search <package>` (if enabled).
+
+## Using `run.sh`
+
+The `run.sh` script is provided for running custom commands or starting services inside the dev container. Typical use cases include:
+
+- Running your application or service for development/testing
+- Starting background processes or daemons
+- Executing integration tests or CI workflows
+
+To use `run.sh`, simply execute:
+```bash
+./run.sh
+```
+You can customize this script to fit your project's needs. It is separate from `dev.sh`, which is focused on starting the development environment and VS Code.
+
+## Contributing, Reporting Bugs, and Requesting Features
+
+We welcome all feedback, bug reports, and feature requests! If you are new to GitHub or open source, here is a step-by-step guide to contributing:
+
+### Report Bugs or Request Features:
+- Go to the [GitHub Issues page](https://github.com/sarg3nt/dynamic-dev-container/issues).
+- Click "New Issue" and choose either "Bug report" or "Feature request".
+- Fill out the template with as much detail as possible (steps to reproduce, expected behavior, screenshots, etc.).
+
+### Contribute Changes
+
+If you know what you'd like to add or change and are comfertable doing the work yourself, here are the steps to do so.
+
+1. **Fork the Repository**:
+   - Click the "Fork" button at the top right of the [GitHub repo](https://github.com/sarg3nt/dynamic-dev-container).
+   - This creates a copy of the project under your GitHub account.
+
+2. **Clone Your Fork**:
+   - On your forked repo page, click "Code" and copy the URL.
+   - In your terminal:
+     ```bash
+     git clone https://github.com/sarg3nt/dynamic-dev-container.git
+     cd dynamic-dev-container
+     ```
+
+3. **Create a New Branch**:
+   - Always create a new branch for your changes:
+     ```bash
+     git checkout -b my-feature-branch
+     ```
+
+4. **Make Your Changes**:
+   - Edit files, add features, or fix bugs as needed.
+   - Commit your changes:
+     ```bash
+     git add .
+     git commit -m "Describe your changes"
+     ```
+
+5. **Push Your Branch**:
+   - Push your branch to your fork:
+     ```bash
+     git push origin my-feature-branch
+     ```
+
+6. **Create a Pull Request (PR)**:
+   - Go to your fork on GitHub. You should see a "Compare & pull request" button.
+   - Click it, review your changes, and submit the PR to the main project.
+   - Fill out the PR template with a clear description of your changes.
+
+7. **Respond to Feedback**:
+   - Project maintainers may review your PR and request changes or clarifications.
+   - Update your branch as needed and push new commits; the PR will update automatically.
+
+8. **Celebrate!**
+   - Once your PR is merged, you have contributed to the project!
+
+**Tip:** If you are new to GitHub, check out [GitHub's official guide to contributing](https://docs.github.com/en/get-started/quickstart/contributing-to-projects) for more details.
+
+---
+
+If you have any questions or need help, please open an issue or join the discussion on GitHub. We want this project to be accessible to everyone, regardless of experience level.
