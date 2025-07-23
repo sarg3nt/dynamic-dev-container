@@ -1,4 +1,4 @@
-// Dev Container Configuration File
+ // Dev Container Configuration File
 // cspell: ignore pwsh Gruntfuggly darkriszty ciiqr sarg3nt dbaeumer docomment doesnt esbenp euskadi githd hediet huizhou kato koehler mhutchie mypy naumovs omnisharp psioniq tamasfe tftpl tomoki yzhang gofumpt gopls csdevkit bradlc kohler hverlin
 {
   // See the root README.md file for more detailed instructions!
@@ -79,8 +79,9 @@
     "DOTNET_ROOT": "/home/vscode/.local/share/mise/installs/dotnet/latest", // Location of .NET installation (will be updated during build)
     "DOTNET_CLI_TELEMETRY_OPTOUT": "1", // Disable .NET telemetry
     "ZSH_THEME": "${localEnv:ZSH_THEME}", // Will use local ZSH_THEME if set, otherwise will use Starship
-    "KUBE_EDITOR": "vi",
-    "TERM": "xterm-256color",
+    "KUBE_EDITOR": "nano", // Change to vi if you choose to install it or you editor of choice.  Note: cannot be 'code' as you are in a container.
+    "KUBECONFIG": "/home/vscode/.kube/config", // Path to the kube config file
+    "TERM": "xterm-256color", // Terminal type
     "TYPE_CHECKING": "true", // Enable type checking for Python
     "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}", // GitHub API token for rate limiting (optional)
     // CUSTOM USER ENVIRONMENT VARIABLES

@@ -2,7 +2,7 @@
 #
 # TUI version of install.sh using dialog for a better user experience.
 # Installs .devcontainer and other files into a project directory to use the dev container in a new project.
-# cspell:ignore openbao myapp sudermanjr kubens
+# cspell:ignore openbao myapp sudermanjr kubens DIALOGRC defaultno noconfirm pyproject sles
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -45,6 +45,7 @@ INSTALL_BUN=false
 INSTALL_GITUI=false
 INSTALL_TEALDEER=false
 INSTALL_MICRO=false
+INSTALL_COSIGN=false
 
 # Version variables for tools
 GOLANG_VERSION="latest"
@@ -54,10 +55,26 @@ OPENBAO_VERSION="latest"
 OPENTOFU_VERSION="latest"
 PACKER_VERSION="latest"
 
+# Files and directories to copy to new projects
+FILES_TO_COPY=(
+  ".gitignore"
+  ".krew_plugins"
+  ".packages"
+  "cspell.json"
+  "dev.sh"
+  "pyproject.toml"
+  "requirements.txt"
+  "run.sh"
+  ".mise.toml"
+)
+
+DIRECTORIES_TO_COPY=(
+  ".devcontainer"
+)
+
 # TUI Configuration
 DIALOG_HEIGHT=25
 DIALOG_WIDTH=85
-DIALOG_LIST_HEIGHT=15
 DIALOG_CHECKLIST_HEIGHT=20
 
 # Colors for dialog
@@ -501,109 +518,164 @@ select_development_tools() {
   fi
 
   # Kubernetes/Helm Tools
-  if tui_yesno "Kubernetes/Helm Tools" "Install kubectl?" "n"; then
+  local k8s_helm_tools
+  k8s_helm_tools=$(get_tools_from_section "Kubernetes/Helm")
+  
+  if [[ -n "$k8s_helm_tools" ]] && tui_yesno "Kubernetes/Helm Tools" "Install kubectl and other Kubernetes/Helm tools?" "n"; then
     INSTALL_KUBERNETES=true
-    INSTALL_KUBECTL=true
-    local version_examples
-    version_examples=$(get_latest_major_versions "kubectl")
-    KUBECTL_VERSION=$(tui_input "Kubernetes Configuration" \
-                                "Enter kubectl version to install $version_examples\n\nkubectl is the command-line tool for Kubernetes:" \
-                                "latest")
     
-    # Select additional Kubernetes/Helm tools
-    local k8s_tools
-    k8s_tools=$(tui_checklist "Core Kubernetes/Helm Tools" \
-                             "Select additional Kubernetes tools to install:" \
-                             "helm" "Helm - The package manager for Kubernetes" on \
-                             "k9s" "k9s - Terminal UI for Kubernetes clusters" on \
-                             "kubectx" "kubectx - Fast way to switch between clusters" on \
-                             "kubens" "kubens - Fast way to switch between namespaces" on)
-    
-    for tool in $k8s_tools; do
-      case "$tool" in
-        "helm") INSTALL_HELM=true ;;
-        "k9s") INSTALL_K9S=true ;;
-        "kubectx") INSTALL_KUBECTX=true ;;
-        "kubens") INSTALL_KUBENS=true ;;
-      esac
+    # Build checklist options dynamically, with kubectl required and others optional
+    local k8s_options=()
+    for tool in $k8s_helm_tools; do
+      local description
+      description=$(get_tool_description "$tool")
+      if [[ "$tool" == "kubectl" ]]; then
+        k8s_options+=("$tool" "$description" "on")  # kubectl is required
+      else
+        k8s_options+=("$tool" "$description" "on")  # others default to on
+      fi
     done
+    
+    if [[ ${#k8s_options[@]} -gt 0 ]]; then
+      local selected_k8s
+      selected_k8s=$(tui_checklist "Kubernetes/Helm Tools" \
+                                  "Select Kubernetes/Helm tools to install:" \
+                                  "${k8s_options[@]}")
+      
+      for tool in $selected_k8s; do
+        case "$tool" in
+          "kubectl") 
+            INSTALL_KUBECTL=true
+            local version_examples
+            version_examples=$(get_latest_major_versions "kubectl")
+            KUBECTL_VERSION=$(tui_input "Kubernetes Configuration" \
+                                        "Enter kubectl version to install $version_examples\n\nkubectl is the command-line tool for Kubernetes:" \
+                                        "latest")
+            ;;
+          "helm") INSTALL_HELM=true ;;
+          "k9s") INSTALL_K9S=true ;;
+          "kubectx") INSTALL_KUBECTX=true ;;
+          "kubens") INSTALL_KUBENS=true ;;
+        esac
+      done
+    fi
   fi
 
   # Kubernetes Utilities
-  if tui_yesno "Kubernetes Utilities" "Install krew (kubectl plugin manager)?" "n"; then
+  local k8s_utils_list
+  k8s_utils_list=$(get_tools_from_section "Kubernetes Utilities")
+  
+  if [[ -n "$k8s_utils_list" ]] && tui_yesno "Kubernetes Utilities" "Install krew and other Kubernetes utilities?" "n"; then
     INSTALL_KREW=true
     
-    # Select additional Kubernetes utilities
-    local k8s_utils
-    k8s_utils=$(tui_checklist "Advanced Kubernetes Utilities" \
-                             "Select additional Kubernetes utilities to install:" \
-                             "dive" "dive - Explore Docker image layers and optimize size" on \
-                             "kubebench" "kubebench - CIS Kubernetes security benchmark" on \
-                             "popeye" "popeye - Kubernetes cluster resource sanitizer" on \
-                             "trivy" "trivy - Vulnerability scanner for containers & code" on \
-                             "cmctl" "cmctl - CLI for cert-manager certificate management" on \
-                             "k3d" "k3d - Lightweight Kubernetes for local development" on)
-    
-    for tool in $k8s_utils; do
-      case "$tool" in
-        "dive") INSTALL_DIVE=true ;;
-        "kubebench") INSTALL_KUBEBENCH=true ;;
-        "popeye") INSTALL_POPEYE=true ;;
-        "trivy") INSTALL_TRIVY=true ;;
-        "cmctl") INSTALL_CMCTL=true ;;
-        "k3d") INSTALL_K3D=true ;;
-      esac
+    # Build checklist options dynamically
+    local k8s_utils_options=()
+    for tool in $k8s_utils_list; do
+      local description
+      description=$(get_tool_description "$tool")
+      k8s_utils_options+=("$tool" "$description" "on")
     done
+    
+    if [[ ${#k8s_utils_options[@]} -gt 0 ]]; then
+      local selected_k8s_utils
+      selected_k8s_utils=$(tui_checklist "Kubernetes Utilities" \
+                                        "Select Kubernetes utilities to install:" \
+                                        "${k8s_utils_options[@]}")
+      
+      for tool in $selected_k8s_utils; do
+        case "$tool" in
+          "krew") INSTALL_KREW=true ;;
+          "dive") INSTALL_DIVE=true ;;
+          "kubebench") INSTALL_KUBEBENCH=true ;;
+          "popeye") INSTALL_POPEYE=true ;;
+          "trivy") INSTALL_TRIVY=true ;;
+          "cmctl") INSTALL_CMCTL=true ;;
+          "k3d") INSTALL_K3D=true ;;
+        esac
+      done
+    fi
   fi
 
   # HashiCorp Tools
-  # OpenTofu
-  if tui_yesno "HashiCorp Tools" "Install OpenTofu (Terraform alternative)?" "n"; then
-    INSTALL_OPENTOFU=true
-    local version_examples
-    version_examples=$(get_latest_major_versions "opentofu")
-    OPENTOFU_VERSION=$(tui_input "OpenTofu Configuration" \
-                                 "Enter OpenTofu version to install $version_examples\n\nOpenTofu is an open-source Terraform alternative:" \
-                                 "latest")
-  fi
-
-  # OpenBao
-  if tui_yesno "HashiCorp Tools" "Install OpenBao (Vault alternative)?" "n"; then
-    INSTALL_OPENBAO=true
-    local version_examples
-    version_examples=$(get_latest_major_versions "openbao")
-    OPENBAO_VERSION=$(tui_input "OpenBao Configuration" \
-                                "Enter OpenBao version to install $version_examples\n\nOpenBao is an open-source Vault alternative:" \
-                                "latest")
-  fi
-
-  # Packer
-  if tui_yesno "HashiCorp Tools" "Install Packer (HashiCorp image builder)?" "n"; then
-    INSTALL_PACKER=true
-    local version_examples
-    version_examples=$(get_latest_major_versions "packer")
-    PACKER_VERSION=$(tui_input "Packer Configuration" \
-                               "Enter Packer version to install $version_examples\n\nPacker builds machine images from configuration:" \
-                               "latest")
+  local hashicorp_tools
+  hashicorp_tools=$(get_tools_from_section "HashiCorp Tools")
+  
+  if [[ -n "$hashicorp_tools" ]]; then
+    # Build checklist options dynamically
+    local hashicorp_options=()
+    for tool in $hashicorp_tools; do
+      local description
+      description=$(get_tool_description "$tool")
+      hashicorp_options+=("$tool" "$description" "off")
+    done
+    
+    if [[ ${#hashicorp_options[@]} -gt 0 ]]; then
+      local selected_hashicorp
+      selected_hashicorp=$(tui_checklist "HashiCorp Tools" \
+                                        "Select HashiCorp tools to install:" \
+                                        "${hashicorp_options[@]}")
+      
+      for tool in $selected_hashicorp; do
+        case "$tool" in
+          "opentofu") 
+            INSTALL_OPENTOFU=true
+            local version_examples
+            version_examples=$(get_latest_major_versions "opentofu")
+            OPENTOFU_VERSION=$(tui_input "OpenTofu Configuration" \
+                                         "Enter OpenTofu version to install $version_examples\n\nOpenTofu is an open-source Terraform alternative:" \
+                                         "latest")
+            ;;
+          "openbao") 
+            INSTALL_OPENBAO=true
+            local version_examples
+            version_examples=$(get_latest_major_versions "openbao")
+            OPENBAO_VERSION=$(tui_input "OpenBao Configuration" \
+                                        "Enter OpenBao version to install $version_examples\n\nOpenBao is an open-source Vault alternative:" \
+                                        "latest")
+            ;;
+          "packer") 
+            INSTALL_PACKER=true
+            local version_examples
+            version_examples=$(get_latest_major_versions "packer")
+            PACKER_VERSION=$(tui_input "Packer Configuration" \
+                                       "Enter Packer version to install $version_examples\n\nPacker builds machine images from configuration:" \
+                                       "latest")
+            ;;
+        esac
+      done
+    fi
   fi
 
   # Miscellaneous Tools
-  local misc_tools
-  misc_tools=$(tui_checklist "Miscellaneous Development Tools" \
-                            "Select miscellaneous tools to install:" \
-                            "gitui" "gitui - Fast terminal UI for git repositories" off \
-                            "tealdeer" "tealdeer - Fast implementation of tldr man pages" off \
-                            "micro" "micro - Modern terminal-based text editor" off \
-                            "powershell" "powershell - Microsoft PowerShell" off)
+  local misc_tools_list
+  misc_tools_list=$(get_tools_from_section "Miscellaneous Tools")
   
-  for tool in $misc_tools; do
-    case "$tool" in
-      "gitui") INSTALL_GITUI=true ;;
-      "tealdeer") INSTALL_TEALDEER=true ;;
-      "micro") INSTALL_MICRO=true ;;
-      "powershell") INSTALL_POWERSHELL=true ;;
-    esac
-  done
+  if [[ -n "$misc_tools_list" ]]; then
+    # Build checklist options dynamically
+    local misc_options=()
+    for tool in $misc_tools_list; do
+      local description
+      description=$(get_tool_description "$tool")
+      misc_options+=("$tool" "$description" "off")
+    done
+    
+    if [[ ${#misc_options[@]} -gt 0 ]]; then
+      local selected_misc
+      selected_misc=$(tui_checklist "Miscellaneous Development Tools" \
+                                   "Select miscellaneous tools to install:" \
+                                   "${misc_options[@]}")
+      
+      for tool in $selected_misc; do
+        case "$tool" in
+          "gitui") INSTALL_GITUI=true ;;
+          "tealdeer") INSTALL_TEALDEER=true ;;
+          "micro") INSTALL_MICRO=true ;;
+          "powershell") INSTALL_POWERSHELL=true ;;
+          "cosign") INSTALL_COSIGN=true ;;
+        esac
+      done
+    fi
+  fi
 
   # VS Code Extensions (for tools without automatic extensions)
   local extensions
@@ -766,7 +838,63 @@ extract_mise_section() {
   local end_marker="$2"
   local file=".mise.toml"
   
-  awk "/${start_marker}/,/${end_marker}/" "$file"
+  # Use awk with proper handling of markers
+  awk -v start="$start_marker" -v end="$end_marker" '
+    $0 == start { found=1; next }
+    $0 == end { found=0; next }
+    found { print }
+  ' "$file"
+}
+
+# Get tools from a specific section in .mise.toml
+get_tools_from_section() {
+  local section_name="$1"
+  local start_marker="#### Begin ${section_name} ####"
+  local end_marker="#### End ${section_name} ####"
+  
+  extract_mise_section "$start_marker" "$end_marker" | \
+    grep -E '^[a-zA-Z0-9_-]+\s*=' | \
+    grep -v '^#' | \
+    grep -v '^\[' | \
+    cut -d'=' -f1 | \
+    sed 's/[[:space:]]*$//' | \
+    sort
+}
+
+# Get tool description (hardcoded for now, could be enhanced later)
+get_tool_description() {
+  local tool="$1"
+  case "$tool" in
+    "opentofu") echo "OpenTofu - Open-source Terraform alternative" ;;
+    "openbao") echo "OpenBao - Open-source Vault alternative" ;;
+    "packer") echo "Packer - HashiCorp image builder" ;;
+    "gitui") echo "gitui - Fast terminal UI for git repositories" ;;
+    "tealdeer") echo "tealdeer - Fast implementation of tldr man pages" ;;
+    "micro") echo "micro - Modern terminal-based text editor" ;;
+    "powershell") echo "powershell - Microsoft PowerShell" ;;
+    "cosign") echo "cosign - Container signing tool" ;;
+    "kubectl") echo "kubectl - Kubernetes command-line tool" ;;
+    "kubectx") echo "kubectx - Fast way to switch between clusters" ;;
+    "kubens") echo "kubens - Fast way to switch between namespaces" ;;
+    "k9s") echo "k9s - Terminal UI for Kubernetes clusters" ;;
+    "helm") echo "Helm - The package manager for Kubernetes" ;;
+    "krew") echo "krew - kubectl plugin manager" ;;
+    "dive") echo "dive - Explore Docker image layers and optimize size" ;;
+    "kubebench") echo "kubebench - CIS Kubernetes security benchmark" ;;
+    "popeye") echo "popeye - Kubernetes cluster resource sanitizer" ;;
+    "trivy") echo "trivy - Vulnerability scanner for containers & code" ;;
+    "cmctl") echo "cmctl - CLI for cert-manager certificate management" ;;
+    "k3d") echo "k3d - Lightweight Kubernetes for local development" ;;
+    "golang") echo "golang - Go programming language" ;;
+    "goreleaser") echo "goreleaser - Release automation tool for Go projects" ;;
+    "dotnet") echo "dotnet - .NET SDK" ;;
+    "node") echo "node - Node.js JavaScript runtime" ;;
+    "pnpm") echo "pnpm - Fast, disk space efficient package manager" ;;
+    "yarn") echo "yarn - Popular alternative package manager" ;;
+    "deno") echo "deno - Secure TypeScript/JavaScript runtime" ;;
+    "bun") echo "bun - Fast all-in-one JavaScript runtime" ;;
+    *) echo "$tool - Development tool" ;;
+  esac
 }
 
 # Extract sections from devcontainer.json
@@ -796,14 +924,12 @@ generate_mise_toml() {
   echo "" >> "$temp_file"
 
   # HashiCorp tools
-  if [ "$INSTALL_OPENTOFU" = true ]; then
-    echo "opentofu = \"${OPENTOFU_VERSION}\"" >> "$temp_file"
-  fi
-  if [ "$INSTALL_OPENBAO" = true ]; then
-    echo "openbao = \"${OPENBAO_VERSION}\"" >> "$temp_file"
-  fi
-  if [ "$INSTALL_PACKER" = true ]; then
-    echo "packer = \"${PACKER_VERSION}\"" >> "$temp_file"
+  if [ "$INSTALL_OPENTOFU" = true ] || [ "$INSTALL_OPENBAO" = true ] || [ "$INSTALL_PACKER" = true ]; then
+    echo "#### Begin HashiCorp Tools ####" >> "$temp_file"
+    [ "$INSTALL_OPENTOFU" = true ] && echo "opentofu = \"${OPENTOFU_VERSION}\"" >> "$temp_file"
+    [ "$INSTALL_OPENBAO" = true ] && echo "openbao = \"${OPENBAO_VERSION}\"" >> "$temp_file"
+    [ "$INSTALL_PACKER" = true ] && echo "packer = \"${PACKER_VERSION}\"" >> "$temp_file"
+    echo "#### End HashiCorp Tools ####" >> "$temp_file"
   fi
 
   # Go
@@ -861,11 +987,17 @@ generate_mise_toml() {
     echo "#### End Kubernetes Utilities ####" >> "$temp_file"
   fi
 
-  # Miscellaneous
-  [ "$INSTALL_GITUI" = true ] && echo 'gitui = "latest"' >> "$temp_file"
-  [ "$INSTALL_TEALDEER" = true ] && echo 'tealdeer = "latest"' >> "$temp_file"
-  [ "$INSTALL_MICRO" = true ] && echo 'micro = "latest"' >> "$temp_file"
-  [ "$INSTALL_POWERSHELL" = true ] && echo 'powershell = "latest"' >> "$temp_file"
+  # Miscellaneous Tools
+  if [ "$INSTALL_GITUI" = true ] || [ "$INSTALL_TEALDEER" = true ] || [ "$INSTALL_MICRO" = true ] || [ "$INSTALL_POWERSHELL" = true ] || [ "$INSTALL_COSIGN" = true ]; then
+    echo "" >> "$temp_file"
+    echo "#### Begin Miscellaneous Tools ####" >> "$temp_file"
+    [ "$INSTALL_GITUI" = true ] && echo 'gitui = "latest"' >> "$temp_file"
+    [ "$INSTALL_TEALDEER" = true ] && echo 'tealdeer = "latest"' >> "$temp_file"
+    [ "$INSTALL_MICRO" = true ] && echo 'micro = "latest"' >> "$temp_file"
+    [ "$INSTALL_POWERSHELL" = true ] && echo 'powershell = "latest"' >> "$temp_file"
+    [ "$INSTALL_COSIGN" = true ] && echo 'cosign = "latest"' >> "$temp_file"
+    echo "#### End Miscellaneous Tools ####" >> "$temp_file"
+  fi
 
   # Add aliases and settings sections from source
   # shellcheck disable=SC2129
@@ -1059,8 +1191,9 @@ generate_devcontainer_json() {
   extract_devcontainer_section "// #### Begin Spell Checker Settings ####" "// #### End PSI Header Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   
   # Remove trailing comma from the last settings entry
-  # Find the last line containing a comma that is not a comment or part of an array
-  last_setting_line=$(grep -n '^\s*".*":.*,' "$temp_file" | tail -n 1 | cut -d: -f1)
+  # Find the last line that's a top-level setting property (8 spaces indentation + quoted property)
+  # This ensures we only target direct properties of the "settings" object, not nested properties
+  last_setting_line=$(grep -n '^        "[^"]*":.*,$' "$temp_file" | tail -n 1 | cut -d: -f1)
   if [[ -n "$last_setting_line" ]]; then
       sed -i "${last_setting_line}s/,$//" "$temp_file"
   fi
@@ -1169,35 +1302,26 @@ main() {
   # Create .devcontainer directory
   mkdir -p "${project_path}/.devcontainer"
 
-  # Copy specific files to the destination
-  # 1. Everything in the .devcontainer folder
-  cp -r .devcontainer/* "${project_path}/.devcontainer/"
+  # Copy directories to the destination
+  for dir in "${DIRECTORIES_TO_COPY[@]}"; do
+    if [[ -d "$dir" ]]; then
+      cp -r "$dir"/* "${project_path}/$dir/" 2>/dev/null || true
+    fi
+  done
   
-  # 2. .gitignore if it does not already exist in destination
-  if [[ ! -f "${project_path}/.gitignore" ]]; then
-    cp .gitignore "${project_path}/.gitignore" 2>/dev/null || true
-  fi
-  
-  # 3. .krew_plugins
-  cp .krew_plugins "${project_path}/.krew_plugins" 2>/dev/null || true
-  
-  # 4. cspell.json
-  cp cspell.json "${project_path}/cspell.json" 2>/dev/null || true
-  
-  # 5. dev.sh
-  cp dev.sh "${project_path}/dev.sh" 2>/dev/null || true
-  
-  # 6. pyproject.toml
-  cp pyproject.toml "${project_path}/pyproject.toml" 2>/dev/null || true
-  
-  # 7. requirements.txt
-  cp requirements.txt "${project_path}/requirements.txt" 2>/dev/null || true
-  
-  # 8. run.sh
-  cp run.sh "${project_path}/run.sh" 2>/dev/null || true
-  
-  # 9. .mise.toml (will be overwritten by generate_mise_toml)
-  cp .mise.toml "${project_path}/.mise.toml" 2>/dev/null || true
+  # Copy files to the destination
+  for file in "${FILES_TO_COPY[@]}"; do
+    # Skip if file already exists in the target directory
+    if [[ -f "${project_path}/$file" ]]; then
+      echo "Skipping $file - already exists in target directory"
+      continue
+    fi
+    
+    if [[ -f "$file" ]]; then
+      cp "$file" "${project_path}/$file" 2>/dev/null || true
+      echo "Copied $file"
+    fi
+  done
 
   # Generate the customized configuration files
   generate_mise_toml "$project_path"
@@ -1205,13 +1329,6 @@ main() {
 
   # Update dev.sh with project settings
   update_dev_sh "$project_path" "$DOCKER_EXEC_COMMAND" "$PROJECT_NAME" "$CONTAINER_NAME"
-
-  # Remove files that are not needed in the new project
-  rm -f "${project_path}/install.sh"
-  rm -f "${project_path}/install-tui.sh"
-  rm -f "${project_path}/LICENSE"
-  rm -f "${project_path}/README.md"
-  rm -f "${project_path}/SECURITY.md"
 
   # Clean up dialog config
   rm -f $DIALOGRC

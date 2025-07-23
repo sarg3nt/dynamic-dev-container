@@ -1,0 +1,55 @@
+#!/bin/bash
+
+set -eo pipefail
+IFS=$'\n\t'
+
+
+#######################################
+# Display container tooling information with progress indicators
+# Shows installed tools, available applications, and kubectl plugins
+# Reads directly from configuration files instead of waiting for installations
+# Globals:
+#   HOME, DEV_CONTAINER_VERSION
+# Arguments:
+#   None
+# Outputs:
+#   Formatted tool listing and installation instructions
+#######################################
+
+main() {
+  # shellcheck source=/usr/bin/lib/sh/colors.sh
+  source /usr/bin/lib/sh/colors.sh
+
+  # Determine if main branch is 'main' or 'master'
+  if git show-ref --verify --quiet refs/heads/main; then
+    main_branch="main"
+  elif git show-ref --verify --quiet refs/heads/master; then
+    main_branch="master"
+  else
+    echo -e "${RED}Error: Could not find 'main' or 'master' branch.${NC}"
+    exit 1
+  fi
+
+  if git merge-base --is-ancestor "${main_branch}" HEAD; then
+    echo -e "${GREEN}Current branch is already up to date with ${main_branch}.${NC}"
+    exit 0
+  fi
+
+  if ! git diff-index --quiet HEAD --; then
+    echo -e "${RED}Error: You have uncommitted changes. Please commit or stash them before rebasing with ${main_branch}.${NC}"
+    exit 1
+  fi
+
+  echo -e "${BLUE}Checking out ${main_branch} and rebasing with current.${NC}"
+  git checkout "${main_branch}"
+  git pull
+  git switch -
+  git rebase "${main_branch}"
+  echo -e "${GREEN}Rebase completed successfully..${NC}"
+
+}
+
+# Execute main function when script is run directly (not sourced)
+if ! (return 0 2>/dev/null); then
+  (main "$@")
+fi

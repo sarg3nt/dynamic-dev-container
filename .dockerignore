@@ -1,3 +1,4 @@
+# Basic project files to exclude
 .dockerignore
 cspell.sh
 dev.sh
@@ -5,3 +6,47 @@ Dockerfile
 README.md
 images/**
 run.sh
+
+# Documentation and metadata
+*.md
+*.txt
+LICENSE
+SECURITY.md
+
+# Version control
+.git/
+.github/
+.gitignore
+
+# Development files
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
+
+# Testing and CI
+tests/
+docs/
+examples/
+coverage.xml
+.coverage
+
+# Build artifacts
+build/
+dist/
+*.rpm
+*.deb
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node.js
+node_modules/
+npm-debug.log
+
+# IDE files
+.idea/
+*.swp
+*.swo

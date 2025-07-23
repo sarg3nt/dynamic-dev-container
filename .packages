@@ -1,0 +1,45 @@
+# User system packages
+# This file defines which system packages the user wants installed for this project.
+# They will be installed when the dev container starts.
+# 
+# Format: One package per line.
+# Comment out packages by adding # in front of them.
+
+# Below is a sample list of packages that can be uncommented to install.
+
+# DNS lookup utilities (dig, nslookup, host commands)
+bind-utils
+# Modern system monitor with better UI than htop
+btop
+# Tool for creating bootable ISO images
+genisoimage
+# Graph visualization software for creating diagrams
+graphviz
+# Network utilities including ping, tracepath, and arping
+iputils
+# NCurses Disk Usage - visual disk usage analyzer
+ncdu
+# SNMP utilities for network monitoring and management
+net-snmp-utils
+# Network exploration tool and security/port scanner
+nmap
+# Non-interactive SSH password authentication utility
+sshpass
+# Multipurpose network relay tool for TCP/UDP connections
+socat
+# Network diagnostic tool to trace packet routes
+traceroute
+# Archive extraction utility for .zip files
+unzip
+# Vi/Vim text editor - basic version
+vim
+# Vi/Vim text editor with enhanced features and syntax highlighting
+vim-enhanced
+# Common files shared by all vim packages
+vim-common
+# Filesystem-specific files for vim editor
+vim-filesystem
+# Command-line tool for downloading files from web servers
+wget
+# Archive creation utility for .zip files
+zip
