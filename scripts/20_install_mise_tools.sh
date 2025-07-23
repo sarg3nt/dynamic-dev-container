@@ -60,9 +60,6 @@ cleanup() {
   
   log "Remove pip cache (if accessible)" "green"
   rm -rf /home/vscode/.cache/pip/* 2>/dev/null || true
-  
-  log "Remove mise cache" "green"
-  rm -rf /home/vscode/.cache/mise/* 2>/dev/null || true
 }
 
 # Run main
