@@ -7,10 +7,14 @@ MISE_PYTHON_COMPILE = false
 #### End Environment ####
 
 [tools]
+#### Begin HashiCorp Tools ####
 # https://github.com/opentofu/opentofu
 opentofu = "latest"
 # https://github.com/openbao/openbao/releases
 openbao = "latest"
+packer = "latest"
+#### End HashiCorp Tools ####
+
 #### Begin Kubernetes/Helm ####
 kubectl = "latest"
 kubectx = "latest"
@@ -47,12 +51,13 @@ deno = "latest"
 bun = "latest"
 #### End JavaScript/Node.js Development ####
 
+#### Begin Miscellaneous Tools ####
 gitui = "latest"
-packer = "latest"
 tealdeer = "latest"
 micro = "latest"
 powershell = "latest"
 cosign = "latest"
+#### End Miscellaneous Tools ####
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
 #### Begin Aliases ####

@@ -33,9 +33,7 @@ ENV USERNAME="vscode"
 COPY usr/bin/lib /usr/bin/lib
 
 # Install packages using the dnf package manager
-RUN --mount=type=bind,source=scripts/10_install_system_packages.sh,target=/10.sh,ro \
-  --mount=type=cache,target=/var/cache/dnf \
-  bash -c "/10.sh"
+RUN --mount=type=bind,source=scripts/10_install_system_packages.sh,target=/10.sh,ro bash -c "/10.sh"
 
 # Set current user to the vscode user, run all future commands as this user.
 USER vscode
@@ -45,11 +43,9 @@ COPY --from=mise /usr/local/bin/mise /usr/local/bin/mise
 COPY --chown=vscode:vscode home/vscode/.config/mise /home/vscode/.config/mise
 
 # Install mise tools and configure environment in one layer
-RUN --mount=type=bind,source=scripts/20_install_mise_tools.sh,target=/20.sh,ro \
-  --mount=type=bind,source=scripts/30_install_other_apps.sh,target=/30.sh,ro \
-  --mount=type=bind,source=scripts/40_setup_ssh_known_hosts.sh,target=/40.sh,ro \
-  --mount=type=cache,target=/home/vscode/.cache/mise,uid=1000,gid=1000 \
-  bash -c "/20.sh && /30.sh && /40.sh"
+RUN --mount=type=bind,source=scripts/20_install_mise_tools.sh,target=/20.sh,ro bash -c "/20.sh" 
+RUN --mount=type=bind,source=scripts/30_install_other_apps.sh,target=/30.sh,ro bash -c "/30.sh"
+RUN --mount=type=bind,source=scripts/40_setup_ssh_known_hosts.sh,target=/40.sh,ro bash -c "/40.sh"
 
 COPY --chown=vscode:vscode home /home/
 COPY usr /usr 

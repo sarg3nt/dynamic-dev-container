@@ -61,8 +61,8 @@ cleanup() {
   log "Remove pip cache (if accessible)" "green"
   rm -rf /home/vscode/.cache/pip/* 2>/dev/null || true
   
-  # Note: Skipping mise cache clear since we're using Docker cache mount
-  log "Skipping mise cache clear (using Docker cache mount)" "yellow"
+  log "Remove mise cache" "green"
+  rm -rf /home/vscode/.cache/mise/* 2>/dev/null || true
 }
 
 # Run main
