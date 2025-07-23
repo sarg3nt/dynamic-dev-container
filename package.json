@@ -1,0 +1,27 @@
+{
+  "name": "my-project",
+  "version": "1.0.0",
+  "description": "A sample Node.js package.json file.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "axios": "^latest",
+    "lodash": "^latest",
+    "express": "^latest",
+    "dotenv": "^latest",
+    "chalk": "^latest",
+    "dayjs": "^latest"
+  },
+  "devDependencies": {
+    "jest": "^latest",
+    "eslint": "^latest",
+    "prettier": "^latest",
+    "nodemon": "^latest"
+  },
+  "keywords": ["first-keyword", "second", "node", "express", "modern"],
+  "author": "",
+  "license": "MIT"
+}

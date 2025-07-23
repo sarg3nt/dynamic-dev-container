@@ -29,6 +29,8 @@ main() {
   echo ""
   copy_docker_config
   echo ""
+  install_node_modules
+  echo ""
   # Uncomment to install PowerCLI
   # bash usr/local/bin/install_powercli
 }
@@ -160,6 +162,21 @@ copy_docker_config() {
   else
     log_warning "No remote Docker config detected, using defaults."
     log_info "You should run 'docker login' to your private repos if you want to be able to push images to them."
+  fi
+}
+
+#######################################
+# Install Node modules if node is installed.
+# Globals:
+#   HOME
+# Arguments:
+#   None
+#######################################
+install_node_modules() {
+  if command -v node >/dev/null 2>&1 && [[ -f package.json ]]; then
+    log_info "Node.js and package.json detected, running npm install..."
+    npm install
+    log_success "Node package install completed."
   fi
 }
 
