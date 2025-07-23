@@ -35,6 +35,7 @@ k3d = "latest"
 
 #### Begin Go Development ####
 golang = 'latest'
+golangci-lint = 'latest'
 goreleaser = 'latest'
 #### End Go Development ####
 

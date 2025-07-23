@@ -109,6 +109,9 @@
 
         // #### Begin Go ####
         "golang.go", // Go language support
+        "premparihar.gotestexplorer", // Go test explorer
+        "msyrus.go-doc", // Go documentation
+        "766b.go-outliner", // Go code outliner
         // #### End Go ####
 
         // #### Begin .NET ####
