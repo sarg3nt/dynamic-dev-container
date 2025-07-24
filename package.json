@@ -8,20 +8,26 @@
     "test": "jest"
   },
   "dependencies": {
-    "axios": "^latest",
-    "lodash": "^latest",
-    "express": "^latest",
-    "dotenv": "^latest",
-    "chalk": "^latest",
-    "dayjs": "^latest"
+    "axios": "latest",
+    "lodash": "latest",
+    "express": "latest",
+    "dotenv": "latest",
+    "chalk": "latest",
+    "dayjs": "latest"
   },
   "devDependencies": {
-    "jest": "^latest",
-    "eslint": "^latest",
-    "prettier": "^latest",
-    "nodemon": "^latest"
+    "jest": "latest",
+    "eslint": "latest",
+    "prettier": "latest",
+    "nodemon": "latest"
   },
-  "keywords": ["first-keyword", "second", "node", "express", "modern"],
+  "keywords": [
+    "first-keyword",
+    "second",
+    "node",
+    "express",
+    "modern"
+  ],
   "author": "",
   "license": "MIT"
 }
