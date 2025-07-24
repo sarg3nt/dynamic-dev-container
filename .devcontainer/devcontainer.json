@@ -1,4 +1,4 @@
- // Dev Container Configuration File
+// Dev Container Configuration File
 // cspell: ignore pwsh Gruntfuggly darkriszty ciiqr sarg3nt dbaeumer docomment doesnt esbenp euskadi githd hediet huizhou kato koehler mhutchie mypy naumovs omnisharp psioniq tamasfe tftpl tomoki yzhang gofumpt gopls csdevkit bradlc kohler hverlin
 {
   // See the root README.md file for more detailed instructions!
