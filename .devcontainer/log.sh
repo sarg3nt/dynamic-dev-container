@@ -44,3 +44,7 @@ log_success() {
 log_info() {
   log "$1" "blue" "INFO"
 }
+
+log_data() {
+  log "$1" "cyan" "DATA"
+}

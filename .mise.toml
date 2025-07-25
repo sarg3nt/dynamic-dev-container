@@ -44,8 +44,7 @@ dotnet = "latest"
 #### End .NET Development ####
 
 #### Begin JavaScript/Node.js Development ####
-# WARNING: Node 20 and above break Dev Container initialization.
-node = "19"
+node = "latest"
 pnpm = "latest"
 yarn = "latest"
 deno = "latest"

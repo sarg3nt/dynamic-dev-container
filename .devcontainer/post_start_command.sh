@@ -11,8 +11,6 @@ source "$(dirname "$0")/log.sh"
 main() {
   echo ""
   log "EXECUTING POST START COMMAND..." "gray" "INFO"
-  eval "$(/usr/local/bin/mise activate bash 2>/dev/null)" || true
-  
   # Set workspace path for configuration files
   WORKSPACE_PATH="${WORKSPACE_PATH:-/workspaces/$(basename "$(pwd)")}"
   export WORKSPACE_PATH
@@ -173,6 +171,7 @@ copy_docker_config() {
 #   None
 #######################################
 install_node_modules() {
+  eval "$(/usr/local/bin/mise activate bash 2>/dev/null)" || true
   if command -v node >/dev/null 2>&1 && [[ -f package.json ]]; then
     log_info "Node.js and package.json detected, running npm install..."
     npm install

@@ -58,6 +58,11 @@ install_python_packages() {
 
 main() {
   install_python_packages
+  log_info "BASH_SUBSHELL in 40_install_python_packages.sh: $BASH_SUBSHELL"
+  if [[ "$BASH_SUBSHELL" -gt 0 ]]; then
+    log_info "Detected subshell. Exiting subshell."
+    exit
+  fi
 }
 
 if ! (return 0 2>/dev/null); then

@@ -24,7 +24,7 @@ setup_mise_env() {
 #######################################
 install_mise_tools() {
   log_info "Starting mise tools installation..."
-  
+    
   # Trust the mise configuration in the current directory
   log_info "Trusting mise configuration..."
   mise trust .mise.toml
@@ -32,6 +32,12 @@ install_mise_tools() {
   log_info "Installing mise tools from .mise.toml..."
   mise install -y
   log_success "Mise tools installed successfully!"
+ 
+  log_info "BASH_SUBSHELL: $BASH_SUBSHELL"
+  if [[ "$BASH_SUBSHELL" -gt 0 ]]; then
+    log_info "Detected subshell. Exiting subshell."
+    exit
+  fi
 
   # Activate mise environment and set up .NET environment variables
   log_info "Activating mise environment..."
@@ -62,11 +68,12 @@ install_mise_tools() {
   fi
 
   unset NODE_OPTIONS
-
+  export NODE_OPTIONS=""
 }
 
 main() {
   install_mise_tools
+
 }
 
 if ! (return 0 2>/dev/null); then
