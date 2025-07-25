@@ -163,30 +163,61 @@ install_tools_with_mise() {
     return 0
   fi
   
-  # Install each tool individually
+  # Install each tool individually with retry logic
   for tool_spec in "${tools_ref[@]}"; do
     # Extract tool name and version
     local tool_name="${tool_spec%@*}"
     local tool_version="${tool_spec#*@}"
     
-    # Check if tool has an alias
-    if [[ -n "${aliases_ref[$tool_name]:-}" ]]; then
-      local alias_value="${aliases_ref[$tool_name]}"
-      log_info "Installing aliased tool: $tool_name using alias $alias_value@$tool_version"
-      # Install using the alias with the provided global flag
-      if mise use $global_flag -y "$alias_value@$tool_version"; then
-        log_success "Successfully installed $tool_name ($alias_value@$tool_version)"
+    # Retry logic: try 3 times with 2 second pause between attempts
+    local max_attempts=3
+    local attempt=1
+    local success=false
+    
+    while [[ $attempt -le $max_attempts && $success == false ]]; do
+      # Check if tool has an alias
+      if [[ -n "${aliases_ref[$tool_name]:-}" ]]; then
+        local alias_value="${aliases_ref[$tool_name]}"
+        if [[ $attempt -eq 1 ]]; then
+          log_info "Installing aliased tool: $tool_name using alias $alias_value@$tool_version"
+        else
+          log_info "Retrying aliased tool installation (attempt $attempt/$max_attempts): $tool_name using alias $alias_value@$tool_version"
+        fi
+        
+        # Install using the alias with the provided global flag
+        if mise use $global_flag -y "$alias_value@$tool_version"; then
+          log_success "Successfully installed $tool_name ($alias_value@$tool_version)"
+          success=true
+        else
+          if [[ $attempt -lt $max_attempts ]]; then
+            log_warning "Failed to install $tool_name ($alias_value@$tool_version) on attempt $attempt, retrying in 2 seconds..."
+            sleep 2
+          else
+            log_error "Failed to install $tool_name ($alias_value@$tool_version) after $max_attempts attempts"
+          fi
+        fi
       else
-        log_error "Failed to install $tool_name ($alias_value@$tool_version)"
+        if [[ $attempt -eq 1 ]]; then
+          log_info "Installing tool: $tool_name@$tool_version"
+        else
+          log_info "Retrying tool installation (attempt $attempt/$max_attempts): $tool_name@$tool_version"
+        fi
+        
+        if mise use $global_flag -y "$tool_name@$tool_version"; then
+          log_success "Successfully installed $tool_name@$tool_version"
+          success=true
+        else
+          if [[ $attempt -lt $max_attempts ]]; then
+            log_warning "Failed to install $tool_name@$tool_version on attempt $attempt, retrying in 2 seconds..."
+            sleep 2
+          else
+            log_error "Failed to install $tool_name@$tool_version after $max_attempts attempts"
+          fi
+        fi
       fi
-    else
-      log_info "Installing tool: $tool_name@$tool_version"
-      if mise use $global_flag -y "$tool_name@$tool_version"; then
-        log_success "Successfully installed $tool_name@$tool_version"
-      else
-        log_error "Failed to install $tool_name@$tool_version"
-      fi
-    fi
+      
+      ((attempt++))
+    done
   done
   
   return 0
