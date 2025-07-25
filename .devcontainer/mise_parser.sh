@@ -185,7 +185,7 @@ install_tools_with_mise() {
         fi
         
         # Install using the alias with the provided global flag
-        if mise use $global_flag -y "$alias_value@$tool_version"; then
+        if mise use "$global_flag" -y "$alias_value@$tool_version"; then
           log_success "Successfully installed $tool_name ($alias_value@$tool_version)"
           success=true
         else
@@ -203,7 +203,7 @@ install_tools_with_mise() {
           log_info "Retrying tool installation (attempt $attempt/$max_attempts): $tool_name@$tool_version"
         fi
         
-        if mise use $global_flag -y "$tool_name@$tool_version"; then
+        if mise use "$global_flag" -y "$tool_name@$tool_version"; then
           log_success "Successfully installed $tool_name@$tool_version"
           success=true
         else
