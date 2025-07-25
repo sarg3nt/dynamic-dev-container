@@ -2,7 +2,7 @@
 #
 # Script to to add Mise tools to the dynamic dev container.
 #
-# cSpell:ignore krew mise 
+# cSpell:ignore krew mise mvdan gofumpt gopls
 
 IFS=$'\n\t'
 
@@ -38,7 +38,9 @@ install_mise_tools() {
   fi
   
   # Declare arrays for tools and aliases
+  # shellcheck disable=SC2034
   local tools_array=()
+  # shellcheck disable=SC2034
   declare -A aliases_array
   
   # Trust the mise configuration in the current directory

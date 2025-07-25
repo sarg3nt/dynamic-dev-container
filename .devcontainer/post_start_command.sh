@@ -185,6 +185,7 @@ install_node() {
   
   # Declare arrays for JavaScript tools and aliases
   local js_tools_array=()
+  # shellcheck disable=SC2034
   declare -A aliases_array
   
   # Parse only JavaScript/Node.js tools and aliases from .mise.toml
