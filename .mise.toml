@@ -26,7 +26,6 @@ helm = "latest"
 #### Begin Kubernetes Utilities ####
 krew = "latest"
 dive = "latest"
-kubebench = "latest"
 popeye = "latest"
 trivy = "latest"
 cmctl = "latest"
@@ -53,10 +52,11 @@ bun = "latest"
 
 #### Begin Miscellaneous Tools ####
 gitui = "latest"
-tealdeer = "latest"
-micro = "latest"
 powershell = "latest"
 cosign = "latest"
+"asdf:sarg3nt/asdf-kube-bench" = "latest"
+"asdf:sarg3nt/asdf-tealdeer" = "latest"
+"asdf:sarg3nt/asdf-micro" = "latest"
 #### End Miscellaneous Tools ####
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.

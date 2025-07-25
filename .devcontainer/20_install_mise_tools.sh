@@ -101,5 +101,5 @@ main() {
 }
 
 if ! (return 0 2>/dev/null); then
-  (main "$@")
+  main "$@"
 fi
