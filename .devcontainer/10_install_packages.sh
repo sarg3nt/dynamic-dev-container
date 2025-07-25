@@ -15,11 +15,11 @@ parse_packages() {
   local packages=()
   
   if [[ ! -f "$packages_file" ]]; then
-    log_success "No /.packages file found, skipping package installation"
+    log_success "No /.packages file found, skipping package installation" >&2
     return 0
   fi
 
-  log_info "Reading packages from $packages_file"
+  log_info "Reading packages from $packages_file" >&2
 
   # Read file line by line, skip comments and empty lines
   while IFS= read -r line; do
@@ -32,9 +32,12 @@ parse_packages() {
   done < "$packages_file"
   
   if [[ ${#packages[@]} -eq 0 ]]; then
-    log_success "No packages found in $packages_file"
+    log_success "No packages found in $packages_file" >&2
     return 0
   fi
+  
+  # Output packages one per line for main() to read
+  printf '%s\n' "${packages[@]}"
 }
 
 # Install packages efficiently
