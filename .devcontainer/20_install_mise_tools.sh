@@ -12,26 +12,50 @@ set -euo pipefail
 # shellcheck disable=SC1091
 source ".devcontainer/log.sh"
 
+# Source the shared mise parser library
+# shellcheck disable=SC1091
+source ".devcontainer/mise_parser.sh"
+
 # Set up mise environment for all functions
 setup_mise_env() {
   eval "$(/usr/local/bin/mise activate bash)"
 }
 
+# Parsing functions moved to shared library: mise_parser.sh
+
 #######################################
-# Install tools with mise.
+# Install tools with mise one at a time.
 # Arguments:
 #   None
 #######################################
 install_mise_tools() {
   log_info "Starting mise tools installation..."
-    
+  
+  # Check if .mise.toml exists
+  if [[ ! -f ".mise.toml" ]]; then
+    log_warning "No .mise.toml file found, skipping mise tools installation"
+    return 0
+  fi
+  
+  # Declare arrays for tools and aliases
+  local tools_array=()
+  declare -A aliases_array
+  
   # Trust the mise configuration in the current directory
   log_info "Trusting mise configuration..."
   mise trust .mise.toml
 
-  log_info "Installing mise tools from .mise.toml..."
-  mise install -y
-  log_success "Mise tools installed successfully!"
+  # Parse tools and aliases from .mise.toml (exclude JavaScript tools)
+  if ! parse_mise_tools "tools_array" "exclude_js"; then
+    log_error "Failed to parse tools from .mise.toml"
+    return 1
+  fi
+  parse_mise_aliases "aliases_array"
+  
+  # Install tools using the shared function
+  install_tools_with_mise "tools_array" "aliases_array" "-g"
+  
+  log_success "Mise tools installation completed!"
  
   log_info "BASH_SUBSHELL: $BASH_SUBSHELL"
   if [[ "$BASH_SUBSHELL" -gt 0 ]]; then

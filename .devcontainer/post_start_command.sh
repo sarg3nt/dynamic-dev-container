@@ -6,7 +6,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# Source the logging utility and mise parser
+# shellcheck disable=SC2016,SC1091
 source "$(dirname "$0")/log.sh"
+source "$(dirname "$0")/mise_parser.sh"
 
 main() {
   echo ""
@@ -14,6 +17,7 @@ main() {
   # Set workspace path for configuration files
   WORKSPACE_PATH="${WORKSPACE_PATH:-/workspaces/$(basename "$(pwd)")}"
   export WORKSPACE_PATH
+  eval "$(/usr/local/bin/mise activate bash)"
 
   link_pylintrc_file
   echo ""
@@ -26,6 +30,8 @@ main() {
   copy_kube_config
   echo ""
   copy_docker_config
+  echo ""
+  install_node
   echo ""
   install_node_modules
   echo ""
@@ -164,6 +170,40 @@ copy_docker_config() {
 }
 
 #######################################
+# Install Node.js tools from the JavaScript/Node.js Development section of .mise.toml
+# Arguments:
+#   None
+#######################################
+install_node() {
+  log_info "Installing JavaScript/Node.js tools from .mise.toml..."
+  
+  # Check if .mise.toml exists
+  if [[ ! -f ".mise.toml" ]]; then
+    log_warning "No .mise.toml file found, skipping JavaScript tools installation"
+    return 0
+  fi
+  
+  # Declare arrays for JavaScript tools and aliases
+  local js_tools_array=()
+  declare -A aliases_array
+  
+  # Parse only JavaScript/Node.js tools and aliases from .mise.toml
+  parse_mise_tools "js_tools_array" "include_js"
+  parse_mise_aliases "aliases_array"
+  
+  # Check if any JavaScript tools were found
+  if [[ ${#js_tools_array[@]} -eq 0 ]]; then
+    log_info "No JavaScript/Node.js tools found in .mise.toml"
+    return 0
+  fi
+  
+  # Install JavaScript tools locally (not globally)
+  install_tools_with_mise "js_tools_array" "aliases_array" ""
+  
+  log_success "JavaScript/Node.js tools installation completed"
+}
+
+#######################################
 # Install Node modules if node is installed.
 # Globals:
 #   HOME
@@ -171,7 +211,7 @@ copy_docker_config() {
 #   None
 #######################################
 install_node_modules() {
-  eval "$(/usr/local/bin/mise activate bash 2>/dev/null)" || true
+  eval "$(/usr/local/bin/mise activate bash)"
   if command -v node >/dev/null 2>&1 && [[ -f package.json ]]; then
     log_info "Node.js and package.json detected, running npm install..."
     npm install
