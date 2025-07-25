@@ -184,7 +184,8 @@ install_tools_with_mise() {
           log_info "Retrying aliased tool installation (attempt $attempt/$max_attempts): $tool_name using alias $alias_value@$tool_version"
         fi
         
-        # Install using the alias with the provided global flag
+        # Do not quote $global_flag, breaks mise.
+        # shellcheck disable=SC2086 
         if mise use $global_flag -y "$alias_value@$tool_version"; then
           log_success "Successfully installed $tool_name ($alias_value@$tool_version)"
           success=true
@@ -203,6 +204,8 @@ install_tools_with_mise() {
           log_info "Retrying tool installation (attempt $attempt/$max_attempts): $tool_name@$tool_version"
         fi
         
+        # Do not quote $global_flag, breaks mise.
+        # shellcheck disable=SC2086
         if mise use $global_flag -y "$tool_name@$tool_version"; then
           log_success "Successfully installed $tool_name@$tool_version"
           success=true
