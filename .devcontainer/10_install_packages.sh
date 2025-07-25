@@ -4,6 +4,7 @@
 # Reads packages from /.packages file and installs them.
 # This runs when the dev container starts, after the base system is built.
 #
+# cSpell:ignore dnf epel crb
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -14,12 +15,12 @@ parse_packages() {
   local packages=()
   
   if [[ ! -f "$packages_file" ]]; then
-    log "No /.packages file found, skipping package installation" "yellow" >&2
+    log_success "No /.packages file found, skipping package installation"
     return 0
   fi
-  
-  log "Reading packages from $packages_file" "green" >&2
-  
+
+  log_info "Reading packages from $packages_file"
+
   # Read file line by line, skip comments and empty lines
   while IFS= read -r line; do
     # Remove leading/trailing whitespace and skip empty lines and comments
@@ -31,12 +32,9 @@ parse_packages() {
   done < "$packages_file"
   
   if [[ ${#packages[@]} -eq 0 ]]; then
-    log "No packages found in $packages_file" "yellow" >&2
+    log_success "No packages found in $packages_file"
     return 0
   fi
-  
-  log "Found ${#packages[@]} packages to install: ${packages[*]}" "green" >&2
-  printf '%s\n' "${packages[@]}"
 }
 
 # Install packages efficiently
@@ -44,22 +42,22 @@ install_packages() {
   local packages=("$@")
   
   if [[ ${#packages[@]} -eq 0 ]]; then
-    log "No packages to install" "yellow"
+    log_success "No packages to install"
     return 0
   fi
-  
-  log "Installing ${#packages[@]} packages in batch: ${packages[*]}" "green"
-  
+
+  log_info "Installing ${#packages[@]} packages in batch: ${packages[*]}"
+
   # Install all packages in one command for efficiency
   # Note: EPEL, CRB, and dnf-plugins-core already configured in base system
   if ! sudo dnf install -y "${packages[@]}"; then
-    log "Package installation failed, trying individual installation" "yellow"
+    log_warning "Package installation failed, trying individual installation"
     
     # If batch install fails, try individual packages
     for package in "${packages[@]}"; do
-      log "Installing $package individually" "green"
+      log_info "Installing $package individually"
       if ! sudo dnf install -y "$package"; then
-        log "Failed to install $package, skipping" "red"
+        log_error "Failed to install $package, skipping"
       fi
     done
   fi
@@ -67,30 +65,17 @@ install_packages() {
 
 # Lightweight cleanup for dynamic installation
 cleanup() {
-  log "Running cleanup after package installation" "green"
-  
-  # Clean package caches
+  log_info "Running cleanup after package installation"
   dnf clean all
-  
-  log "Cleanup completed" "green"
+  log_success "Cleanup completed"
 }
 
 main() {
   # Source logging functions from the local .devcontainer directory
-  if [[ -f ".devcontainer/log.sh" ]]; then
-    source ".devcontainer/log.sh"
-  elif [[ -f "/usr/bin/lib/sh/log.sh" ]]; then
-    source "/usr/bin/lib/sh/log.sh"
-  else
-    # Fallback logging if not available
-    log() {
-      local message="$1"
-      local color="${2:-white}"
-      echo "$(date '+%Y-%m-%d %H:%M:%S') $message"
-    }
-  fi
+  # shellcheck disable=SC1091
+  source ".devcontainer/log.sh"
   
-  log "10-install-packages.sh (dynamic installer)" "blue"
+  log_info "10-install-packages.sh"
   
   # Parse packages from file
   local packages=()
@@ -103,10 +88,10 @@ main() {
     install_packages "${packages[@]}"
     cleanup
   else
-    log "No packages to install" "yellow"
+    log_success "No packages to install"
   fi
-  
-  log "Dynamic package installation completed" "green"
+
+  log_success "Dynamic package installation completed"
 }
 
 # Run main if not sourced
