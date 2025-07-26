@@ -9,7 +9,6 @@ run.sh
 
 # Documentation and metadata
 *.md
-*.txt
 LICENSE
 SECURITY.md
 

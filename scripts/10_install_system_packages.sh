@@ -36,6 +36,7 @@ package_install() {
     git \
     gnupg2 \
     jq \
+    socat \
     util-linux-user \
     xz
 }

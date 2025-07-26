@@ -10,13 +10,14 @@
 # Add custom Mise tools and version to your projects root as .mise.toml  See: https://mise.jdx.dev/configuration.html
 
 # Use mise from package manager or smaller binary
-FROM jdxcode/mise:v2025.7.10@sha256:647d0f9b3a6d2b5680ef07e3562e8c8dc83cacfd6952e0038190228314105278 AS mise
+# https://github.com/jdx/mise/pkgs/container/mise/versions
+FROM jdxcode/mise:v2025.7.27@sha256:41666a96b6129b1a0b3da7fe974b469befc4f81f787b1dccaa9325823ba6f18b AS mise
 
 # Extract only the mise binary and strip it
 RUN strip /usr/local/bin/mise || true
 
 # https://hub.docker.com/r/rockylinux/rockylinux/tags
-FROM rockylinux/rockylinux:10-ubi@sha256:eca03145dd5e0b2a281eef164d391e4758b4a5962d29b688d15a72cef712fbb4 AS final
+FROM rockylinux/rockylinux:10-ubi@sha256:02564b26a5d147fcdbd1058abd9b358008f5608b382dcb288cfc718d627256cb AS final
 ARG GITHUB_TOKEN
 ENV GITHUB_API_TOKEN=$GITHUB_TOKEN
 LABEL org.opencontainers.image.source=https://github.com/sarg3nt/dynamic-dev-container

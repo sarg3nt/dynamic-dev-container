@@ -4,9 +4,7 @@
 k9s:
   # The name of the context parent cluster
   cluster: default
-  readOnly: false          # [New!] you can now single out a given context and make it readonly. Woof!
-  #skin: red        # [NEW!] you can also skin individual contexts. Woof Woof!
-  # Tracks namespace configuration
+  readOnly: false
   # WARNING: if the namespace section is commented out :q will stop working
   namespace:
     # Active namespace
@@ -24,5 +22,3 @@ k9s:
   featureGates:
     # Enable/Disable nodeShell
     nodeShell: true
-  # Default port forward host
-  portForwardAddress: localhost

@@ -19,7 +19,7 @@ k9s:
   disablePodCounting: false
   shellPod:
     image: ghcr.io/sarg3nt/dynamic-dev-container:latest
-    namespace: default
+    namespace: kube-system
     limits:
       cpu: 500m
       memory: 2Gi

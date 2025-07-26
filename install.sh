@@ -62,6 +62,7 @@ FILES_TO_COPY=(
   ".packages"
   "cspell.json"
   "dev.sh"
+  "package.json"
   "pyproject.toml"
   "requirements.txt"
   "run.sh"

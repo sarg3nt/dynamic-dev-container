@@ -8,38 +8,36 @@
 # Below is a sample list of packages that can be uncommented to install.
 
 # DNS lookup utilities (dig, nslookup, host commands)
-bind-utils
+# bind-utils
 # Modern system monitor with better UI than htop
-btop
+# btop
 # Tool for creating bootable ISO images
-genisoimage
+# genisoimage
 # Graph visualization software for creating diagrams
-graphviz
+# graphviz
 # Network utilities including ping, tracepath, and arping
-iputils
+# iputils
 # NCurses Disk Usage - visual disk usage analyzer
-ncdu
+# ncdu
 # SNMP utilities for network monitoring and management
-net-snmp-utils
+# net-snmp-utils
 # Network exploration tool and security/port scanner
-nmap
+# nmap
 # Non-interactive SSH password authentication utility
-sshpass
-# Multipurpose network relay tool for TCP/UDP connections
-socat
+# sshpass
 # Network diagnostic tool to trace packet routes
-traceroute
+# traceroute
 # Archive extraction utility for .zip files
-unzip
+# unzip
 # Vi/Vim text editor - basic version
-vim
+# vim
 # Vi/Vim text editor with enhanced features and syntax highlighting
-vim-enhanced
+# vim-enhanced
 # Common files shared by all vim packages
-vim-common
+# vim-common
 # Filesystem-specific files for vim editor
-vim-filesystem
+# vim-filesystem
 # Command-line tool for downloading files from web servers
-wget
+# wget
 # Archive creation utility for .zip files
-zip
+# zip

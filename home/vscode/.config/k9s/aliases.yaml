@@ -5,6 +5,21 @@ aliases:
   all: workload
   wl: workload
   sec: v1/secrets
+  cm: configmaps
+  ns: namespaces
+  svc: services
+  ing: ingresses
+  po: pods
+  pvc: persistentvolumeclaims
+  pv: persistentvolumes
+  ev: events
+  rs: replicasets
+  hpa: horizontalpodautoscalers
+  crd: customresourcedefinitions
+  crds: customresourcedefinitions
+  sa: serviceaccounts
+  no: nodes
+  sc: storageclasses
   jo: jobs
   cr: clusterroles
   crb: clusterrolebindings

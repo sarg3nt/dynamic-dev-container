@@ -1,5 +1,4 @@
-# cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr openbao kubens
-# NOTE: The #### section #### headers below must not be altered or moved as they are used as markers for the install script.
+# Test .mise.toml without JavaScript/Node.js Development section
 
 #### Begin Environment ####
 [env]
@@ -8,9 +7,7 @@ MISE_PYTHON_COMPILE = false
 
 [tools]
 #### Begin HashiCorp Tools ####
-# https://github.com/opentofu/opentofu
 opentofu = "latest"
-# https://github.com/openbao/openbao/releases
 openbao = "latest"
 packer = "latest"
 #### End HashiCorp Tools ####
@@ -21,16 +18,8 @@ kubectx = "latest"
 kubens = "latest"
 k9s = "latest"
 helm = "latest"
+kubebench = "latest"
 #### End Kubernetes/Helm ####
-
-#### Begin Kubernetes Utilities ####
-krew = "latest"
-dive = "latest"
-popeye = "latest"
-trivy = "latest"
-cmctl = "latest"
-k3d = "latest"
-#### End Kubernetes Utilities ####
 
 #### Begin Go Development ####
 golang = 'latest'
@@ -42,24 +31,16 @@ goreleaser = 'latest'
 dotnet = "latest"
 #### End .NET Development ####
 
-#### Begin JavaScript/Node.js Development ####
-node = "latest"
-pnpm = "latest"
-yarn = "latest"
-deno = "latest"
-bun = "latest"
-#### End JavaScript/Node.js Development ####
+# NO JavaScript/Node.js Development section here
 
 #### Begin Miscellaneous Tools ####
 gitui = "latest"
+tealdeer = "latest"
+micro = "latest"
 powershell = "latest"
 cosign = "latest"
-"asdf:sarg3nt/asdf-kube-bench" = "latest"
-"asdf:sarg3nt/asdf-tealdeer" = "latest"
-"asdf:sarg3nt/asdf-micro" = "latest"
 #### End Miscellaneous Tools ####
 
-# See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
 #### Begin Aliases ####
 [alias]
 kubebench = 'asdf:sarg3nt/asdf-kube-bench'

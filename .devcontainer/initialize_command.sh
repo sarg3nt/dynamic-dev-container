@@ -21,7 +21,6 @@ main() {
 # Get the latest version of the dev container
 #
 # Description:
-#   Pulls the latest 'dynamic-dev-container' Docker image from GitHub Container Registry.
 #   Logs success or failure messages based on the outcome.
 #
 # Arguments:

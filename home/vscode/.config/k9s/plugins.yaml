@@ -1,5 +1,4 @@
 plugins:
-
   # See https://k9scli.io/topics/plugins/
   raw-logs-follow:
     # Define a mnemonic to invoke the plugin
