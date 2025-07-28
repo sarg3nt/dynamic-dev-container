@@ -356,6 +356,29 @@ setup_go_tools() {
 }
 
 #######################################
+# Update tldr cache if tldr is available
+# Arguments:
+#   None
+# Returns:
+#   0 on success or if tldr not available, 1 on failure
+#######################################
+setup_tldr_cache() {
+  if ! command -v tldr >/dev/null 2>&1; then
+    log_info "tldr not found, skipping cache update"
+    return 0
+  fi
+  
+  log_info "Populating tldr cache..."
+  if ! tldr --update; then
+    log_warning "Failed to update tldr cache."
+    return 1
+  else
+    log_success "tldr cache updated successfully."
+    return 0
+  fi
+}
+
+#######################################
 # Main function to orchestrate the mise tools installation process
 # Arguments:
 #   None
@@ -373,18 +396,23 @@ main() {
     exit_code=1
   fi
   
-  # Set up .NET environment (continue even if this fails)
+  # Set up .NET environment
   if ! setup_dotnet_environment; then
     log_warning ".NET environment setup failed, continuing..."
     exit_code=1
   fi
   
-  # Set up Go tools (continue even if this fails)
+  # Set up Go tools
   if ! setup_go_tools; then
     log_warning "Go tools setup failed, continuing..."
     exit_code=1
   fi
   
+  # Set up tldr cache (continue even if this fails)
+  if ! setup_tldr_cache; then
+    log_warning "tldr cache setup failed, continuing..."
+  fi
+
   if [[ $exit_code -eq 0 ]]; then
     log_success "All mise tools and development environments set up successfully!"
   else
