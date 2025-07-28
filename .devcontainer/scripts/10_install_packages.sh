@@ -15,7 +15,7 @@ set -euo pipefail
 
 # Source the logging utility
 # shellcheck disable=SC1091
-source ".devcontainer/log.sh"
+source "$(dirname "$0")/log.sh"
 
 # Constants
 readonly PACKAGES_FILE=".packages"
