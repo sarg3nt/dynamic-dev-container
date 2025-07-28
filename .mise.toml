@@ -9,27 +9,27 @@ MISE_PYTHON_COMPILE = false
 [tools]
 #### Begin HashiCorp Tools ####
 # https://github.com/opentofu/opentofu
-opentofu = "latest"
+opentofu = 'latest'
 # https://github.com/openbao/openbao/releases
-openbao = "latest"
-packer = "latest"
+openbao = 'latest'
+packer = 'latest'
 #### End HashiCorp Tools ####
 
 #### Begin Kubernetes/Helm ####
-kubectl = "latest"
-kubectx = "latest"
-kubens = "latest"
-k9s = "latest"
-helm = "latest"
+kubectl = 'latest'
+kubectx = 'latest'
+kubens = 'latest'
+k9s = 'latest'
+helm = 'latest'
 #### End Kubernetes/Helm ####
 
 #### Begin Kubernetes Utilities ####
-krew = "latest"
-dive = "latest"
-popeye = "latest"
-trivy = "latest"
-cmctl = "latest"
-k3d = "latest"
+krew = 'latest'
+dive = 'latest'
+popeye = 'latest'
+trivy = 'latest'
+cmctl = 'latest'
+k3d = 'latest'
 #### End Kubernetes Utilities ####
 
 #### Begin Go Development ####
@@ -39,24 +39,24 @@ goreleaser = 'latest'
 #### End Go Development ####
 
 #### Begin .NET Development ####
-dotnet = "latest"
+dotnet = 'latest'
 #### End .NET Development ####
 
 #### Begin JavaScript/Node.js Development ####
-node = "latest"
-pnpm = "latest"
-yarn = "latest"
-deno = "latest"
-bun = "latest"
+node = 'latest'
+pnpm = 'latest'
+yarn = 'latest'
+deno = 'latest'
+bun = 'latest'
 #### End JavaScript/Node.js Development ####
 
 #### Begin Miscellaneous Tools ####
-gitui = "latest"
-powershell = "latest"
-cosign = "latest"
-"asdf:sarg3nt/asdf-kube-bench" = "latest"
-"asdf:sarg3nt/asdf-tealdeer" = "latest"
-"asdf:sarg3nt/asdf-micro" = "latest"
+gitui = 'latest'
+powershell = 'latest'
+cosign = 'latest'
+kubebench = 'latest'
+tealdeer = 'latest'
+micro = 'latest'
 #### End Miscellaneous Tools ####
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
@@ -70,6 +70,6 @@ micro = 'asdf:sarg3nt/asdf-micro'
 #### Begin Settings ####
 [settings]
 experimental = true
-http_timeout = "90s"
+http_timeout = '90s'
 yes = true
 #### End Settings ####

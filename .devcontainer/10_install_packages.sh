@@ -32,7 +32,7 @@ parse_packages() {
   done < "$packages_file"
   
   if [[ ${#packages[@]} -eq 0 ]]; then
-    log_success "No packages found in $packages_file" >&2
+    log_info "No packages found in $packages_file" >&2
     return 0
   fi
   
@@ -91,7 +91,7 @@ main() {
     install_packages "${packages[@]}"
     cleanup
   else
-    log_success "No packages to install"
+    log_info "No packages to install"
   fi
 
   log_success "Dynamic package installation completed"

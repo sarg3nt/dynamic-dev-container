@@ -6,10 +6,9 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Source the logging utility and mise parser
+# Source the logging utility
 # shellcheck disable=SC2016,SC1091
 source "$(dirname "$0")/log.sh"
-source "$(dirname "$0")/mise_parser.sh"
 
 main() {
   echo ""
@@ -170,7 +169,7 @@ copy_docker_config() {
 }
 
 #######################################
-# Install Node.js tools from the JavaScript/Node.js Development section of .mise.toml
+# Install Node.js tools using native mise install command
 # Arguments:
 #   None
 #######################################
@@ -183,25 +182,39 @@ install_node() {
     return 0
   fi
   
-  # Declare arrays for JavaScript tools and aliases
-  local js_tools_array=()
-  # shellcheck disable=SC2034
-  declare -A aliases_array
-  
-  # Parse only JavaScript/Node.js tools and aliases from .mise.toml
-  parse_mise_tools "js_tools_array" "include_js"
-  parse_mise_aliases "aliases_array"
-  
-  # Check if any JavaScript tools were found
-  if [[ ${#js_tools_array[@]} -eq 0 ]]; then
+  # Check if JavaScript/Node.js section exists
+  if ! grep -q "#### Begin JavaScript/Node.js Development ####" ".mise.toml"; then
     log_info "No JavaScript/Node.js tools found in .mise.toml"
     return 0
   fi
   
-  # Install JavaScript tools locally (not globally)
-  install_tools_with_mise "js_tools_array" "aliases_array" ""
+  # Trust the mise configuration in the current directory
+  log_info "Trusting mise configuration..."
+  mise trust .mise.toml
   
-  log_success "JavaScript/Node.js tools installation completed"
+  # Install tools using native mise install with retry logic
+  local max_attempts=3
+  local attempt=1
+  local install_success=false
+  
+  while [[ $attempt -le $max_attempts && $install_success == false ]]; do
+    log_info "Running mise install to ensure all tools are installed (attempt $attempt/$max_attempts)..."
+    
+    if mise install -y; then
+      log_success "JavaScript/Node.js tools installation completed"
+      install_success=true
+    else
+      if [[ $attempt -lt $max_attempts ]]; then
+        log_warning "Mise install failed on attempt $attempt, retrying in 3 seconds..."
+        sleep 3
+      else
+        log_error "Mise install failed after $max_attempts attempts"
+        exit 1
+      fi
+    fi
+    
+    ((attempt++))
+  done
 }
 
 #######################################

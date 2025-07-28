@@ -12,7 +12,7 @@ USER vscode
 RUN --mount=type=bind,source=.,target=/tmp/src,ro --mount=type=bind,source=.devcontainer,target=/tmp/src/.devcontainer,ro bash -c "cd /tmp/src && .devcontainer/10_install_packages.sh"
 
 # Install mise tools - requires .mise.toml in the working directory
-RUN --mount=type=bind,source=.,target=/tmp/src,ro --mount=type=bind,source=.devcontainer,target=/tmp/src/.devcontainer,ro bash -c "cd /tmp/src && .devcontainer/20_install_mise_tools.sh"
+RUN --mount=type=bind,source=.,target=/tmp/src,rw --mount=type=bind,source=.devcontainer,target=/tmp/src/.devcontainer,rw bash -c "cd /tmp/src && .devcontainer/20_install_mise_tools.sh"
 
 # Install krew plugins - requires krew to be installed from mise
 RUN --mount=type=bind,source=.,target=/tmp/src,ro --mount=type=bind,source=.devcontainer,target=/tmp/src/.devcontainer,ro bash -c "cd /tmp/src && .devcontainer/30_install_krew_plugins.sh"
