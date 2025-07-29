@@ -8,52 +8,18 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Global decision tracking variables
-INSTALL_OPENTOFU=false
-INSTALL_KUBERNETES=false
-INSTALL_GO=false
-INSTALL_DOTNET=false
-INSTALL_JAVASCRIPT=false
-INSTALL_PACKER=false
-INSTALL_POWERSHELL=false
+INSTALL_SECTIONS=()
+
+# Individual tool flags - will be populated dynamically
+declare -A TOOL_SELECTED
+declare -A TOOL_VERSION_CONFIGURABLE
+declare -A TOOL_VERSION_VALUE
+
+# Extension flags
 INCLUDE_PYTHON_EXTENSIONS=false
 INCLUDE_MARKDOWN_EXTENSIONS=false
 INCLUDE_SHELL_EXTENSIONS=false
 INCLUDE_JS_EXTENSIONS=false
-
-# Individual tool flags (default false)
-INSTALL_OPENBAO=false
-INSTALL_KUBECTL=false
-INSTALL_KUBECTX=false
-INSTALL_KUBENS=false
-INSTALL_K9S=false
-INSTALL_HELM=false
-INSTALL_KREW=false
-INSTALL_DIVE=false
-INSTALL_KUBEBENCH=false
-INSTALL_POPEYE=false
-INSTALL_TRIVY=false
-INSTALL_CMCTL=false
-INSTALL_K3D=false
-INSTALL_GOLANG=false
-INSTALL_GORELEASER=false
-INSTALL_DOTNET_SDK=false
-INSTALL_NODE=false
-INSTALL_PNPM=false
-INSTALL_YARN=false
-INSTALL_DENO=false
-INSTALL_BUN=false
-INSTALL_GITUI=false
-INSTALL_TEALDEER=false
-INSTALL_MICRO=false
-INSTALL_COSIGN=false
-
-# Version variables for tools
-GOLANG_VERSION="latest"
-DOTNET_SDK_VERSION="latest"
-KUBECTL_VERSION="latest"
-OPENBAO_VERSION="latest"
-OPENTOFU_VERSION="latest"
-PACKER_VERSION="latest"
 
 # Files and directories to copy to new projects
 FILES_TO_COPY=(
@@ -314,7 +280,7 @@ get_latest_major_versions() {
   
   local major_versions
   # Parse versions to get unique major versions, sorted numerically
-  if [[ "$tool_name" == "kubectl" || "$tool_name" == "go" || "$tool_name" == "opentofu" || "$tool_name" == "openbao" || "$tool_name" == "packer" ]]; then
+  if [[ "$tool_name" == "kubectl" || "$tool_name" == "go" || "$tool_name" == "golang" || "$tool_name" == "opentofu" || "$tool_name" == "openbao" || "$tool_name" == "packer" ]]; then
     # For versions like 1.31.2, major is 1.31
     major_versions=$(echo "$versions" | awk -F. '{print $1"."$2}' | sort -rV | uniq | head -n 5 | tr '\n' ',' | sed 's/,$//')
   else
@@ -329,7 +295,114 @@ get_latest_major_versions() {
   fi
 }
 
-# TUI input dialog with default value
+# Parse tool sections from .mise.toml
+parse_mise_sections() {
+  local file=".mise.toml"
+  local in_tools_section=false
+  local current_section=""
+  local current_section_name=""
+  local current_tools=()
+  local previous_line=""
+  
+  # Clear global arrays
+  INSTALL_SECTIONS=()
+  
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    # Check if we're entering the [tools] section
+    if [[ "$line" == "[tools]" ]]; then
+      in_tools_section=true
+      continue
+    fi
+    
+    # Check if we're leaving the [tools] section
+    if [[ "$in_tools_section" == true && "$line" =~ ^\[.*\] ]]; then
+      # Save the last section if it exists
+      if [[ -n "$current_section" ]]; then
+        INSTALL_SECTIONS+=("$current_section")
+      fi
+      break
+    fi
+    
+    # Only process lines within the [tools] section
+    if [[ "$in_tools_section" == true ]]; then
+      # Check for section start marker
+      if [[ "$line" =~ ^####\ Begin\ (.+)$ ]]; then
+        # Save previous section if it exists
+        if [[ -n "$current_section" ]]; then
+          INSTALL_SECTIONS+=("$current_section")
+        fi
+        
+        # Start new section
+        current_section_name="${BASH_REMATCH[1]}"
+        current_section="$current_section_name"
+        current_tools=()
+        continue
+      fi
+      
+      # Check for section end marker
+      if [[ "$line" =~ ^####\ End\ (.+)$ ]]; then
+        # Save current section
+        if [[ -n "$current_section" ]]; then
+          INSTALL_SECTIONS+=("$current_section")
+        fi
+        current_section=""
+        current_section_name=""
+        continue
+      fi
+      
+      # Check for tool definition within a section
+      if [[ -n "$current_section" && "$line" =~ ^([a-zA-Z0-9_-]+)\ *=\ * ]]; then
+        local tool_name="${BASH_REMATCH[1]}"
+        current_tools+=("$tool_name")
+        
+        # Check if previous line had #version# marker for this specific tool
+        if [[ "$previous_line" == "#version#" ]]; then
+          TOOL_VERSION_CONFIGURABLE["$tool_name"]=true
+        else
+          TOOL_VERSION_CONFIGURABLE["$tool_name"]=false
+        fi
+        
+        # Initialize tool as not selected
+        TOOL_SELECTED["$tool_name"]=false
+        TOOL_VERSION_VALUE["$tool_name"]="latest"
+      fi
+    fi
+    
+    previous_line="$line"
+  done < "$file"
+  
+  # Save the last section if it exists
+  if [[ -n "$current_section" ]]; then
+    INSTALL_SECTIONS+=("$current_section")
+  fi
+}
+
+# Get tools from a specific section
+get_section_tools() {
+  local section_name="$1"
+  local file=".mise.toml"
+  local in_section=false
+  local tools=()
+  
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "#### Begin $section_name" ]]; then
+      in_section=true
+      continue
+    fi
+    
+    if [[ "$line" == "#### End $section_name" ]]; then
+      break
+    fi
+    
+    if [[ "$in_section" == true && "$line" =~ ^([a-zA-Z0-9_-]+)\ *=\ * ]]; then
+      tools+=("${BASH_REMATCH[1]}")
+    fi
+  done < "$file"
+  
+  printf '%s\n' "${tools[@]}"
+}
+
+#TUI input dialog with default value
 tui_input() {
   local title="$1"
   local prompt="$2"
@@ -467,216 +540,75 @@ collect_project_info() {
 }
 
 # Development tools selection
+# shellcheck disable=SC2120  # Function uses positional parameters set by eval
 select_development_tools() {
-  # Go Development Tools
-  if tui_yesno "Go Development" "Install Go programming language?" "n"; then
-    INSTALL_GO=true
-    INSTALL_GOLANG=true
-    local version_examples
-    version_examples=$(get_latest_major_versions "go")
-    GOLANG_VERSION=$(tui_input "Go Configuration" \
-                              "Enter Go version to install $version_examples\n\nGo is a programming language developed by Google:" \
-                              "latest")
-    
-    if tui_yesno "Go Tools" "Install GoReleaser?" "y"; then
-      INSTALL_GORELEASER=true
-    fi
-  fi
-
-  # .NET Development Tools  
-  if tui_yesno ".NET Development" "Install .NET SDK?" "n"; then
-    INSTALL_DOTNET=true
-    INSTALL_DOTNET_SDK=true
-    local version_examples
-    version_examples=$(get_latest_major_versions "dotnet")
-    DOTNET_SDK_VERSION=$(tui_input ".NET Configuration" \
-                                  "Enter .NET SDK version to install $version_examples\n\n.NET is Microsoft's cross-platform development framework:" \
-                                  "latest")
-  fi
-
-  # JavaScript/Node.js Development Tools
-  if tui_yesno "JavaScript/Node.js Development" "Install Node.js (v19)?\n\nNote: Node.js is fixed to v19 due to compatibility issues.\nSee README.md for details on customizing the Node.js version." "n"; then
-    INSTALL_JAVASCRIPT=true
-    INSTALL_NODE=true
-    
-    # Select additional JavaScript tools
-    local js_tools
-    js_tools=$(tui_checklist "JavaScript/Node.js Package Managers & Runtimes" \
-                            "Select additional JavaScript tools to install:" \
-                            "pnpm" "pnpm - Fast, disk space efficient package manager" on \
-                            "yarn" "yarn - Popular alternative package manager" on \
-                            "deno" "Deno - Secure TypeScript/JavaScript runtime" on \
-                            "bun" "Bun - Fast all-in-one JavaScript runtime" on)
-    
-    for tool in $js_tools; do
-      case "$tool" in
-        "pnpm") INSTALL_PNPM=true ;;
-        "yarn") INSTALL_YARN=true ;;
-        "deno") INSTALL_DENO=true ;;
-        "bun") INSTALL_BUN=true ;;
-      esac
-    done
-  fi
-
-  # Kubernetes/Helm Tools
-  local k8s_helm_tools
-  k8s_helm_tools=$(get_tools_from_section "Kubernetes/Helm")
+  # Parse the .mise.toml file to discover sections and tools
+  parse_mise_sections
   
-  if [[ -n "$k8s_helm_tools" ]] && tui_yesno "Kubernetes/Helm Tools" "Install kubectl and other Kubernetes/Helm tools?" "n"; then
-    INSTALL_KUBERNETES=true
+  # Process each section found in .mise.toml
+  for section in "${INSTALL_SECTIONS[@]}"; do
+    local section_tools=()
     
-    # Build checklist options dynamically, with kubectl required and others optional
-    local k8s_options=()
-    for tool in $k8s_helm_tools; do
-      local description
-      description=$(get_tool_description "$tool")
-      if [[ "$tool" == "kubectl" ]]; then
-        k8s_options+=("$tool" "$description" "on")  # kubectl is required
-      else
-        k8s_options+=("$tool" "$description" "on")  # others default to on
-      fi
-    done
+    # Get tools for this section
+    while IFS= read -r tool; do
+      [[ -n "$tool" ]] && section_tools+=("$tool")
+    done < <(get_section_tools "$section")
     
-    if [[ ${#k8s_options[@]} -gt 0 ]]; then
-      local selected_k8s
-      selected_k8s=$(tui_checklist "Kubernetes/Helm Tools" \
-                                  "Select Kubernetes/Helm tools to install:" \
-                                  "${k8s_options[@]}")
+    # Skip empty sections
+    if [[ ${#section_tools[@]} -eq 0 ]]; then
+      continue
+    fi
+    
+    # Ask user if they want to install tools from this section
+    if tui_yesno "$section" "Install $section?" "n"; then
       
-      for tool in $selected_k8s; do
-        case "$tool" in
-          "kubectl") 
-            INSTALL_KUBECTL=true
-            local version_examples
-            version_examples=$(get_latest_major_versions "kubectl")
-            KUBECTL_VERSION=$(tui_input "Kubernetes Configuration" \
-                                        "Enter kubectl version to install $version_examples\n\nkubectl is the command-line tool for Kubernetes:" \
-                                        "latest")
-            ;;
-          "helm") INSTALL_HELM=true ;;
-          "k9s") INSTALL_K9S=true ;;
-          "kubectx") INSTALL_KUBECTX=true ;;
-          "kubens") INSTALL_KUBENS=true ;;
-        esac
+      # Build options for all tools in this section
+      local tool_options=()
+      for tool in "${section_tools[@]}"; do
+        local description
+        description=$(get_tool_description "$tool")
+        
+        # Add version info to description for version-configurable tools
+        if [[ "${TOOL_VERSION_CONFIGURABLE[$tool]:-false}" == "true" ]]; then
+          local version_examples
+          version_examples=$(get_latest_major_versions "$tool")
+          description="$description (version configurable $version_examples)"
+        fi
+        
+        tool_options+=("$tool" "$description" "on")
+      done
+      
+      # Show checklist for all tools in this section
+      local selected_tools
+      selected_tools=$(tui_checklist "$section Tools" \
+                                     "Select tools to install from $section:" \
+                                     "${tool_options[@]}")
+      
+      # Mark selected tools and ask for versions if needed
+      # Parse the quoted tool names returned by dialog
+      eval "set -- $selected_tools"
+      for tool in "$@"; do
+        TOOL_SELECTED["$tool"]=true
+        
+        # If this tool is version-configurable, ask for the version
+        if [[ "${TOOL_VERSION_CONFIGURABLE[$tool]:-false}" == "true" ]]; then
+          local version_examples
+          version_examples=$(get_latest_major_versions "$tool")
+          local tool_desc
+          tool_desc=$(get_tool_description "$tool")
+          
+          local version
+          version=$(tui_input "$tool Configuration" \
+                             "Enter $tool version to install $version_examples\n\n$tool_desc:" \
+                             "latest")
+          
+          TOOL_VERSION_VALUE["$tool"]="$version"
+        else
+          TOOL_VERSION_VALUE["$tool"]="latest"
+        fi
       done
     fi
-  fi
-
-  # Kubernetes Utilities
-  local k8s_utils_list
-  k8s_utils_list=$(get_tools_from_section "Kubernetes Utilities")
-  
-  if [[ -n "$k8s_utils_list" ]] && tui_yesno "Kubernetes Utilities" "Install krew and other Kubernetes utilities?" "n"; then
-    INSTALL_KREW=true
-    
-    # Build checklist options dynamically
-    local k8s_utils_options=()
-    for tool in $k8s_utils_list; do
-      local description
-      description=$(get_tool_description "$tool")
-      k8s_utils_options+=("$tool" "$description" "on")
-    done
-    
-    if [[ ${#k8s_utils_options[@]} -gt 0 ]]; then
-      local selected_k8s_utils
-      selected_k8s_utils=$(tui_checklist "Kubernetes Utilities" \
-                                        "Select Kubernetes utilities to install:" \
-                                        "${k8s_utils_options[@]}")
-      
-      for tool in $selected_k8s_utils; do
-        case "$tool" in
-          "krew") INSTALL_KREW=true ;;
-          "dive") INSTALL_DIVE=true ;;
-          "kubebench") INSTALL_KUBEBENCH=true ;;
-          "popeye") INSTALL_POPEYE=true ;;
-          "trivy") INSTALL_TRIVY=true ;;
-          "cmctl") INSTALL_CMCTL=true ;;
-          "k3d") INSTALL_K3D=true ;;
-        esac
-      done
-    fi
-  fi
-
-  # HashiCorp Tools
-  local hashicorp_tools
-  hashicorp_tools=$(get_tools_from_section "HashiCorp Tools")
-  
-  if [[ -n "$hashicorp_tools" ]]; then
-    # Build checklist options dynamically
-    local hashicorp_options=()
-    for tool in $hashicorp_tools; do
-      local description
-      description=$(get_tool_description "$tool")
-      hashicorp_options+=("$tool" "$description" "off")
-    done
-    
-    if [[ ${#hashicorp_options[@]} -gt 0 ]]; then
-      local selected_hashicorp
-      selected_hashicorp=$(tui_checklist "HashiCorp Tools" \
-                                        "Select HashiCorp tools to install:" \
-                                        "${hashicorp_options[@]}")
-      
-      for tool in $selected_hashicorp; do
-        case "$tool" in
-          "opentofu") 
-            INSTALL_OPENTOFU=true
-            local version_examples
-            version_examples=$(get_latest_major_versions "opentofu")
-            OPENTOFU_VERSION=$(tui_input "OpenTofu Configuration" \
-                                         "Enter OpenTofu version to install $version_examples\n\nOpenTofu is an open-source Terraform alternative:" \
-                                         "latest")
-            ;;
-          "openbao") 
-            INSTALL_OPENBAO=true
-            local version_examples
-            version_examples=$(get_latest_major_versions "openbao")
-            OPENBAO_VERSION=$(tui_input "OpenBao Configuration" \
-                                        "Enter OpenBao version to install $version_examples\n\nOpenBao is an open-source Vault alternative:" \
-                                        "latest")
-            ;;
-          "packer") 
-            INSTALL_PACKER=true
-            local version_examples
-            version_examples=$(get_latest_major_versions "packer")
-            PACKER_VERSION=$(tui_input "Packer Configuration" \
-                                       "Enter Packer version to install $version_examples\n\nPacker builds machine images from configuration:" \
-                                       "latest")
-            ;;
-        esac
-      done
-    fi
-  fi
-
-  # Miscellaneous Tools
-  local misc_tools_list
-  misc_tools_list=$(get_tools_from_section "Miscellaneous Tools")
-  
-  if [[ -n "$misc_tools_list" ]]; then
-    # Build checklist options dynamically
-    local misc_options=()
-    for tool in $misc_tools_list; do
-      local description
-      description=$(get_tool_description "$tool")
-      misc_options+=("$tool" "$description" "off")
-    done
-    
-    if [[ ${#misc_options[@]} -gt 0 ]]; then
-      local selected_misc
-      selected_misc=$(tui_checklist "Miscellaneous Development Tools" \
-                                   "Select miscellaneous tools to install:" \
-                                   "${misc_options[@]}")
-      
-      for tool in $selected_misc; do
-        case "$tool" in
-          "gitui") INSTALL_GITUI=true ;;
-          "tealdeer") INSTALL_TEALDEER=true ;;
-          "micro") INSTALL_MICRO=true ;;
-          "powershell") INSTALL_POWERSHELL=true ;;
-          "cosign") INSTALL_COSIGN=true ;;
-        esac
-      done
-    fi
-  fi
+  done
 
   # VS Code Extensions (for tools without automatic extensions)
   local extensions
@@ -708,75 +640,44 @@ show_summary() {
   [[ -n "$DOCKER_EXEC_COMMAND" ]] && summary+="  • Exec Command: $DOCKER_EXEC_COMMAND\n"
   summary+="\n"
   
-  # Count and display selected tools
+  # Count and display selected tools by section
   local tool_count=0
   local tools_section=""
   
-  if [[ "$INSTALL_GO" == true ]]; then
-    tools_section+="  ✓ Go ($GOLANG_VERSION)"
-    [[ "$INSTALL_GORELEASER" == true ]] && tools_section+=" + GoReleaser"
-    tools_section+="\n"
-    ((tool_count++))
-  fi
-  
-  if [[ "$INSTALL_DOTNET" == true ]]; then
-    tools_section+="  ✓ .NET SDK ($DOTNET_SDK_VERSION)\n"
-    ((tool_count++))
-  fi
-  
-  if [[ "$INSTALL_JAVASCRIPT" == true ]]; then
-    tools_section+="  ✓ Node.js (v19)"
-    [[ "$INSTALL_PNPM" == true ]] && tools_section+=" + pnpm"
-    [[ "$INSTALL_YARN" == true ]] && tools_section+=" + yarn"
-    [[ "$INSTALL_DENO" == true ]] && tools_section+=" + Deno"
-    [[ "$INSTALL_BUN" == true ]] && tools_section+=" + Bun"
-    tools_section+="\n"
-    ((tool_count++))
-  fi
-  
-  if [[ "$INSTALL_KUBERNETES" == true ]]; then
-    tools_section+="  ✓ kubectl ($KUBECTL_VERSION)"
-    [[ "$INSTALL_HELM" == true ]] && tools_section+=" + Helm"
-    [[ "$INSTALL_K9S" == true ]] && tools_section+=" + k9s"
-    [[ "$INSTALL_KUBECTX" == true ]] && tools_section+=" + kubectx/kubens"
-    tools_section+="\n"
-    ((tool_count++))
-  fi
-  
-  if [[ "$INSTALL_KREW" == true ]]; then
-    tools_section+="  ✓ Kubernetes utilities: krew"
-    [[ "$INSTALL_DIVE" == true ]] && tools_section+=", dive"
-    [[ "$INSTALL_KUBEBENCH" == true ]] && tools_section+=", kubebench"
-    [[ "$INSTALL_POPEYE" == true ]] && tools_section+=", popeye"
-    [[ "$INSTALL_TRIVY" == true ]] && tools_section+=", trivy"
-    [[ "$INSTALL_CMCTL" == true ]] && tools_section+=", cmctl"
-    [[ "$INSTALL_K3D" == true ]] && tools_section+=", k3d"
-    tools_section+="\n"
-    ((tool_count++))
-  fi
-  
-  if [[ "$INSTALL_OPENTOFU" == true || "$INSTALL_OPENBAO" == true || "$INSTALL_PACKER" == true ]]; then
-    tools_section+="  ✓ HashiCorp tools:"
-    [[ "$INSTALL_OPENTOFU" == true ]] && tools_section+=" OpenTofu ($OPENTOFU_VERSION)"
-    [[ "$INSTALL_OPENBAO" == true ]] && tools_section+=" OpenBao ($OPENBAO_VERSION)"
-    [[ "$INSTALL_PACKER" == true ]] && tools_section+=" Packer ($PACKER_VERSION)"
-    tools_section+="\n"
-    ((tool_count++))
-  fi
-  
-  [[ "$INSTALL_POWERSHELL" == true ]] && { tools_section+="  ✓ PowerShell\n"; ((tool_count++)); }
-  
-  if [[ "$INSTALL_GITUI" == true || "$INSTALL_TEALDEER" == true || "$INSTALL_MICRO" == true ]]; then
-    tools_section+="  ✓ Misc tools:"
-    [[ "$INSTALL_GITUI" == true ]] && tools_section+=" gitui"
-    [[ "$INSTALL_TEALDEER" == true ]] && tools_section+=" tealdeer"
-    [[ "$INSTALL_MICRO" == true ]] && tools_section+=" micro"
-    tools_section+="\n"
-    ((tool_count++))
-  fi
+  # Group tools by their sections
+  for section in "${INSTALL_SECTIONS[@]}"; do
+    local section_tools=()
+    local section_has_selected=false
+    
+    # Get all tools in this section and check if any are selected
+    while IFS= read -r tool; do
+      if [[ -n "$tool" && "${TOOL_SELECTED[$tool]}" == "true" ]]; then
+        section_tools+=("$tool")
+        section_has_selected=true
+      fi
+    done < <(get_section_tools "$section")
+    
+    # If this section has selected tools, add to summary
+    if [[ "$section_has_selected" == "true" && ${#section_tools[@]} -gt 0 ]]; then
+      tools_section+="  ✓ $section: "
+      local tool_list=""
+      for tool in "${section_tools[@]}"; do
+        local version="${TOOL_VERSION_VALUE[$tool]:-latest}"
+        if [[ "$version" != "latest" ]]; then
+          tool_list+="$tool ($version), "
+        else
+          tool_list+="$tool, "
+        fi
+      done
+      # Remove trailing comma and space
+      tool_list=${tool_list%, }
+      tools_section+="$tool_list\n"
+      ((tool_count++))
+    fi
+  done
   
   if [[ $tool_count -gt 0 ]]; then
-    summary+="Development Tools ($tool_count categories):\n$tools_section"
+    summary+="Development Tools ($tool_count sections):\n$tools_section"
   else
     summary+="Development Tools: None selected\n"
   fi
@@ -787,19 +688,24 @@ show_summary() {
   local ext_list=""
   
   # Automatic extensions based on selected tools
-  [[ "$INSTALL_GO" == true ]] && { ext_list+="Go "; ((ext_count++)); }
-  [[ "$INSTALL_DOTNET" == true ]] && { ext_list+=".NET "; ((ext_count++)); }
-  [[ "$INSTALL_JAVASCRIPT" == true ]] && { ext_list+="JavaScript/Node.js "; ((ext_count++)); }
-  [[ "$INSTALL_KUBERNETES" == true || "$INSTALL_KREW" == true ]] && { ext_list+="Kubernetes/Helm "; ((ext_count++)); }
-  [[ "$INSTALL_OPENTOFU" == true ]] && { ext_list+="Terraform/OpenTofu "; ((ext_count++)); }
-  [[ "$INSTALL_NODE" == true ]] && { ext_list+="JavaScript/TypeScript "; ((ext_count++)); }
-  [[ "$INSTALL_PACKER" == true ]] && { ext_list+="Packer "; ((ext_count++)); }
-  [[ "$INSTALL_POWERSHELL" == true ]] && { ext_list+="PowerShell "; ((ext_count++)); }
+  for tool in "${!TOOL_SELECTED[@]}"; do
+    if [[ "${TOOL_SELECTED[$tool]}" == "true" ]]; then
+      case "$tool" in
+        "go") ext_list+="Go "; ((ext_count++)) ;;
+        "dotnet") ext_list+=".NET "; ((ext_count++)) ;;
+        "node") ext_list+="JavaScript/Node.js "; ((ext_count++)) ;;
+        "kubectl"|"helm"|"k9s") ext_list+="Kubernetes/Helm "; ((ext_count++)) ;;
+        "opentofu") ext_list+="Terraform/OpenTofu "; ((ext_count++)) ;;
+        "packer") ext_list+="Packer "; ((ext_count++)) ;;
+        "powershell") ext_list+="PowerShell "; ((ext_count++)) ;;
+      esac
+    fi
+  done
   
   # Optional extensions selected by user
-  [[ "$INCLUDE_PYTHON_EXTENSIONS" == true ]] && { ext_list+="Python "; ((ext_count++)); }
-  [[ "$INCLUDE_MARKDOWN_EXTENSIONS" == true ]] && { ext_list+="Markdown "; ((ext_count++)); }
-  [[ "$INCLUDE_SHELL_EXTENSIONS" == true ]] && { ext_list+="Shell/Bash "; ((ext_count++)); }
+  [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" ]] && { ext_list+="Python "; ((ext_count++)); }
+  [[ "$INCLUDE_MARKDOWN_EXTENSIONS" == "true" ]] && { ext_list+="Markdown "; ((ext_count++)); }
+  [[ "$INCLUDE_SHELL_EXTENSIONS" == "true" ]] && { ext_list+="Shell/Bash "; ((ext_count++)); }
   
   if [[ $ext_count -gt 0 ]]; then
     summary+="VS Code Extensions: GitHub + Core + $ext_list\n"
@@ -887,6 +793,7 @@ get_tool_description() {
     "cmctl") echo "cmctl - CLI for cert-manager certificate management" ;;
     "k3d") echo "k3d - Lightweight Kubernetes for local development" ;;
     "golang") echo "golang - Go programming language" ;;
+    "golangci-lint") echo "golangci-lint - Fast Go linters runner" ;;
     "goreleaser") echo "goreleaser - Release automation tool for Go projects" ;;
     "dotnet") echo "dotnet - .NET SDK" ;;
     "node") echo "node - Node.js JavaScript runtime" ;;
@@ -919,93 +826,51 @@ generate_mise_toml() {
   # Start with the header and environment section from source
   echo "# cspell:ignore cmctl gitui krew kubebench kubectx kubens direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr" > "$temp_file"
   # shellcheck disable=SC2129
-  extract_mise_section "#### Begin Environment ####" "#### End Environment ####" >> "$temp_file"
+  extract_mise_section "#### Begin Environment" "#### End Environment" >> "$temp_file"
   echo "" >> "$temp_file"
   echo "[tools]" >> "$temp_file"
   echo "" >> "$temp_file"
 
-  # HashiCorp tools
-  if [ "$INSTALL_OPENTOFU" = true ] || [ "$INSTALL_OPENBAO" = true ] || [ "$INSTALL_PACKER" = true ]; then
-    echo "#### Begin HashiCorp Tools ####" >> "$temp_file"
-    [ "$INSTALL_OPENTOFU" = true ] && echo "opentofu = \"${OPENTOFU_VERSION}\"" >> "$temp_file"
-    [ "$INSTALL_OPENBAO" = true ] && echo "openbao = \"${OPENBAO_VERSION}\"" >> "$temp_file"
-    [ "$INSTALL_PACKER" = true ] && echo "packer = \"${PACKER_VERSION}\"" >> "$temp_file"
-    echo "#### End HashiCorp Tools ####" >> "$temp_file"
-  fi
+  # Generate sections based on selected tools and their sections
+  for section in "${INSTALL_SECTIONS[@]}"; do
+    local section_has_tools=false
+    local section_tools=()
+    
+    # Collect selected tools for this section
+    while IFS= read -r tool; do
+      if [[ -n "$tool" && "${TOOL_SELECTED[$tool]}" == "true" ]]; then
+        section_tools+=("$tool")
+        section_has_tools=true
+      fi
+    done < <(get_section_tools "$section")
+    
+    # If section has selected tools, generate the section
+    if [[ "$section_has_tools" == "true" && ${#section_tools[@]} -gt 0 ]]; then
+      echo "#### Begin $section" >> "$temp_file"
+      
+      for tool in "${section_tools[@]}"; do
+        local version="${TOOL_VERSION_VALUE[$tool]:-latest}"
+        echo "$tool = \"$version\"" >> "$temp_file"
+      done
+      
+      echo "#### End $section" >> "$temp_file"
+      echo "" >> "$temp_file"
+    fi
+  done
 
-  # Go
-  if [ "$INSTALL_GOLANG" = true ] || [ "$INSTALL_GORELEASER" = true ]; then
+  # Add alias section from source (if it exists)
+  if grep -q "^\[alias\]" .mise.toml; then
     echo "" >> "$temp_file"
-    echo "#### Begin Go Development ####" >> "$temp_file"
-    [ "$INSTALL_GOLANG" = true ] && echo "golang = \"${GOLANG_VERSION}\"" >> "$temp_file"
-    [ "$INSTALL_GORELEASER" = true ] && echo 'goreleaser = "latest"' >> "$temp_file"
-    echo "#### End Go Development ####" >> "$temp_file"
+    # Extract everything from [alias] to the next section or end of file
+    awk '/^\[alias\]/{found=1} found && /^\[/ && !/^\[alias\]/{found=0} found{print}' .mise.toml >> "$temp_file"
   fi
-
-  # .NET
-  if [ "$INSTALL_DOTNET_SDK" = true ]; then
+  
+  # Add settings section from source (if it exists)  
+  if grep -q "^\[settings\]" .mise.toml; then
     echo "" >> "$temp_file"
-    echo "#### Begin .NET Development ####" >> "$temp_file"
-    echo "dotnet = \"${DOTNET_SDK_VERSION}\"" >> "$temp_file"
-    echo "#### End .NET Development ####" >> "$temp_file"
+    # Extract everything from [settings] to the end of file
+    awk '/^\[settings\]/{found=1} found{print}' .mise.toml >> "$temp_file"
   fi
-
-  # JavaScript/Node
-  if [ "$INSTALL_NODE" = true ] || [ "$INSTALL_PNPM" = true ] || [ "$INSTALL_YARN" = true ] || [ "$INSTALL_DENO" = true ] || [ "$INSTALL_BUN" = true ]; then
-    echo "" >> "$temp_file"
-    echo "#### Begin JavaScript/Node.js Development ####" >> "$temp_file"
-    [ "$INSTALL_NODE" = true ] && echo 'node = "19"' >> "$temp_file"
-    [ "$INSTALL_PNPM" = true ] && echo 'pnpm = "latest"' >> "$temp_file"
-    [ "$INSTALL_YARN" = true ] && echo 'yarn = "latest"' >> "$temp_file"
-    [ "$INSTALL_DENO" = true ] && echo 'deno = "latest"' >> "$temp_file"
-    [ "$INSTALL_BUN" = true ] && echo 'bun = "latest"' >> "$temp_file"
-    echo "#### End JavaScript/Node.js Development ####" >> "$temp_file"
-  fi
-
-  # Kubernetes/Helm
-  if [ "$INSTALL_KUBECTL" = true ] || [ "$INSTALL_KUBECTX" = true ] || [ "$INSTALL_KUBENS" = true ] || [ "$INSTALL_K9S" = true ] || [ "$INSTALL_HELM" = true ]; then
-    echo "" >> "$temp_file"
-    echo "#### Begin Kubernetes/Helm ####" >> "$temp_file"
-    [ "$INSTALL_KUBECTL" = true ] && echo "kubectl = \"${KUBECTL_VERSION}\"" >> "$temp_file"
-    [ "$INSTALL_KUBECTX" = true ] && echo 'kubectx = "latest"' >> "$temp_file"
-    [ "$INSTALL_KUBENS" = true ] && echo 'kubens = "latest"' >> "$temp_file"
-    [ "$INSTALL_K9S" = true ] && echo 'k9s = "latest"' >> "$temp_file"
-    [ "$INSTALL_HELM" = true ] && echo 'helm = "latest"' >> "$temp_file"
-    echo "#### End Kubernetes/Helm ####" >> "$temp_file"
-  fi
-
-  # Kubernetes Utilities
-  if [ "$INSTALL_KREW" = true ] || [ "$INSTALL_DIVE" = true ] || [ "$INSTALL_KUBEBENCH" = true ] || [ "$INSTALL_POPEYE" = true ] || [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_CMCTL" = true ] || [ "$INSTALL_K3D" = true ]; then
-    echo "" >> "$temp_file"
-    echo "#### Begin Kubernetes Utilities ####" >> "$temp_file"
-    [ "$INSTALL_KREW" = true ] && echo 'krew = "latest"' >> "$temp_file"
-    [ "$INSTALL_DIVE" = true ] && echo 'dive = "latest"' >> "$temp_file"
-    [ "$INSTALL_KUBEBENCH" = true ] && echo 'kubebench = "latest"' >> "$temp_file"
-    [ "$INSTALL_POPEYE" = true ] && echo 'popeye = "latest"' >> "$temp_file"
-    [ "$INSTALL_TRIVY" = true ] && echo 'trivy = "latest"' >> "$temp_file"
-    [ "$INSTALL_CMCTL" = true ] && echo 'cmctl = "latest"' >> "$temp_file"
-    [ "$INSTALL_K3D" = true ] && echo 'k3d = "latest"' >> "$temp_file"
-    echo "#### End Kubernetes Utilities ####" >> "$temp_file"
-  fi
-
-  # Miscellaneous Tools
-  if [ "$INSTALL_GITUI" = true ] || [ "$INSTALL_TEALDEER" = true ] || [ "$INSTALL_MICRO" = true ] || [ "$INSTALL_POWERSHELL" = true ] || [ "$INSTALL_COSIGN" = true ]; then
-    echo "" >> "$temp_file"
-    echo "#### Begin Miscellaneous Tools ####" >> "$temp_file"
-    [ "$INSTALL_GITUI" = true ] && echo 'gitui = "latest"' >> "$temp_file"
-    [ "$INSTALL_TEALDEER" = true ] && echo 'tealdeer = "latest"' >> "$temp_file"
-    [ "$INSTALL_MICRO" = true ] && echo 'micro = "latest"' >> "$temp_file"
-    [ "$INSTALL_POWERSHELL" = true ] && echo 'powershell = "latest"' >> "$temp_file"
-    [ "$INSTALL_COSIGN" = true ] && echo 'cosign = "latest"' >> "$temp_file"
-    echo "#### End Miscellaneous Tools ####" >> "$temp_file"
-  fi
-
-  # Add aliases and settings sections from source
-  # shellcheck disable=SC2129
-  echo "" >> "$temp_file"
-  extract_mise_section "#### Begin Aliases ####" "#### End Aliases ####" >> "$temp_file"
-  echo "" >> "$temp_file"
-  extract_mise_section "#### Begin Settings ####" "#### End Settings ####" >> "$temp_file"
 
   mv "$temp_file" "${project_path}/.mise.toml"
 }
@@ -1053,23 +918,44 @@ generate_devcontainer_json() {
   # Always include GitHub extensions
   extract_devcontainer_section "// #### Begin Github ####" "// #### End Github ####" | grep -E '^\s*".*",' >> "$temp_file"
   
-  # Include Go extensions if Go was installed
-  if [ "$INSTALL_GO" = true ]; then
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin Go ####" "// #### End Go ####" >> "$temp_file"
-  fi
-  
-  # Include .NET extensions if .NET was installed
-  if [ "$INSTALL_DOTNET" = true ]; then
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin .NET ####" "// #### End .NET ####" >> "$temp_file"
-  fi
-  
-  # Include JavaScript/Node.js extensions if JavaScript tools were installed
-  if [ "$INSTALL_JAVASCRIPT" = true ]; then
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin JavaScript/Node.js ####" "// #### End JavaScript/Node.js ####" >> "$temp_file"
-  fi
+  # Include extensions based on selected tools
+  for tool in "${!TOOL_SELECTED[@]}"; do
+    if [[ "${TOOL_SELECTED[$tool]}" == "true" ]]; then
+      case "$tool" in
+        "go"|"goreleaser")
+          echo "" >> "$temp_file"
+          extract_devcontainer_section "// #### Begin Go ####" "// #### End Go ####" >> "$temp_file"
+          ;;
+        "dotnet")
+          echo "" >> "$temp_file"
+          extract_devcontainer_section "// #### Begin .NET ####" "// #### End .NET ####" >> "$temp_file"
+          ;;
+        "node"|"pnpm"|"yarn"|"deno"|"bun")
+          echo "" >> "$temp_file"
+          extract_devcontainer_section "// #### Begin JavaScript/Node.js ####" "// #### End JavaScript/Node.js ####" >> "$temp_file"
+          ;;
+        "kubectl"|"helm"|"k9s"|"kubectx"|"kubens"|"krew"|"dive"|"kubebench"|"popeye"|"trivy"|"cmctl"|"k3d")
+          # Kubernetes extensions (avoid duplicates)
+          if ! grep -q "// #### Begin Kubernetes/Helm ####" "$temp_file"; then
+            echo "" >> "$temp_file"
+            extract_devcontainer_section "// #### Begin Kubernetes/Helm ####" "// #### End Kubernetes/Helm ####" >> "$temp_file"
+          fi
+          ;;
+        "opentofu")
+          echo "" >> "$temp_file"
+          extract_devcontainer_section "// #### Begin Terraform/OpenTofu ####" "// #### End Terraform/OpenTofu ####" >> "$temp_file"
+          ;;
+        "packer")
+          echo "" >> "$temp_file"
+          extract_devcontainer_section "// #### Begin Packer ####" "// #### End Packer ####" >> "$temp_file"
+          ;;
+        "powershell")
+          echo "" >> "$temp_file"
+          extract_devcontainer_section "// #### Begin PowerShell ####" "// #### End PowerShell ####" >> "$temp_file"
+          ;;
+      esac
+    fi
+  done
   
   # Include Python extensions if selected
   if [ "$INCLUDE_PYTHON_EXTENSIONS" = true ]; then
@@ -1089,29 +975,11 @@ generate_devcontainer_json() {
     extract_devcontainer_section "// #### Begin Shell/Bash ####" "// #### End Shell/Bash ####" >> "$temp_file"
   fi
   
-  # Include Kubernetes extensions if any Kubernetes tools were installed
-  if [ "$INSTALL_KUBERNETES" = true ] || [ "$INSTALL_KREW" = true ]; then
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin Kubernetes/Helm ####" "// #### End Kubernetes/Helm ####" >> "$temp_file"
-  fi
-  
-  # Include Terraform/OpenTofu extensions if OpenTofu was installed
-  if [ "$INSTALL_OPENTOFU" = true ]; then
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin Terraform/OpenTofu ####" "// #### End Terraform/OpenTofu ####" >> "$temp_file"
-  fi
-  
   # Include JavaScript/TypeScript extensions if Node.js was installed
-  if [ "$INSTALL_NODE" = true ]; then
+  if [[ "${TOOL_SELECTED[node]}" == "true" ]]; then
     INCLUDE_JS_EXTENSIONS=true
     echo "" >> "$temp_file"
     extract_devcontainer_section "// #### Begin JavaScript/TypeScript ####" "// #### End JavaScript/TypeScript ####" >> "$temp_file"
-  fi
-  
-  # Include Packer extensions if Packer was installed
-  if [ "$INSTALL_PACKER" = true ]; then
-    echo "" >> "$temp_file"
-    extract_devcontainer_section "// #### Begin Packer ####" "// #### End Packer ####" >> "$temp_file"
   fi
   
   # Always include Core Extensions
@@ -1134,23 +1002,36 @@ generate_devcontainer_json() {
   # Always include Core VS Code Settings
   extract_devcontainer_section "// #### Begin Core VS Code Settings ####" "// #### End Core VS Code Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   
-  # Include Go settings if Go was installed
-  if [ "$INSTALL_GO" = true ]; then
-    # shellcheck disable=SC2129
-    extract_devcontainer_section "// #### Begin Go Settings ####" "// #### End Go Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
-  fi
-  
-  # Include .NET settings if .NET was installed
-  if [ "$INSTALL_DOTNET" = true ]; then
-    # shellcheck disable=SC2129
-    extract_devcontainer_section "// #### Begin .NET Settings ####" "// #### End .NET Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
-  fi
-  
-  # Include JavaScript/Node.js settings if JavaScript tools were installed
-  if [ "$INSTALL_JAVASCRIPT" = true ]; then
-    # shellcheck disable=SC2129
-    extract_devcontainer_section "// #### Begin JavaScript/Node.js Settings ####" "// #### End JavaScript/Node.js Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
-  fi
+  # Include settings based on selected tools
+  for tool in "${!TOOL_SELECTED[@]}"; do
+    if [[ "${TOOL_SELECTED[$tool]}" == "true" ]]; then
+      case "$tool" in
+        "go"|"goreleaser")
+          # shellcheck disable=SC2129
+          extract_devcontainer_section "// #### Begin Go Settings ####" "// #### End Go Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
+          ;;
+        "dotnet")
+          # shellcheck disable=SC2129
+          extract_devcontainer_section "// #### Begin .NET Settings ####" "// #### End .NET Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
+          ;;
+        "node"|"pnpm"|"yarn"|"deno"|"bun")
+          # shellcheck disable=SC2129
+          extract_devcontainer_section "// #### Begin JavaScript/Node.js Settings ####" "// #### End JavaScript/Node.js Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
+          ;;
+        "kubectl"|"helm"|"k9s"|"kubectx"|"kubens"|"krew"|"dive"|"kubebench"|"popeye"|"trivy"|"cmctl"|"k3d")
+          # Kubernetes settings (avoid duplicates)
+          if ! grep -q "Begin Kubernetes/Helm Settings" "$temp_file"; then
+            # shellcheck disable=SC2129
+            extract_devcontainer_section "// #### Begin Kubernetes/Helm Settings ####" "// #### End Kubernetes/Helm Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
+          fi
+          ;;
+        "powershell")
+          # shellcheck disable=SC2129
+          extract_devcontainer_section "// #### Begin PowerShell Settings ####" "// #### End PowerShell Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
+          ;;
+      esac
+    fi
+  done
   
   # Include Python settings if Python extensions were selected
   if [ "$INCLUDE_PYTHON_EXTENSIONS" = true ]; then
@@ -1170,29 +1051,17 @@ generate_devcontainer_json() {
     extract_devcontainer_section "// #### Begin Shell/Bash Settings ####" "// #### End Shell/Bash Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   fi
   
-  # Include Kubernetes settings if any Kubernetes tools were installed
-  if [ "$INSTALL_KUBERNETES" = true ] || [ "$INSTALL_KREW" = true ]; then
-    # shellcheck disable=SC2129
-    extract_devcontainer_section "// #### Begin Kubernetes/Helm Settings ####" "// #### End Kubernetes/Helm Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
-  fi
-  
   # Include JavaScript/TypeScript settings if JS extensions were selected
   if [ "$INCLUDE_JS_EXTENSIONS" = true ]; then
     # shellcheck disable=SC2129
     extract_devcontainer_section "// #### Begin JavaScript/TypeScript Settings ####" "// #### End JavaScript/TypeScript Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   fi
   
-  # Include PowerShell settings if PowerShell was installed
-  if [ "$INSTALL_POWERSHELL" = true ]; then
-    # shellcheck disable=SC2129
-    extract_devcontainer_section "// #### Begin PowerShell Settings ####" "// #### End PowerShell Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
-  fi
-  
   # Always include the final settings blocks
   extract_devcontainer_section "// #### Begin Spell Checker Settings ####" "// #### End PSI Header Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   
   # Remove trailing comma from the last settings entry
-  # Find the last line that's a top-level setting property (8 spaces indentation + quoted property)
+  # Find the last line that's a top-level setting property (8 spaces indentation + quoted property)  
   # This ensures we only target direct properties of the "settings" object, not nested properties
   last_setting_line=$(grep -n '^        "[^"]*":.*,$' "$temp_file" | tail -n 1 | cut -d: -f1)
   if [[ -n "$last_setting_line" ]]; then

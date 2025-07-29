@@ -247,7 +247,7 @@ You can choose to install any combination of the following tools.
 -   **Go**: The Go programming language, with an option to include **GoReleaser** for release automation.
 -   **.NET**: The .NET SDK for building applications with C#, F#, and Visual Basic.
 -   **JavaScript/Node.js**: A comprehensive JS ecosystem, including:
-    -   **Node.js** (v19 for compatibility, see project README for customization)
+    -   **Node.js** with selectable version
     -   **pnpm**, **yarn**: Popular alternative package managers.
     -   **Deno**, **Bun**: Modern, fast JavaScript runtimes.
 -   **Python**: Python v3.13 is included by default, along with the necessary VS Code extensions.

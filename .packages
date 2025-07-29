@@ -10,7 +10,7 @@
 # DNS lookup utilities (dig, nslookup, host commands)
 # bind-utils
 # Modern system monitor with better UI than htop
-# btop
+btop
 # Tool for creating bootable ISO images
 # genisoimage
 # Graph visualization software for creating diagrams
@@ -18,7 +18,7 @@
 # Network utilities including ping, tracepath, and arping
 # iputils
 # NCurses Disk Usage - visual disk usage analyzer
-# ncdu
+ncdu
 # SNMP utilities for network monitoring and management
 # net-snmp-utils
 # Network exploration tool and security/port scanner

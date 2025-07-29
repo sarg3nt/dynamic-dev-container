@@ -1,75 +1,80 @@
 # cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr openbao kubens
 # NOTE: The #### section #### headers below must not be altered or moved as they are used as markers for the install script.
 
-#### Begin Environment ####
+#### Begin Environment
 [env]
 MISE_PYTHON_COMPILE = false
-#### End Environment ####
+#### End Environment
 
 [tools]
-#### Begin HashiCorp Tools ####
-# https://github.com/opentofu/opentofu
-opentofu = "latest"
-# https://github.com/openbao/openbao/releases
-openbao = "latest"
-packer = "latest"
-#### End HashiCorp Tools ####
+#### Begin HashiCorp Tools
+#version#
+opentofu = 'latest'
+#version#
+openbao = 'latest'
+#version#
+packer = 'latest'
+#### End HashiCorp Tools
 
-#### Begin Kubernetes/Helm ####
-kubectl = "latest"
-kubectx = "latest"
-kubens = "latest"
-k9s = "latest"
-helm = "latest"
-#### End Kubernetes/Helm ####
+#### Begin Kubernetes
+#version#
+kubectl = 'latest'
+kubectx = 'latest'
+kubens = 'latest'
+k9s = 'latest'
+helm = 'latest'
+kubebench = 'latest'
+#### End Kubernetes
 
-#### Begin Kubernetes Utilities ####
-krew = "latest"
-dive = "latest"
-popeye = "latest"
-trivy = "latest"
-cmctl = "latest"
-k3d = "latest"
-#### End Kubernetes Utilities ####
+#### Begin Kubernetes Utilities
+krew = 'latest'
+dive = 'latest'
+popeye = 'latest'
+trivy = 'latest'
+cmctl = 'latest'
+k3d = 'latest'
+#### End Kubernetes Utilities
 
-#### Begin Go Development ####
+#### Begin Go Development
+#version#
 golang = 'latest'
 golangci-lint = 'latest'
 goreleaser = 'latest'
-#### End Go Development ####
+#### End Go Development
 
-#### Begin .NET Development ####
-dotnet = "latest"
-#### End .NET Development ####
+#### Begin .NET Development
+#version#
+dotnet = 'latest'
+#### End .NET Development
 
-#### Begin JavaScript/Node.js Development ####
-node = "latest"
-pnpm = "latest"
-yarn = "latest"
-deno = "latest"
-bun = "latest"
-#### End JavaScript/Node.js Development ####
+#### Begin Node Development
+#version#
+node = 'latest'
+pnpm = 'latest'
+yarn = 'latest'
+deno = 'latest'
+bun = 'latest'
+#### End Node Development
 
-#### Begin Miscellaneous Tools ####
-gitui = "latest"
-powershell = "latest"
-cosign = "latest"
-"asdf:sarg3nt/asdf-kube-bench" = "latest"
-"asdf:sarg3nt/asdf-tealdeer" = "latest"
-"asdf:sarg3nt/asdf-micro" = "latest"
-#### End Miscellaneous Tools ####
+#### Begin PowerShell
+#version#
+powershell = 'latest'
+#### End PowerShell
+
+#### Begin Miscellaneous Tools
+gitui = 'latest'
+cosign = 'latest'
+tealdeer = 'latest'
+micro = 'latest'
+#### End Miscellaneous Tools
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
-#### Begin Aliases ####
 [alias]
 kubebench = 'asdf:sarg3nt/asdf-kube-bench'
 tealdeer = 'asdf:sarg3nt/asdf-tealdeer'
 micro = 'asdf:sarg3nt/asdf-micro'
-#### End Aliases ####
 
-#### Begin Settings ####
 [settings]
 experimental = true
-http_timeout = "90s"
+http_timeout = '90s'
 yes = true
-#### End Settings ####
