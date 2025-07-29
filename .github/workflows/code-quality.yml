@@ -78,19 +78,22 @@ jobs:
           egress-policy: block
           allowed-endpoints: >
             github.com:443
+            files.pythonhosted.org:443
+            pypi.org:443
 
       - name: Checkout Repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
+      - name: Install Python YAML Parser
+        run: |
+          pip install pyyaml
+
       - name: Validate YAML Files
         run: |
-          # Install yq for YAML validation
-          sudo snap install yq
-
           echo "Validating YAML files..."
           find . -name "*.yml" -o -name "*.yaml" | while read -r file; do
             echo "Validating $file"
-            yq eval '.' "$file" > /dev/null || echo "Warning: $file may have syntax issues"
+            python -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null || echo "Warning: $file may have syntax issues"
           done
 
       - name: Validate JSON Files

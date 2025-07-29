@@ -3,7 +3,7 @@ name: Weekly Release
 on:
   schedule:
     # If the schedule stops working, see the docs: https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule
-    - cron: '0 0 * * 0' # Runs weekly at 00:00 on Sunday
+    - cron: "0 0 * * 0" # Runs weekly at 00:00 on Sunday
   workflow_dispatch: # Allows manual triggering
 
 env:
@@ -16,7 +16,7 @@ env:
   TAG_LATEST: ""
   TAG_OLD: ""
 
-permissions: 
+permissions:
   contents: read
 
 jobs:
@@ -31,9 +31,16 @@ jobs:
         uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf
         with:
           disable-sudo: true
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            ghcr.io:443
+            registry-1.docker.io:443
+            auth.docker.io:443
+            production.cloudflare.docker.com:443
 
-      - name: 'Checkout Repository'
+      - name: "Checkout Repository"
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0

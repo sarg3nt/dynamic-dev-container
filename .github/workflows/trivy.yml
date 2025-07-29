@@ -52,7 +52,14 @@ jobs:
         uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf
         with:
           disable-sudo: true
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            ghcr.io:443
+            registry-1.docker.io:443
+            auth.docker.io:443
+            production.cloudflare.docker.com:443
+            public.ecr.aws:443
 
       - name: Log Into Registry
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
