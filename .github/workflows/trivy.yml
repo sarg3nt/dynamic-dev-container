@@ -7,22 +7,28 @@ name: Trivy
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
     # The branches below must be a subset of the branches above
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
-      - 'home/**'
-      - 'scripts/**'
-      - 'usr/**'
-      - 'workflow_scripts/**'
-      - '.dockerignore'
-      - '.mise.toml'
-      - '.pre-commit-config.yaml'
-      - 'Dockerfile'
+      - "home/**"
+      - "scripts/**"
+      - "usr/**"
+      - "workflow_scripts/**"
+      - ".dockerignore"
+      - ".mise.toml"
+      - ".pre-commit-config.yaml"
+      - "Dockerfile"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - "package.json"
+      - "**/*.sh"
+    # Skip on draft PRs since container-test.yml already covers this
+    types: [opened, synchronize, reopened, ready_for_review]
 
   schedule:
-    - cron: '19 14 * * 5'
+    - cron: "19 14 * * 5"
   workflow_dispatch: # Allows manual triggering
 
 env:
@@ -34,7 +40,9 @@ permissions:
 
 jobs:
   trivy-scan:
-    name: Trivy Scan
+    name: Trivy Security Scan
+    # Skip if this is a draft PR (container-test.yml will handle it)
+    if: github.event.pull_request.draft != true
     permissions:
       contents: write # for actions/checkout to fetch code and for SBOM to push results
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
@@ -47,7 +55,7 @@ jobs:
           egress-policy: audit
 
       - name: Log Into Registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -65,11 +73,11 @@ jobs:
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5
         with:
-          image-ref: '${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ github.sha }}'
-          format: 'template'
-          template: '@/contrib/sarif.tpl'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
+          image-ref: "${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ github.sha }}"
+          format: "template"
+          template: "@/contrib/sarif.tpl"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
         env:
           TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db
           TRIVY_SKIP_JAVA_DB_UPDATE: true
@@ -77,5 +85,4 @@ jobs:
       - name: Upload Trivy Results
         uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47
         with:
-          sarif_file: 'trivy-results.sarif'
-
+          sarif_file: "trivy-results.sarif"
