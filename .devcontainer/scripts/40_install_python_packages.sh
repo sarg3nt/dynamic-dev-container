@@ -98,9 +98,9 @@ install_python_packages() {
 
   log_info "Found $REQUIREMENTS_FILE in root, installing Python packages..."
   log_info "Contents of $REQUIREMENTS_FILE:"
-  cat "$REQUIREMENTS_FILE" | while IFS= read -r line; do
+  while IFS= read -r line; do
     [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]] && log_info "  $line"
-  done
+  done < "$REQUIREMENTS_FILE"
 
   # Install packages with retry logic
   local attempt=1

@@ -125,10 +125,6 @@ copy_gitconfig() {
 }
 
 #######################################
-# Update the git config to make vscode default merge/diff tool and add some aliases
-# Arguments:
-#   None
-#######################################
 # Update '.gitconfig' to use VS Code as merge tool, diff tool, and editor
 # Arguments:
 #   None
@@ -225,10 +221,6 @@ copy_ssh_folder() {
 }
 
 #######################################
-# Copy in the user's `~/.kube/config` so modifications to it in the devcontainer do not affect the host's version.
-# Globals:
-#   HOME
-#######################################
 # Copy Kubernetes configuration directory for kubectl access
 # Arguments:
 #   None
@@ -276,8 +268,6 @@ copy_kube_config() {
   fi
 }
 
-#######################################
-# Copy the user's `~/.docker/` so we can modify the config.json to remove any credStores that might be configured.
 #######################################
 # Copy Docker configuration directory for Docker access
 # Arguments:
