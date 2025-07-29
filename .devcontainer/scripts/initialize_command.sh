@@ -6,7 +6,7 @@
 # It pulls the latest container image and creates required directories for
 # Docker, Kubernetes, SSH, and other development tools.
 #
-# cSpell:ignore sarg
+# cSpell:ignore sarg gnupg
 
 IFS=$'\n\t'
 
@@ -17,12 +17,12 @@ source "$(dirname "$0")/log.sh"
 
 # Constants
 readonly CONTAINER_IMAGE="ghcr.io/sarg3nt/dynamic-dev-container:0.0.3"
-readonly REQUIRED_DIRECTORIES=(
-  ".docker"
-  ".kube"
-  ".config/k9s"
-  ".local/share/k9s"
-  ".ssh"
+
+# Directory configuration: "name|permission|log_level|impact_message"
+readonly DIRECTORY_CONFIG=(
+  ".docker||warning|Docker may not work properly without this folder."
+  ".kube||warning|Kubectl may not work properly without this folder."
+  ".ssh|700|error|You need to run 'ssh-keygen' to finish setup."
 )
 
 #######################################
@@ -51,67 +51,70 @@ get_latest_dev_container_version() {
 }
 
 #######################################
-# Create any required missing folders
+# Ensure all required folders exist
 # Arguments:
 #   None
 # Returns:
 #   0 on success, 1 on failure
 # Globals:
 #   HOME - The user's home directory
-#   REQUIRED_DIRECTORIES - Array of directories to create
+#   DIRECTORY_CONFIG - Array of directory configurations
 #######################################
 create_required_folders() {
-  log_info "Creating required folders (if they don't exist)."
-  local directories_created=false
+  log_info "Ensuring required folders exist."
   local failed_directories=()
   
-  for dir_name in "${REQUIRED_DIRECTORIES[@]}"; do
+  for dir_config in "${DIRECTORY_CONFIG[@]}"; do
+    # Parse the config string: "name|permission|log_level|impact_message"
+    IFS='|' read -r dir_name permission log_level impact_message <<< "$dir_config"
     local full_path="${HOME}/${dir_name}"
     
-    if [[ ! -d "$full_path" ]]; then
-      log_warning "Creating missing directory: $full_path"
-      
-      if mkdir -p "$full_path" 2>/dev/null; then
-        directories_created=true
-        
-        # Set appropriate permissions for SSH directory
-        if [[ "$dir_name" == ".ssh" ]]; then
-          chmod 700 "$full_path" 2>/dev/null || true
-          log_warning "WARNING: You did not have an '.ssh' folder in your home directory."
-          log_warning "We created a '.ssh' folder for you so the mount didn't fail but you need to run 'ssh-keygen' to finish setup."
-        fi
-        
-        # Log specific warnings for different directories  
-        case "$dir_name" in
-          ".docker")
-            log_error "You did not have a .docker folder in your home directory, creating."
-            log_error "Docker may not work properly without this folder."
-            ;;
-          ".kube")
-            log_error "You did not have a .kube folder in your home directory, creating."
-            log_error "Kubectl and k9s will not work without this folder."
-            ;;
-          ".config/k9s"|".local/share/k9s")
-            log_error "You did not have a .k9s folder in your home directory, creating."
-            log_error "K9s will use a local config."
-            ;;
-        esac
-        
-        echo ""
-      else
-        log_error "Failed to create directory: $full_path"
-        failed_directories+=("$dir_name")
+    # Check if directory already exists
+    local dir_existed=false
+    if [[ -d "$full_path" ]]; then
+      dir_existed=true
+    fi
+    
+    # Always ensure directory exists (mkdir -p is safe)
+    if mkdir -p "$full_path" 2>/dev/null; then
+      # Set directory permissions if specified
+      if [[ -n "$permission" ]]; then
+        chmod "$permission" "$full_path" 2>/dev/null || true
       fi
+      
+      # Log appropriate message based on whether directory existed
+      if [[ "$dir_existed" == true ]]; then
+        log_info "Verified ${dir_name} folder exists in your home directory."
+      else
+        # Log directory-specific messages using configured log level
+        local color_map=("error:red" "warning:yellow" "info:blue")
+        local color="blue"  # default for info
+        
+        # Find the color for the log level
+        for mapping in "${color_map[@]}"; do
+          if [[ "$log_level" == "${mapping%:*}" ]]; then
+            color="${mapping#*:}"
+            break
+          fi
+        done
+        
+        log "Created ${dir_name} folder in your home directory." "$color" "${log_level^^}"
+        
+        # Log the impact message if provided (only for newly created directories)
+        if [[ -n "$impact_message" ]]; then
+          log "$impact_message" "$color" "${log_level^^}"
+        fi
+      fi
+    else
+      failed_directories+=("$dir_name")
     fi
   done
 
-  if [[ "$directories_created" == false ]]; then
-    log_success "All required directories already exist!"
-  fi
-  
   if [[ ${#failed_directories[@]} -gt 0 ]]; then
     log_error "Failed to create ${#failed_directories[@]} directories: ${failed_directories[*]}"
     return 1
+  else
+    log_success "All required directories are ready!"
   fi
   
   return 0

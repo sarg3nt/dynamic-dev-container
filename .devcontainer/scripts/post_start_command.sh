@@ -19,10 +19,10 @@ set -euo pipefail
 source "$(dirname "$0")/log.sh"
 
 # Constants
-readonly MAX_INSTALL_ATTEMPTS=3
-readonly RETRY_DELAY=3
+readonly MAX_INSTALL_ATTEMPTS=5
+readonly RETRY_DELAY=5
 readonly MISE_CONFIG_FILE=".mise.toml"
-readonly JS_BEGIN_MARKER="#### Begin JavaScript/Node.js Development ####"
+readonly JS_BEGIN_MARKER="#### Begin Node Development"
 
 main() {
   echo ""
@@ -36,9 +36,13 @@ main() {
   echo ""
   copy_gitconfig
   echo ""
+  fix_git_credential_helper
+  echo ""
   git_update_diff_tool
   echo ""
   copy_ssh_folder
+  echo ""
+  copy_gpg_folder
   echo ""
   copy_kube_config
   echo ""
@@ -115,6 +119,113 @@ copy_gitconfig() {
 }
 
 #######################################
+# Fix git credential helper if it's set to manager-core (which requires GPG)
+# This function tries to use GPG if available, otherwise falls back to simpler helpers
+# Arguments:
+#   None
+# Returns:
+#   0 on success, 1 on failure
+# Globals:
+#   HOME - User's home directory
+#######################################
+fix_git_credential_helper() {
+  log_info "Checking git credential helper configuration..."
+  
+  local current_helper
+  current_helper=$(git config --global credential.helper 2>/dev/null || echo "")
+  
+  case "$current_helper" in
+    "manager-core")
+      log_info "Found manager-core credential helper. Checking if it works..."
+      
+      # Check if Git Credential Manager Core is available
+      if command -v git-credential-manager-core >/dev/null 2>&1; then
+        log_success "Git Credential Manager Core is available, keeping current configuration."
+        return 0
+      fi
+      
+      # Check if GPG is properly configured and working
+      if check_gpg_functionality; then
+        log_success "GPG is working properly, keeping manager-core configuration."
+        return 0
+      else
+        log_warning "GPG not properly configured for manager-core. Switching to cache helper."
+        if git config --global credential.helper cache 2>/dev/null; then
+          log_success "Updated credential helper to 'cache' (memory-only) successfully."
+          return 0
+        else
+          log_error "Failed to update credential helper"
+          return 1
+        fi
+      fi
+      ;;
+    "")
+      log_info "No credential helper configured."
+      
+      # Try to set up the best available option
+      if check_gpg_functionality; then
+        log_info "GPG is available, setting credential helper to cache with GPG support."
+        if git config --global credential.helper cache 2>/dev/null; then
+          log_success "Set credential helper to 'cache' successfully."
+          return 0
+        fi
+      else
+        log_info "GPG not available, setting credential helper to cache (memory-only)."
+        if git config --global credential.helper cache 2>/dev/null; then
+          log_success "Set credential helper to 'cache' successfully."
+          return 0
+        fi
+      fi
+      
+      log_error "Failed to set credential helper"
+      return 1
+      ;;
+    *)
+      log_info "Credential helper already configured: $current_helper"
+      return 0
+      ;;
+  esac
+}
+
+#######################################
+# Check if GPG functionality is working properly
+# Arguments:
+#   None
+# Returns:
+#   0 if GPG is working, 1 if not
+# Globals:
+#   HOME - User's home directory
+#######################################
+check_gpg_functionality() {
+  # Check if GPG command exists
+  if ! command -v gpg >/dev/null 2>&1; then
+    log_info "GPG command not found."
+    return 1
+  fi
+  
+  # Check if GPG directory exists and has proper permissions
+  if [[ ! -d "${HOME}/.gnupg" ]]; then
+    log_info "GPG directory not found at ${HOME}/.gnupg"
+    return 1
+  fi
+  
+  # Test basic GPG functionality (this is what was failing before)
+  if ! gpg --export --export-options backup >/dev/null 2>&1; then
+    log_info "GPG export test failed - GPG not properly configured."
+    return 1
+  fi
+  
+  # Check if there are any GPG keys available
+  if ! gpg --list-keys >/dev/null 2>&1; then
+    log_info "No GPG keys found in keyring."
+    return 1
+  fi
+  
+  log_info "GPG functionality verified successfully."
+  return 0
+}
+
+#######################################
 # Update the git config to make vscode default merge/diff tool and add some aliases
 # Arguments:
 #   None
@@ -147,17 +258,7 @@ git_update_diff_tool() {
   # Check if merge section already exists to avoid duplicate entries
   if ! grep -qxF '[merge]' "$git_config"; then
     cat >> "$git_config" << 'EOF'
-
-[merge]
-  tool = vscode
-[mergetool "vscode"]
-  cmd = code --wait $MERGED
-[diff]
-  tool = vscode
-[difftool "vscode"]
-  cmd = code --wait --diff $LOCAL $REMOTE
 [core]
-  editor = "code --wait"
   pager = bat
 [alias]
   s = !git for-each-ref --format='%(refname:short)' refs/heads | fzf | xargs git switch
@@ -220,6 +321,52 @@ copy_ssh_folder() {
     fi
   else
     log_warning "No remote SSH folder detected. You need to set up SSH."
+    return 0
+  fi
+}
+
+#######################################
+# Copy in the user's `~/.gnupg` so modifications to it in the devcontainer do not affect the host's version.
+# Globals:
+#   HOME - User's home directory
+#######################################
+copy_gpg_folder() {
+  log_info "GPG Folder Setup:"
+  local remote_config="${HOME}/.gnupg-localhost"
+  local config="${HOME}/.gnupg"
+  
+  if [[ -d "$remote_config" ]]; then
+    log_success "Remote GPG folder detected, copying in."
+    
+    # Remove existing GPG directory if it exists
+    if [[ -d "$config" ]] && ! rm -rf "$config" 2>/dev/null; then
+      log_error "Failed to remove existing GPG directory"
+      return 1
+    fi
+    
+    # Create GPG directory and copy contents
+    if mkdir -p "$config" >/dev/null 2>&1 && cp -R "${remote_config}/." "${config}/" 2>/dev/null; then
+      # Set proper ownership and permissions for GPG directory
+      if sudo chown -R "$(id -u)" "$config" 2>/dev/null && chmod 700 "$config" 2>/dev/null; then
+        # Set permissions for GPG files (600 for private keys, 644 for public)
+        find "$config" -type f -name "*.key" -exec chmod 600 {} \; 2>/dev/null || true
+        find "$config" -type f -name "secring.*" -exec chmod 600 {} \; 2>/dev/null || true
+        find "$config" -type f -name "trustdb.gpg" -exec chmod 600 {} \; 2>/dev/null || true
+        find "$config" -type f -name "*.conf" -exec chmod 644 {} \; 2>/dev/null || true
+        find "$config" -type f -name "*.asc" -exec chmod 644 {} \; 2>/dev/null || true
+        find "$config" -type f -name "pubring.*" -exec chmod 644 {} \; 2>/dev/null || true
+        log_success "GPG folder copied successfully with proper permissions."
+        return 0
+      else
+        log_error "Failed to set GPG directory ownership or permissions"
+        return 1
+      fi
+    else
+      log_error "Failed to create GPG directory or copy contents"
+      return 1
+    fi
+  else
+    log_warning "No remote GPG folder detected. GPG commit signing will not be available."
     return 0
   fi
 }
@@ -334,17 +481,17 @@ copy_docker_config() {
 #   RETRY_DELAY - Delay between retry attempts in seconds
 #######################################
 install_node() {
-  log_info "Installing JavaScript/Node.js tools from .mise.toml..."
+  log_info "Installing JavaScript/Node.js tools from ${MISE_CONFIG_FILE}..."
   
-  # Check if .mise.toml exists
+  # Check if ${MISE_CONFIG_FILE}, which is usually .mise.toml, exists
   if [[ ! -f "$MISE_CONFIG_FILE" ]]; then
-    log_warning "No .mise.toml file found, skipping JavaScript tools installation"
+    log_warning "No ${MISE_CONFIG_FILE} file found, skipping JavaScript tools installation"
     return 0
   fi
   
   # Check if JavaScript/Node.js section exists
   if ! grep -q "$JS_BEGIN_MARKER" "$MISE_CONFIG_FILE"; then
-    log_info "No JavaScript/Node.js tools found in .mise.toml"
+    log_info "No JavaScript/Node.js tools found in ${MISE_CONFIG_FILE}"
     return 0
   fi
   

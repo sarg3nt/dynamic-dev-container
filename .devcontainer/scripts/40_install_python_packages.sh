@@ -156,12 +156,6 @@ main() {
     log_warning "Python packages installation completed with failures. Check logs above for details."
   fi
   
-  # Handle subshell exit if needed
-  if [[ "$BASH_SUBSHELL" -gt 0 ]]; then
-    log_info "Detected subshell. Exiting subshell."
-    exit $exit_code
-  fi
-  
   return $exit_code
 }
 
