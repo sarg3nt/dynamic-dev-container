@@ -40,8 +40,6 @@ main() {
   echo ""
   copy_ssh_folder
   echo ""
-  copy_gpg_folder
-  echo ""
   copy_kube_config
   echo ""
   copy_docker_config
@@ -109,7 +107,7 @@ copy_gitconfig() {
       current_helper=$(git config --global credential.helper 2>/dev/null || echo "")
       
       if [[ "$current_helper" == "manager-core" ]]; then
-        log_warning "Found manager-core credential helper which requires GPG. Switching to cache helper."
+        log_info "Found manager-core credential helper which requires GPG. Switching to cache helper."
         git config --global credential.helper cache 2>/dev/null || true
         log_info "Updated credential helper to 'cache' (memory-only)."
       fi
@@ -222,52 +220,6 @@ copy_ssh_folder() {
     fi
   else
     log_warning "No remote SSH folder detected. You need to set up SSH."
-    return 0
-  fi
-}
-
-#######################################
-# Copy in the user's `~/.gnupg` so modifications to it in the devcontainer do not affect the host's version.
-# Globals:
-#   HOME - User's home directory
-#######################################
-copy_gpg_folder() {
-  log_info "GPG Folder Setup:"
-  local remote_config="${HOME}/.gnupg-localhost"
-  local config="${HOME}/.gnupg"
-  
-  if [[ -d "$remote_config" ]]; then
-    log_success "Remote GPG folder detected, copying in."
-    
-    # Remove existing GPG directory if it exists
-    if [[ -d "$config" ]] && ! rm -rf "$config" 2>/dev/null; then
-      log_error "Failed to remove existing GPG directory"
-      return 1
-    fi
-    
-    # Create GPG directory and copy contents
-    if mkdir -p "$config" >/dev/null 2>&1 && cp -R "${remote_config}/." "${config}/" 2>/dev/null; then
-      # Set proper ownership and permissions for GPG directory
-      if sudo chown -R "$(id -u)" "$config" 2>/dev/null && chmod 700 "$config" 2>/dev/null; then
-        # Set permissions for GPG files (600 for private keys, 644 for public)
-        find "$config" -type f -name "*.key" -exec chmod 600 {} \; 2>/dev/null || true
-        find "$config" -type f -name "secring.*" -exec chmod 600 {} \; 2>/dev/null || true
-        find "$config" -type f -name "trustdb.gpg" -exec chmod 600 {} \; 2>/dev/null || true
-        find "$config" -type f -name "*.conf" -exec chmod 644 {} \; 2>/dev/null || true
-        find "$config" -type f -name "*.asc" -exec chmod 644 {} \; 2>/dev/null || true
-        find "$config" -type f -name "pubring.*" -exec chmod 644 {} \; 2>/dev/null || true
-        log_success "GPG folder copied successfully with proper permissions."
-        return 0
-      else
-        log_error "Failed to set GPG directory ownership or permissions"
-        return 1
-      fi
-    else
-      log_error "Failed to create GPG directory or copy contents"
-      return 1
-    fi
-  else
-    log_warning "No remote GPG folder detected. GPG commit signing will not be available."
     return 0
   fi
 }
