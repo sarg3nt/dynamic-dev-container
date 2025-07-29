@@ -22,8 +22,8 @@ readonly BACKUP_FILE="${MISE_CONFIG_FILE}.backup"
 readonly TEMP_FILE="${MISE_CONFIG_FILE}.temp"
 readonly JS_BEGIN_MARKER="#### Begin JavaScript/Node.js Development ####"
 readonly JS_END_MARKER="#### End JavaScript/Node.js Development ####"
-readonly MAX_INSTALL_ATTEMPTS=3
-readonly RETRY_DELAY=3
+readonly MAX_INSTALL_ATTEMPTS=10
+readonly RETRY_DELAY=6
 readonly ZSHRC_FILE="/home/vscode/.zshrc"
 
 # Global variables

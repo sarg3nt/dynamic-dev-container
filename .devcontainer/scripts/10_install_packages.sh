@@ -94,7 +94,7 @@ install_packages() {
     return 0
   fi
 
-  log_info "Installing ${#packages[@]} packages: ${packages[*]}"
+  log_info "Installing ${#packages[@]} packages:"$'\n'"${packages[*]}"
 
   # Validate dnf availability
   if ! command -v dnf >/dev/null 2>&1; then
