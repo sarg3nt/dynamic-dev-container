@@ -30,7 +30,7 @@ jobs:
 
       - name: Install ShellCheck
         run: |
-          # Use apt to install shellcheck (comes from Ubuntu repos)
+          # Use apt to install shellcheck from Ubuntu repositories (more reliable than external actions)
           sudo apt-get update
           sudo apt-get install -y shellcheck
 
