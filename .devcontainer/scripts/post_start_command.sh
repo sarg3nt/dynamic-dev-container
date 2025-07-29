@@ -36,8 +36,6 @@ main() {
   echo ""
   copy_gitconfig
   echo ""
-  fix_git_credential_helper
-  echo ""
   git_update_diff_tool
   echo ""
   copy_ssh_folder
@@ -106,6 +104,16 @@ copy_gitconfig() {
     log_info "Remote '.gitconfig' detected, copying in."
     
     if cp "$remote_config" "$config" 2>/dev/null && sudo chown "$(id -u)" "$config" 2>/dev/null; then
+      # Fix credential helper if it's set to manager-core (which requires GPG that may not be available)
+      local current_helper
+      current_helper=$(git config --global credential.helper 2>/dev/null || echo "")
+      
+      if [[ "$current_helper" == "manager-core" ]]; then
+        log_warning "Found manager-core credential helper which requires GPG. Switching to cache helper."
+        git config --global credential.helper cache 2>/dev/null || true
+        log_info "Updated credential helper to 'cache' (memory-only)."
+      fi
+      
       log_success "Copied '.gitconfig' successfully."
       return 0
     else
@@ -116,113 +124,6 @@ copy_gitconfig() {
     log_warning "No remote '.gitconfig' file detected. You need to set up Git."
     return 0
   fi
-}
-
-#######################################
-# Fix git credential helper if it's set to manager-core (which requires GPG)
-# This function tries to use GPG if available, otherwise falls back to simpler helpers
-# Arguments:
-#   None
-# Returns:
-#   0 on success, 1 on failure
-# Globals:
-#   HOME - User's home directory
-#######################################
-fix_git_credential_helper() {
-  log_info "Checking git credential helper configuration..."
-  
-  local current_helper
-  current_helper=$(git config --global credential.helper 2>/dev/null || echo "")
-  
-  case "$current_helper" in
-    "manager-core")
-      log_info "Found manager-core credential helper. Checking if it works..."
-      
-      # Check if Git Credential Manager Core is available
-      if command -v git-credential-manager-core >/dev/null 2>&1; then
-        log_success "Git Credential Manager Core is available, keeping current configuration."
-        return 0
-      fi
-      
-      # Check if GPG is properly configured and working
-      if check_gpg_functionality; then
-        log_success "GPG is working properly, keeping manager-core configuration."
-        return 0
-      else
-        log_warning "GPG not properly configured for manager-core. Switching to cache helper."
-        if git config --global credential.helper cache 2>/dev/null; then
-          log_success "Updated credential helper to 'cache' (memory-only) successfully."
-          return 0
-        else
-          log_error "Failed to update credential helper"
-          return 1
-        fi
-      fi
-      ;;
-    "")
-      log_info "No credential helper configured."
-      
-      # Try to set up the best available option
-      if check_gpg_functionality; then
-        log_info "GPG is available, setting credential helper to cache with GPG support."
-        if git config --global credential.helper cache 2>/dev/null; then
-          log_success "Set credential helper to 'cache' successfully."
-          return 0
-        fi
-      else
-        log_info "GPG not available, setting credential helper to cache (memory-only)."
-        if git config --global credential.helper cache 2>/dev/null; then
-          log_success "Set credential helper to 'cache' successfully."
-          return 0
-        fi
-      fi
-      
-      log_error "Failed to set credential helper"
-      return 1
-      ;;
-    *)
-      log_info "Credential helper already configured: $current_helper"
-      return 0
-      ;;
-  esac
-}
-
-#######################################
-# Check if GPG functionality is working properly
-# Arguments:
-#   None
-# Returns:
-#   0 if GPG is working, 1 if not
-# Globals:
-#   HOME - User's home directory
-#######################################
-check_gpg_functionality() {
-  # Check if GPG command exists
-  if ! command -v gpg >/dev/null 2>&1; then
-    log_info "GPG command not found."
-    return 1
-  fi
-  
-  # Check if GPG directory exists and has proper permissions
-  if [[ ! -d "${HOME}/.gnupg" ]]; then
-    log_info "GPG directory not found at ${HOME}/.gnupg"
-    return 1
-  fi
-  
-  # Test basic GPG functionality (this is what was failing before)
-  if ! gpg --export --export-options backup >/dev/null 2>&1; then
-    log_info "GPG export test failed - GPG not properly configured."
-    return 1
-  fi
-  
-  # Check if there are any GPG keys available
-  if ! gpg --list-keys >/dev/null 2>&1; then
-    log_info "No GPG keys found in keyring."
-    return 1
-  fi
-  
-  log_info "GPG functionality verified successfully."
-  return 0
 }
 
 #######################################

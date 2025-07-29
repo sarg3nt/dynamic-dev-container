@@ -60,11 +60,6 @@
       "type": "bind"
     },
     {
-      "source": "${localEnv:HOME}/.gnupg",
-      "target": "/home/vscode/.gnupg-localhost",
-      "type": "bind"
-    },
-    {
       "source": "/var/run/docker.sock",
       "target": "/var/run/docker-host.sock",
       "type": "bind"
