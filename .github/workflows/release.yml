@@ -31,6 +31,13 @@ jobs:
             registry-1.docker.io:443
             auth.docker.io:443
             production.cloudflare.docker.com:443
+            mirrors.rockylinux.org:443
+            download.rockylinux.org:443
+            dl.rockylinux.org:443
+            vault.rockylinux.org:443
+            download.docker.com:443
+            registry.fedoraproject.org:443
+            mirror.stream.centos.org:443
 
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
