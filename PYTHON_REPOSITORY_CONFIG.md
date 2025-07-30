@@ -5,6 +5,7 @@ The dynamic dev container now supports configurable Python package repositories,
 - [Features](#features)
 - [Configuration](#configuration)
   - [Repository Types](#repository-types)
+  - [Quick Start Checklist](#quick-start-checklist)
   - [Configuration Files](#configuration-files)
     - [Required Repository Configuration](#required-repository-configuration)
     - [Optional Repository Configuration](#optional-repository-configuration)
@@ -58,6 +59,35 @@ When you select Python development during installation, you'll be prompted to co
 3. **Nexus**: Nexus Repository enterprise repository  
 4. **Custom**: Any other Python package repository
 
+### Quick Start Checklist
+
+To customize the `pyproject.toml` template for your project:
+
+1. **Update Project Metadata** (Required):
+   - [ ] Change `name` from "my-awesome-project" to your package name
+   - [ ] Update `description` with your project's purpose
+   - [ ] Set the correct `license` (MIT, Apache-2.0, etc.)
+   - [ ] Replace `keywords` with relevant tags
+   - [ ] Update `authors` with your information
+
+2. **Configure URLs** (Recommended):
+   - [ ] Update all GitHub URLs to point to your repository
+   - [ ] Verify `Documentation` link points to your README or docs
+   - [ ] Ensure `Bug Tracker` points to your issues page
+
+3. **Update File Paths** (Required):
+   - [ ] Replace "my_awesome_project" in `tool.hatch.version.path`
+   - [ ] Replace "my_awesome_project" in `tool.hatch.build.targets.wheel.packages`
+   - [ ] Replace "my_awesome_project" in all `tool.coverage` sections
+
+4. **Customize Dependencies** (As Needed):
+   - [ ] Review and update `dependencies` for your project's needs
+   - [ ] Modify `dev` dependencies based on your development tools
+
+5. **Repository Configuration** (If Using Private Repos):
+   - [ ] Update `tool.pybuild` URLs for your package repository
+   - [ ] Set environment variables for authentication
+
 ### Configuration Files
 
 All repository configuration is stored in `pyproject.toml` within the `[tool.pybuild]` section. **No default values are provided** - all configuration must be explicitly set.
@@ -79,62 +109,65 @@ prod_suffix = ""              # Optional: Suffix for prod environment URLs
 
 #### Required Project Metadata Updates
 
-The `pyproject.toml` template contains placeholder values that **must be updated** for your project:
+The `pyproject.toml` template contains example values that should be updated for your project:
 
 ##### Project Information
 ```toml
 [project]
-name = "your-project-name"                    # Replace "project-name"
-description = "Your project description."     # Replace "<project descripton>."
-license = "MIT"                              # Replace "<add license here>" (e.g., MIT, Apache-2.0, GPL-3.0)
-keywords = ["python", "cli", "automation"]   # Replace placeholder keywords
-authors = [{ name = "Your Name", email = "your.email@example.com" }]  # Update author info
+name = "my-awesome-project"                           # Your package name (lowercase, no spaces)
+description = "A brief description of your project"  # What your project does
+license = "MIT"                                      # Your license (MIT, Apache-2.0, GPL-3.0, etc.)
+keywords = ["python", "cli", "automation"]          # Keywords for discoverability
+authors = [
+  { name = "Your Name", email = "your.email@example.com" }
+]
 ```
 
 ##### Project URLs
 ```toml
 [project.urls]
-Documentation = "https://github.com/yourusername/yourproject/blob/main/README.md"
-Homepage = "https://github.com/yourusername/yourproject"
-Source = "https://github.com/yourusername/yourproject"
+Documentation = "https://github.com/yourusername/my-awesome-project/blob/main/README.md"
+Homepage = "https://github.com/yourusername/my-awesome-project"
+Source = "https://github.com/yourusername/my-awesome-project"
+"Bug Tracker" = "https://github.com/yourusername/my-awesome-project/issues"
 ```
 
 **Purpose of each URL:**
 - **Documentation**: Link to your project's documentation (README, docs site, wiki)
 - **Homepage**: Main project page (usually GitHub repository)  
 - **Source**: Link to source code repository
+- **Bug Tracker**: Where users can report issues
 
 ##### Build Configuration Paths
 ```toml
 [tool.hatch.version]
-path = "src/yourproject/__about__.py"      # Replace "<project>" with your package name
+path = "src/my_awesome_project/__about__.py"      # Replace with your package name
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/yourproject"]             # Replace "<project>" with your package name
+packages = ["src/my_awesome_project"]             # Replace with your package name
 ```
 
 ##### Testing Configuration
 ```toml
 [tool.coverage.run]
-source_pkgs = ["yourproject", "tests"]     # Replace "<project>" with your package name
-omit = ["src/yourproject/__about__.py"]    # Replace "<project>" with your package name
+source_pkgs = ["my_awesome_project", "tests"]     # Replace with your package name
+omit = ["src/my_awesome_project/__about__.py"]    # Replace with your package name
 
 [tool.coverage.paths]
-project = ["src", "*/yourproject/src"]     # Replace "<project>" with your package name
-tests = ["tests", "*/yourproject/tests"]   # Replace "<project>" with your package name
+project = ["src", "*/my_awesome_project/src"]     # Replace with your package name
+tests = ["tests", "*/my_awesome_project/tests"]   # Replace with your package name
 ```
 
 #### Optional Customizations
 
 ##### Dependencies
-Review and update the sample dependencies in the `dependencies` array to match your project's actual requirements:
+The template includes common, sensible dependencies. Update them based on your project's needs:
 
 ```toml
 dependencies = [
-  # Replace these sample dependencies with your actual requirements
-  "requests~=2.32",     # HTTP library
-  "click~=8.1",         # CLI framework
-  "pydantic~=2.5",      # Data validation
+  "click>=8.0,<9.0",      # CLI framework for command-line tools
+  "requests>=2.28,<3.0",  # HTTP library for web requests
+  "pydantic>=2.0,<3.0",   # Data validation and parsing
 ]
 ```
 
@@ -144,9 +177,11 @@ Update the `dev` optional dependencies as needed:
 ```toml
 [project.optional-dependencies]
 dev = [
-  "pytest~=8.3",        # Testing framework
-  "ruff~=0.9",          # Linting and formatting
-  "mypy~=1.15.0",       # Type checking
+  "hatch>=1.14,<2.0",           # Build and project management tool
+  "pytest>=8.0,<9.0",          # Testing framework
+  "pytest-cov>=4.0,<5.0",      # Coverage reporting for tests
+  "ruff>=0.9,<1.0",             # Fast Python linter and formatter
+  "mypy>=1.15,<2.0",            # Static type checker
 ]
 ```
 

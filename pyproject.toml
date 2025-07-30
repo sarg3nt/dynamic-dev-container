@@ -1,24 +1,31 @@
 # cspell:ignore pyyaml pytest mypy pkgs datetimez Pyflakes Pylint isort pycodestyle pydocstyle pyupgrade pyproject orjson pybuild 
 
-####### Example pyproject.toml file. #######
-# Edit this file for your own Python project.
+####### Example pyproject.toml file for Python projects #######
+# This is a template configuration file for Python projects using modern tools.
+# Replace placeholder values with your actual project information.
 
+# Build system configuration - tells Python how to build your package
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# Package index configuration for pip installations
 [tool.pip]
-index-url = "<add your index URL here>"
+index-url = "https://pypi.org/simple/"  # Replace with your package index URL if using private repositories
 
+# Core project metadata - this is the main configuration for your Python package
 [project]
-name = "project-name"
-dynamic = ["version"]
-description = "<project descripton>."
-readme = "README.md"
-requires-python = ">=3.12"
-license = "<add license here>"
-keywords = ["<add your keywords here>", "Config.yaml", "infrastructure", "helm"]
-authors = [{ name = "author name", email = "author@myemail.com" }]
+name = "my-awesome-project"                           # Your package name (no spaces, lowercase recommended)
+dynamic = ["version"]                                 # Version will be read from __about__.py
+description = "A brief description of your project"  # One-line summary of what your project does
+readme = "README.md"                                 # Path to your README file
+requires-python = ">=3.12"                          # Minimum Python version required
+license = "MIT"                                      # Your project's license (MIT, Apache-2.0, GPL-3.0, etc.)
+keywords = ["python", "cli", "automation"]          # Keywords to help users find your project
+authors = [
+  { name = "Your Name", email = "your.email@example.com" }
+]
+# PyPI classifiers help categorize your project
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
@@ -26,182 +33,209 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 
+# Runtime dependencies - packages your project needs to run
 dependencies = [
-  # These are some sample dependencies, put your packages dependencies here so when it is innstalled, 
-  # the sub packages will also automatically be installed.
-  # https://pypi.org/project/fabric/
-  "fabric~=3.2",
-  # https://pypi.org/project/GitPython/
-  "gitpython~=3.1",
-  # https://pypi.org/project/kubernetes/
-  "kubernetes~=32.0",
-  # https://pypi.org/project/loguru/
-  "loguru~=0.7",
-  # https://pypi.org/project/orjson/
-  "orjson~=3.10",
-  # https://pypi.org/project/prettytable/
-  "prettytable~=3.14",
-  # https://pypi.org/project/python-hcl2/
-  "python-hcl2~=7.0",
-  # https://pypi.org/project/PyYAML/
-  "pyyaml~=6.0",
-  # https://pypi.org/project/requests/
-  "requests~=2.32",
-  # https://pypi.org/project/termcolor/
-  "termcolor~=2.5",
+  # Replace these example dependencies with your actual requirements
+  "click>=8.0,<9.0",      # CLI framework for command-line tools
+  "requests>=2.28,<3.0",  # HTTP library for web requests
+  "pydantic>=2.0,<3.0",   # Data validation and parsing
 ]
 
+# Optional dependencies for development and testing
 [project.optional-dependencies]
-### These are mainly here for documentation as we don't do a pip install -e .[dev] ###
-# We install them in our requirements.txt file.
+# Development tools (install with: pip install -e .[dev])
 dev = [
-  # https://pypi.org/project/hatch/
-  "hatch~=1.14",
-  # https://pypi.org/project/pytest/
-  "pytest~=8.3",
-  # https://pypi.org/project/pytest-mock/
-  "pytest-mock~=3.14",
-  # https://pypi.org/project/pytest-cov/
-  "pytest-cov~=6.0",
-  # https://pypi.org/project/ruff/
-  "ruff~=0.9",
-
-  ### Type stubs for type checking. ###
-  "kubernetes-typed~=18.20",
-  "types-PyYAML~=6.0",
-  "types-requests",
+  "hatch>=1.14,<2.0",           # Build and project management tool
+  "pytest>=8.0,<9.0",          # Testing framework
+  "pytest-cov>=4.0,<5.0",      # Coverage reporting for tests
+  "ruff>=0.9,<1.0",             # Fast Python linter and formatter
+  "mypy>=1.15,<2.0",            # Static type checker
 ]
 
+# Project URLs - links displayed on PyPI and in documentation
 [project.urls]
-Documentation = "https://www.github.com/yourusername/project-name/blob/main/README.md"
-Homepage = "https://www.github.com/yourusername/project-name"
-Source = "https://www.github.com/yourusername/project-name"
+Documentation = "https://github.com/yourusername/my-awesome-project/blob/main/README.md"
+Homepage = "https://github.com/yourusername/my-awesome-project"
+Source = "https://github.com/yourusername/my-awesome-project"
+"Bug Tracker" = "https://github.com/yourusername/my-awesome-project/issues"
 
+# Version configuration - tells Hatch where to find the version string
 [tool.hatch.version]
-path = "src/<project>/__about__.py"
+path = "src/my_awesome_project/__about__.py"  # Replace 'my_awesome_project' with your package name
 
+# Build configuration - specifies which files to include in the package
 [tool.hatch.build.targets.wheel]
-packages = ["src/<project>"]
+packages = ["src/my_awesome_project"]  # Replace 'my_awesome_project' with your package name
 
 # Python Package Repository Configuration
-# Configure these settings for your package repository
+# Configure these settings for your package repository (PyPI, Artifactory, Nexus, etc.)
 [tool.pybuild]
-# For PyPI (default):
+# Default PyPI configuration (for public packages)
 publish_base_url = "https://upload.pypi.org/legacy/"
 install_index_url = "https://pypi.org/simple/"
 install_extra_index_url = ""
 
-# For Artifactory (example):
+# Example: Private Artifactory configuration
 # publish_base_url = "https://your-artifactory.com/artifactory/api/pypi/your-repo"
 # install_index_url = "https://your-artifactory.com/artifactory/api/pypi/your-repo/simple"
 # install_extra_index_url = "https://your-artifactory.com/artifactory/api/pypi/your-other-repo/simple"
 
-# For Nexus Repository (example):
+# Example: Nexus Repository configuration
 # publish_base_url = "https://your-nexus.com/repository/pypi-internal/"
 # install_index_url = "https://your-nexus.com/repository/pypi-internal/simple"
 # install_extra_index_url = "https://your-nexus.com/repository/pypi-public/simple"
 
-# Environment suffixes (optional)
-dev_suffix = "-dev"
-prod_suffix = ""
+# Environment suffixes (optional) - used for environment-specific repository URLs
+dev_suffix = "-dev"   # Appended to URLs for development environment
+prod_suffix = ""      # Appended to URLs for production environment (usually empty)
 
 # Authentication Note:
-# For authentication, export environment variables:
-#   HATCH_INDEX_USER=your_username
-#   HATCH_INDEX_AUTH=your_password
+# Set these environment variables for repository authentication:
+#   export HATCH_INDEX_USER=your_username
+#   export HATCH_INDEX_AUTH=your_password_or_token
 # These variables are used by the pybuild.py script for repository authentication.
 
+# Development environment configuration for Hatch
 [tool.hatch.envs.types]
-extra-dependencies = ["mypy~=1.15.0"]
+extra-dependencies = ["mypy>=1.15,<2.0"]
+
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src tests}"
 
+# Test coverage configuration
 [tool.coverage.run]
-source_pkgs = ["<project>", "tests"]
-branch = true
-parallel = true
-omit = ["src/<project>/__about__.py"]
+source_pkgs = ["my_awesome_project", "tests"]  # Replace 'my_awesome_project' with your package name
+branch = true          # Enable branch coverage
+parallel = true        # Allow parallel test execution
+omit = [
+  "src/my_awesome_project/__about__.py",  # Skip version file from coverage
+]
 
 [tool.coverage.paths]
-project = ["src", "*/<project>/src"]
-tests = ["tests", "*/<project>/tests"]
+# Map different path patterns to the same source for coverage combining
+project = ["src", "*/my_awesome_project/src"]      # Replace 'my_awesome_project' with your package name
+tests = ["tests", "*/my_awesome_project/tests"]    # Replace 'my_awesome_project' with your package name
 
 [tool.coverage.report]
-exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
+# Lines to exclude from coverage reporting
+exclude_lines = [
+  "no cov",                           # Pragma comments
+  "if __name__ == .__main__.:",       # Main execution blocks
+  "if TYPE_CHECKING:",                # Type checking imports
+]
 
+# Pytest configuration
 [tool.pytest.ini_options]
-markers = ["order(number): runs tests in the order given", "serial"]
+# Custom markers for test organization
+markers = [
+  "order(number): runs tests in the order given",
+  "serial: marks tests as serial (not parallel)",
+]
 
+# Ruff configuration - Python linter and formatter
 [tool.ruff]
-line-length = 120
+line-length = 120           # Maximum line length
+target-version = "py312"    # Target Python version for rules
 
 [tool.ruff.lint]
+# Rule selection - see https://docs.astral.sh/ruff/rules/ for details
 select = [
-  "F",     # Pyflakes
-  "E",     # pycodestyle errors
-  "W",     # pycodestyle warnings
-  "I",     # isort
-  "N",     # pep8-naming
-  "D",     # pydocstyle
-  "UP",    # pyupgrade
-  "YTT",   # flake8-2020
-  "ANN",   # flake8-annotations
-  "ASYNC", # flake8-async
-  "S",     # flake8-bandit
-  "B",     # flake8-bugbear
-  "A",     # flake8-builtins
-  "COM",   # flake8-commas
-  "C4",    # flake8-comprehensions
-  "DTZ",   # flake8-datetimez
-  "T10",   # flake8-debugger
-  "EM",    # flake8-errmsg
-  "EXE",   # flake8-executable
-  "ISC",   # flake8-implicit-str-concat
-  "ICN",   # flake8-import-conventions
-  "LOG",   # flake8-logging
-  "G",     # flake8-logging-format
-  "INP",   # flake8-no-pep420
-  "PIE",   # flake8-pie
-  "T20",   # flake8-print
-  "PYI",   # flake8-pyi
-  "PT",    # flake8-pytest-style
-  "Q",     # flake8-quotes
-  "RSE",   # flake8-raise
-  "RET",   # flake8-return
-  "SLF",   # flake8-self
-  "SLOT",  # flake8-slots
-  "SIM",   # flake8-simplify
-  "TID",   # flake8-tidy-imports
-  "TC",    # flake8-type-checking
-  "INT",   # flake8-gettext
-  "ARG",   # flake8-unused-arguments
-  "TD",    # flake8-todos
-  "ERA",   # eradicate
-  "PL",    # Pylint
+  "F",     # Pyflakes - basic error detection
+  "E",     # pycodestyle errors - PEP 8 style violations
+  "W",     # pycodestyle warnings - PEP 8 style warnings
+  "I",     # isort - import sorting
+  "N",     # pep8-naming - naming conventions
+  "D",     # pydocstyle - docstring conventions
+  "UP",    # pyupgrade - modern Python syntax
+  "YTT",   # flake8-2020 - avoid outdated Python patterns
+  "ANN",   # flake8-annotations - type annotations
+  "ASYNC", # flake8-async - async/await best practices
+  "S",     # flake8-bandit - security issues
+  "B",     # flake8-bugbear - likely bugs and design problems
+  "A",     # flake8-builtins - builtin shadowing
+  "COM",   # flake8-commas - trailing commas
+  "C4",    # flake8-comprehensions - list/dict comprehensions
+  "DTZ",   # flake8-datetimez - datetime usage
+  "T10",   # flake8-debugger - debugger statements
+  "EM",    # flake8-errmsg - error message formatting
+  "EXE",   # flake8-executable - executable file issues
+  "ISC",   # flake8-implicit-str-concat - string concatenation
+  "ICN",   # flake8-import-conventions - import naming
+  "LOG",   # flake8-logging - logging best practices
+  "G",     # flake8-logging-format - logging format strings
+  "INP",   # flake8-no-pep420 - explicit __init__.py files
+  "PIE",   # flake8-pie - misc. lints
+  "T20",   # flake8-print - print statements
+  "PYI",   # flake8-pyi - type stub files
+  "PT",    # flake8-pytest-style - pytest best practices
+  "Q",     # flake8-quotes - quote consistency
+  "RSE",   # flake8-raise - exception raising
+  "RET",   # flake8-return - return statement issues
+  "SLF",   # flake8-self - private member access
+  "SLOT",  # flake8-slots - __slots__ usage
+  "SIM",   # flake8-simplify - code simplification
+  "TID",   # flake8-tidy-imports - import organization
+  "TC",    # flake8-type-checking - type checking imports
+  "INT",   # flake8-gettext - internationalization
+  "ARG",   # flake8-unused-arguments - unused function arguments
+  "TD",    # flake8-todos - TODO comments
+  "ERA",   # eradicate - commented out code
+  "PL",    # Pylint - comprehensive Python linting
 ]
+
+# Rules to ignore - customize based on your project needs
 ignore = [
-  "E501",    # line-too-long
-  "BLE001",  # blind-except
-  "D202",    # no-blank-line-after-function
-  "T201",    # print
-  "D401",    # non-imperative-mood
-  "D205",    # blank-line-after-summary
-  "PLR0912", # too-many-branches
-  "PLR0915", # too-many-statements
-  "S603",    # subprocess-without-shell-equals-true
-  "TD002",   # missing-todo-author
-  "TD003",   # missing-todo-link
+  "E501",    # line-too-long (handled by formatter)
+  "D202",    # no-blank-line-after-function (stylistic preference)
+  "T201",    # print statements (useful for CLI tools)
+  "D401",    # non-imperative-mood (docstring style preference)
+  "D205",    # blank-line-after-summary (docstring style preference)
+  "PLR0912", # too-many-branches (complexity limit)
+  "PLR0915", # too-many-statements (complexity limit)
+  "S603",    # subprocess-without-shell-equals-true (sometimes needed)
+  "TD002",   # missing-todo-author (not always needed)
+  "TD003",   # missing-todo-link (not always needed)
 ]
-task-tags = ["FIXME", "TODO"]
-unfixable = ["B"]
 
+# TODO/FIXME comment tags
+task-tags = ["TODO", "FIXME", "XXX", "HACK"]
+
+# Rules that cannot be auto-fixed
+unfixable = ["B"]  # flake8-bugbear issues often need manual review
+
+# Pylint-specific configuration
 [tool.ruff.lint.pylint]
-max-args = 8
+max-args = 8              # Maximum number of function arguments
+max-locals = 15           # Maximum number of local variables
+max-branches = 12         # Maximum number of branches in function
+max-statements = 50       # Maximum number of statements in function
 
+# Per-file rule ignores - customize for your project structure
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["E402"]
-"**/{tests,docs,tools}/*" = ["E402"]
+"__init__.py" = ["E402"]                    # Allow imports not at top of file
+"**/tests/**/*" = ["S101", "D100", "D103"] # Allow asserts, missing docstrings in tests
+"scripts/**/*" = ["T201", "S602"]          # Allow print statements, shell calls in scripts
 
-#[tool.ruff.format]
-# 5. Use single quotes for non-triple-quoted strings.
-# quote-style = "single"
+# MyPy configuration - static type checking
+[tool.mypy]
+python_version = "3.12"
+strict = true                    # Enable all strict checks
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+# Ruff formatter configuration (optional)
+[tool.ruff.format]
+quote-style = "double"           # Use double quotes for strings
+indent-style = "space"           # Use spaces for indentation
+skip-magic-trailing-comma = false
+line-ending = "auto"             # Auto-detect line endings
+docstring-code-format = true     # Format code blocks in docstrings
