@@ -17,7 +17,7 @@ kubernetes-typed~=18.20
 # https://pypi.org/project/loguru/
 loguru~=0.7.3
 # https://pypi.org/project/orjson/
-orjson~=3.10.15
+orjson~=3.11.1
 # https://pypi.org/project/prettytable/
 prettytable~=3.14.0
 # https://pypi.org/project/pytest/
