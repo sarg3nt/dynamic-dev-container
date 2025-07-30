@@ -1020,7 +1020,7 @@ generate_devcontainer_json() {
           ;;
         "kubectl"|"helm"|"k9s"|"kubectx"|"kubens"|"krew"|"dive"|"kubebench"|"popeye"|"trivy"|"cmctl"|"k3d")
           # Kubernetes settings (avoid duplicates)
-          if ! grep -q "Begin Kubernetes/Helm Settings" "$temp_file"; then
+          if ! grep -q "helm-intellisense.lintFileOnSave" "$temp_file"; then
             # shellcheck disable=SC2129
             extract_devcontainer_section "// #### Begin Kubernetes/Helm Settings ####" "// #### End Kubernetes/Helm Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
           fi
