@@ -17,7 +17,7 @@ FROM jdxcode/mise:v2025.7.30@sha256:e7343b1c68e792146fa7eda6e2c92256d3554165f48d
 RUN strip /usr/local/bin/mise || true
 
 # https://hub.docker.com/r/rockylinux/rockylinux/tags
-FROM rockylinux/rockylinux:10-ubi@sha256:02564b26a5d147fcdbd1058abd9b358008f5608b382dcb288cfc718d627256cb AS final
+FROM rockylinux/rockylinux:10-ubi@sha256:eca03145dd5e0b2a281eef164d391e4758b4a5962d29b688d15a72cef712fbb4 AS final
 ARG GITHUB_TOKEN
 ENV GITHUB_API_TOKEN=$GITHUB_TOKEN
 LABEL org.opencontainers.image.source=https://github.com/sarg3nt/dynamic-dev-container
