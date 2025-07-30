@@ -37,7 +37,7 @@ dependencies = [
   # https://pypi.org/project/GitPython/
   "gitpython~=3.1",
   # https://pypi.org/project/kubernetes/
-  "kubernetes~=32.0",
+  "kubernetes~=33.1",
   # https://pypi.org/project/loguru/
   "loguru~=0.7",
   # https://pypi.org/project/orjson/

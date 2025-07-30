@@ -11,7 +11,7 @@ hatch~=1.14.0
 # https://pypi.org/project/keeper-secrets-manager-core/
 keeper-secrets-manager-core~=16.6
 # https://pypi.org/project/kubernetes/
-kubernetes~=32.0
+kubernetes~=33.1
 # https://pypi.org/project/kubernetes-typed/
 kubernetes-typed~=18.20
 # https://pypi.org/project/loguru/
