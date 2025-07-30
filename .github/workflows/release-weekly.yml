@@ -28,7 +28,7 @@ jobs:
       packages: write
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911
         with:
           disable-sudo: true
           egress-policy: block
@@ -70,7 +70,7 @@ jobs:
 
       - name: Build and Push Docker image
         id: build
-        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
         with:
           push: true
           tags: ${{ env.TAG_MAJOR }},${{ env.TAG_MINOR }},${{ env.TAG_PATCH }},${{ env.TAG_LATEST }}
@@ -78,7 +78,7 @@ jobs:
       # Docs: https://github.com/marketplace/actions/create-release
       - name: Create Release
         id: create_release
-        uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174
+        uses: ncipollo/release-action@bcfe5470707e8832e12347755757cec0eb3c22af
         with:
           body: "A Weekly release containing upgrades to system packages in the base Rocky Linux container."
           makeLatest: true
