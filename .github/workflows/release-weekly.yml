@@ -1,0 +1,79 @@
+name: Weekly Release
+
+on:
+  schedule:
+    # If the schedule stops working, see the docs: https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#schedule
+    - cron: "0 0 * * 0" # Runs weekly at 00:00 on Sunday
+  workflow_dispatch: # Allows manual triggering
+
+env:
+  REGISTRY: ghcr.io
+  REPOSITORY: ${{ github.repository }}
+  VERSION: ""
+  TAG_MAJOR: ""
+  TAG_MINOR: ""
+  TAG_PATCH: ""
+  TAG_LATEST: ""
+  TAG_OLD: ""
+
+permissions:
+  contents: read
+
+jobs:
+  release-build-and-push:
+    name: Weekly Release Build and Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            ghcr.io:443
+            registry-1.docker.io:443
+            auth.docker.io:443
+            production.cloudflare.docker.com:443
+
+      - name: "Checkout Repository"
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get the Latest Version
+        id: get_version
+        run: bash ${GITHUB_WORKSPACE}/workflow_scripts/get_latest_version.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY: ${{ env.REGISTRY }}
+          REPOSITORY: ${{ env.REPOSITORY }}
+
+      - name: Log Into Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker image
+        id: build
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4
+        with:
+          push: true
+          tags: ${{ env.TAG_MAJOR }},${{ env.TAG_MINOR }},${{ env.TAG_PATCH }},${{ env.TAG_LATEST }}
+
+      # Docs: https://github.com/marketplace/actions/create-release
+      - name: Create Release
+        id: create_release
+        uses: ncipollo/release-action@440c8c1cb0ed28b9f43e4d1d670870f059653174
+        with:
+          body: "A Weekly release containing upgrades to system packages in the base Rocky Linux container."
+          makeLatest: true
+          prerelease: false
+          tag: ${{ env.VERSION }}

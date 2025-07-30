@@ -107,6 +107,8 @@
         "GitHub.vscode-pull-request-github", // GitHub pull request management
         "GitHub.github-vscode-theme", // GitHub theme
         "GitHub.remotehub", // GitHub remote repositories
+        "GitHub.vscode-github-actions", // GitHub Actions syntax highlighting and IntelliSense
+        "cschleiden.vscode-github-actions", // GitHub Actions workflow support
         "mhutchie.git-graph", // Git graph visualization
         "huizhou.githd", // Git history diff
         // #### End Github ####
@@ -211,7 +213,12 @@
           "*.json.tftpl": "json",
           "Jenkinsfile*": "groovy",
           ".env": "env",
-          "*.env.*": "env"
+          "*.env.*": "env",
+          "CODEOWNERS": "gitignore",
+          "**/workflows/*.yml": "github-actions-workflow",
+          "**/workflows/*.yaml": "github-actions-workflow",
+          "dependabot.yml": "yaml",
+          "dependabot.yaml": "yaml"
         },
         "terminal.integrated.profiles.linux": {
           "zsh": {

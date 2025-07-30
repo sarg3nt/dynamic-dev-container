@@ -1,0 +1,95 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Trivy
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: ["main"]
+    paths:
+      - "home/**"
+      - "scripts/**"
+      - "usr/**"
+      - "workflow_scripts/**"
+      - ".dockerignore"
+      - ".mise.toml"
+      - ".pre-commit-config.yaml"
+      - "Dockerfile"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - "package.json"
+      - "**/*.sh"
+    # Skip on draft PRs since container-test.yml already covers this
+    types: [opened, synchronize, reopened, ready_for_review]
+
+  schedule:
+    - cron: "19 14 * * 5"
+  workflow_dispatch: # Allows manual triggering
+
+env:
+  REGISTRY: ghcr.io
+  REPOSITORY: ${{ github.repository }}
+
+permissions:
+  contents: read
+
+jobs:
+  trivy-scan:
+    name: Trivy Security Scan
+    # Skip if this is a draft PR (container-test.yml will handle it)
+    if: github.event.pull_request.draft != true
+    permissions:
+      contents: write # for actions/checkout to fetch code and for SBOM to push results
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            ghcr.io:443
+            registry-1.docker.io:443
+            auth.docker.io:443
+            production.cloudflare.docker.com:443
+            public.ecr.aws:443
+
+      - name: Log Into Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4
+        with:
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ github.sha }}
+
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5
+        with:
+          image-ref: "${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ github.sha }}"
+          format: "template"
+          template: "@/contrib/sarif.tpl"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
+        env:
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
+
+      - name: Upload Trivy Results
+        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47
+        with:
+          sarif_file: "trivy-results.sarif"

@@ -1,0 +1,22 @@
+# Default owner for all files
+* @sarg3nt
+
+# Infrastructure and container configuration
+/.devcontainer/ @BrickCForce @Stanrofl @aidanleuck
+/home/ @BrickCForce @Stanrofl @aidanleuck
+/scripts/ @BrickCForce @Stanrofl @aidanleuck
+/usr/ @BrickCForce @Stanrofl @aidanleuck
+
+# Configuration files
+.krew_plugins @BrickCForce @Stanrofl @aidanleuck
+.packages @BrickCForce @Stanrofl @aidanleuck
+requirements.txt @BrickCForce @Stanrofl @aidanleuck
+
+# File type patterns
+*.toml @BrickCForce @Stanrofl @aidanleuck
+*.json @BrickCForce @Stanrofl @aidanleuck
+*.sh @BrickCForce @Stanrofl @aidanleuck
+*.md @BrickCForce @Stanrofl @aidanleuck
+
+# GitHub configuration (must be at the end to override default)
+/.github/CODEOWNERS @BrickCForce @Stanrofl @aidanleuck
