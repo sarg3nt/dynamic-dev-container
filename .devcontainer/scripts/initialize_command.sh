@@ -16,7 +16,7 @@ set -euo pipefail
 source "$(dirname "$0")/log.sh"
 
 # Constants
-readonly CONTAINER_IMAGE="ghcr.io/sarg3nt/dynamic-dev-container:0.0.3"
+readonly CONTAINER_IMAGE="ghcr.io/sarg3nt/dynamic-dev-container:latest"
 
 # Directory configuration: "name|permission|log_level|impact_message"
 readonly DIRECTORY_CONFIG=(
