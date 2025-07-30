@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "axios": "latest",
-    "lodash": "latest",
     "express": "latest",
     "dotenv": "latest",
     "chalk": "latest",
