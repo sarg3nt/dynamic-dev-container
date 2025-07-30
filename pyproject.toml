@@ -17,12 +17,7 @@ description = "<project descripton>."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "<add license here>"
-keywords = [
-  "<add your keywords here>",
-  "Config.yaml",
-  "infrastructure",
-  "helm",
-]
+keywords = ["<add your keywords here>", "Config.yaml", "infrastructure", "helm"]
 authors = [{ name = "author name", email = "author@myemail.com" }]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -32,6 +27,8 @@ classifiers = [
 ]
 
 dependencies = [
+  # These are some sample dependencies, put your packages dependencies here so when it is innstalled, 
+  # the sub packages will also automatically be installed.
   # https://pypi.org/project/fabric/
   "fabric~=3.2",
   # https://pypi.org/project/GitPython/
@@ -76,7 +73,7 @@ dev = [
 ]
 
 [project.urls]
-Documentation = "<add link to documentation MD file, probably in GitHub"
+Documentation = "<add link to documentation MD file, probably in GitHub>"
 Homepage = "<Add Link to project home page in GitHub>"
 Source = "<Add link to project source in Github>"
 
@@ -87,6 +84,34 @@ disable = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/<project>"]
+
+# Python Package Repository Configuration
+# Configure these settings for your package repository
+[tool.pybuild]
+# For PyPI (default):
+publish_base_url = "https://upload.pypi.org/legacy/"
+install_index_url = "https://pypi.org/simple/"
+install_extra_index_url = ""
+
+# For Artifactory (example):
+# publish_base_url = "https://your-artifactory.com/artifactory/api/pypi/your-repo"
+# install_index_url = "https://your-artifactory.com/artifactory/api/pypi/your-repo/simple"
+# install_extra_index_url = "https://your-artifactory.com/artifactory/api/pypi/your-other-repo/simple"
+
+# For Nexus Repository (example):
+# publish_base_url = "https://your-nexus.com/repository/pypi-internal/"
+# install_index_url = "https://your-nexus.com/repository/pypi-internal/simple"
+# install_extra_index_url = "https://your-nexus.com/repository/pypi-public/simple"
+
+# Environment suffixes (optional)
+dev_suffix = "-dev"
+prod_suffix = ""
+
+# Authentication Note:
+# For authentication, export environment variables:
+#   HATCH_INDEX_USER=your_username
+#   HATCH_INDEX_AUTH=your_password
+# These variables are used by the pybuild.py script for repository authentication.
 
 [tool.hatch.envs.types]
 extra-dependencies = ["mypy~=1.15.0"]

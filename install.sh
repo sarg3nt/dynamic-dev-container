@@ -21,6 +21,13 @@ INCLUDE_MARKDOWN_EXTENSIONS=false
 INCLUDE_SHELL_EXTENSIONS=false
 INCLUDE_JS_EXTENSIONS=false
 
+# Python package repository configuration
+PYTHON_PUBLISH_URL=""
+PYTHON_INDEX_URL=""
+PYTHON_EXTRA_INDEX_URL=""
+PYTHON_DEV_SUFFIX=""
+PYTHON_PROD_SUFFIX=""
+
 # Files and directories to copy to new projects
 FILES_TO_COPY=(
   ".gitignore"
@@ -539,6 +546,116 @@ collect_project_info() {
   fi
 }
 
+# Configure Python package repositories
+configure_python_repositories() {
+  local repo_type
+  repo_type=$(dialog --title "Python Package Repository" \
+                    --menu "Choose your Python package repository type:" \
+                    $DIALOG_HEIGHT $DIALOG_WIDTH 10 \
+                    "pypi" "PyPI (python.org) - Default public repository" \
+                    "artifactory" "JFrog Artifactory - Enterprise repository" \
+                    "nexus" "Nexus Repository - Enterprise repository" \
+                    "custom" "Custom repository URLs" \
+                    3>&1 1>&2 2>&3 3>&-)
+  
+  case "$repo_type" in
+    "pypi")
+      PYTHON_PUBLISH_URL="https://upload.pypi.org/legacy/"
+      PYTHON_INDEX_URL="https://pypi.org/simple/"
+      PYTHON_EXTRA_INDEX_URL=""
+      PYTHON_DEV_SUFFIX=""
+      PYTHON_PROD_SUFFIX=""
+      ;;
+    "artifactory")
+      configure_artifactory_urls
+      ;;
+    "nexus")
+      configure_nexus_urls
+      ;;
+    "custom")
+      configure_custom_urls
+      ;;
+    *)
+      # Default to PyPI if cancelled
+      PYTHON_PUBLISH_URL="https://upload.pypi.org/legacy/"
+      PYTHON_INDEX_URL="https://pypi.org/simple/"
+      PYTHON_EXTRA_INDEX_URL=""
+      PYTHON_DEV_SUFFIX=""
+      PYTHON_PROD_SUFFIX=""
+      ;;
+  esac
+}
+
+# Configure Artifactory URLs
+configure_artifactory_urls() {
+  local form_result
+  form_result=$(tui_form "Artifactory Configuration" \
+                        "Enter your Artifactory repository configuration:" \
+                        "Server URL:" 1 1 "https://your-artifactory.com" 1 15 50 0 \
+                        "Repository Name:" 2 1 "your-pypi-repo" 2 20 30 0 \
+                        "Dev Suffix:" 3 1 "-dev" 3 15 20 0 \
+                        "Prod Suffix:" 4 1 "" 4 16 20 0)
+  
+  if [[ -n "$form_result" ]]; then
+    local server_url repository_name dev_suffix prod_suffix
+    server_url=$(echo "$form_result" | sed -n '1p')
+    repository_name=$(echo "$form_result" | sed -n '2p')
+    dev_suffix=$(echo "$form_result" | sed -n '3p')
+    prod_suffix=$(echo "$form_result" | sed -n '4p')
+    
+    PYTHON_PUBLISH_URL="${server_url}/artifactory/api/pypi/${repository_name}"
+    PYTHON_INDEX_URL="${server_url}/artifactory/api/pypi/${repository_name}/simple"
+    PYTHON_EXTRA_INDEX_URL=""
+    PYTHON_DEV_SUFFIX="$dev_suffix"
+    PYTHON_PROD_SUFFIX="$prod_suffix"
+  fi
+}
+
+# Configure Nexus URLs
+configure_nexus_urls() {
+  local form_result
+  form_result=$(tui_form "Nexus Configuration" \
+                        "Enter your Nexus repository configuration:" \
+                        "Server URL:" 1 1 "https://your-nexus.com" 1 15 50 0 \
+                        "Repository Name:" 2 1 "pypi-internal" 2 20 30 0 \
+                        "Dev Suffix:" 3 1 "-dev" 3 15 20 0 \
+                        "Prod Suffix:" 4 1 "" 4 16 20 0)
+  
+  if [[ -n "$form_result" ]]; then
+    local server_url repository_name dev_suffix prod_suffix
+    server_url=$(echo "$form_result" | sed -n '1p')
+    repository_name=$(echo "$form_result" | sed -n '2p')
+    dev_suffix=$(echo "$form_result" | sed -n '3p')
+    prod_suffix=$(echo "$form_result" | sed -n '4p')
+    
+    PYTHON_PUBLISH_URL="${server_url}/repository/${repository_name}/"
+    PYTHON_INDEX_URL="${server_url}/repository/${repository_name}/simple"
+    PYTHON_EXTRA_INDEX_URL=""
+    PYTHON_DEV_SUFFIX="$dev_suffix"
+    PYTHON_PROD_SUFFIX="$prod_suffix"
+  fi
+}
+
+# Configure custom URLs
+configure_custom_urls() {
+  local form_result
+  form_result=$(tui_form "Custom Repository Configuration" \
+                        "Enter your custom repository URLs:" \
+                        "Publish URL:" 1 1 "" 1 15 60 0 \
+                        "Index URL:" 2 1 "" 2 13 60 0 \
+                        "Extra Index URL:" 3 1 "" 3 19 60 0 \
+                        "Dev Suffix:" 4 1 "-dev" 4 15 20 0 \
+                        "Prod Suffix:" 5 1 "" 5 16 20 0)
+  
+  if [[ -n "$form_result" ]]; then
+    PYTHON_PUBLISH_URL=$(echo "$form_result" | sed -n '1p')
+    PYTHON_INDEX_URL=$(echo "$form_result" | sed -n '2p')
+    PYTHON_EXTRA_INDEX_URL=$(echo "$form_result" | sed -n '3p')
+    PYTHON_DEV_SUFFIX=$(echo "$form_result" | sed -n '4p')
+    PYTHON_PROD_SUFFIX=$(echo "$form_result" | sed -n '5p')
+  fi
+}
+
 # Development tools selection
 # shellcheck disable=SC2120  # Function uses positional parameters set by eval
 select_development_tools() {
@@ -625,6 +742,11 @@ select_development_tools() {
       "shell") INCLUDE_SHELL_EXTENSIONS=true ;;
     esac
   done
+
+  # Python package repository configuration
+  if [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" ]]; then
+    configure_python_repositories
+  fi
 }
 
 
@@ -711,6 +833,15 @@ show_summary() {
     summary+="VS Code Extensions: GitHub + Core + $ext_list\n"
   else
     summary+="VS Code Extensions: GitHub + Core extensions only\n"
+  fi
+  
+  # Python repository configuration
+  if [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" && -n "$PYTHON_PUBLISH_URL" ]]; then
+    summary+="\nPython Package Repository:\n"
+    summary+="  • Publish URL: $PYTHON_PUBLISH_URL\n"
+    summary+="  • Index URL: $PYTHON_INDEX_URL\n"
+    [[ -n "$PYTHON_EXTRA_INDEX_URL" ]] && summary+="  • Extra Index: $PYTHON_EXTRA_INDEX_URL\n"
+    [[ -n "$PYTHON_DEV_SUFFIX" ]] && summary+="  • Dev Suffix: $PYTHON_DEV_SUFFIX\n"
   fi
   
   summary+="\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -893,6 +1024,22 @@ update_dev_sh() {
   
   mv "$temp_file" "${project_path}/dev.sh"
   chmod +x "${project_path}/dev.sh"
+}
+
+# Update pyproject.toml with Python repository configuration
+update_pyproject_toml() {
+  local project_path="$1"
+  local pyproject_file="${project_path}/pyproject.toml"
+  
+  # Only update if Python extensions are enabled and configuration exists
+  if [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" && -n "$PYTHON_PUBLISH_URL" ]]; then
+    # Use sed to update the pybuild configuration section
+    sed -i "s|publish_base_url = \".*\"|publish_base_url = \"$PYTHON_PUBLISH_URL\"|" "$pyproject_file"
+    sed -i "s|install_index_url = \".*\"|install_index_url = \"$PYTHON_INDEX_URL\"|" "$pyproject_file"
+    sed -i "s|install_extra_index_url = \".*\"|install_extra_index_url = \"$PYTHON_EXTRA_INDEX_URL\"|" "$pyproject_file"
+    sed -i "s|dev_suffix = \".*\"|dev_suffix = \"$PYTHON_DEV_SUFFIX\"|" "$pyproject_file"
+    sed -i "s|prod_suffix = \".*\"|prod_suffix = \"$PYTHON_PROD_SUFFIX\"|" "$pyproject_file"
+  fi
 }
 
 # Generate custom devcontainer.json
@@ -1200,6 +1347,9 @@ main() {
   # Update dev.sh with project settings
   update_dev_sh "$project_path" "$DOCKER_EXEC_COMMAND" "$PROJECT_NAME" "$CONTAINER_NAME"
 
+  # Update pyproject.toml with Python repository configuration
+  update_pyproject_toml "$project_path"
+
   # Clean up dialog config
   rm -f $DIALOGRC
 
@@ -1218,7 +1368,16 @@ main() {
   echo -e "   export GITHUB_TOKEN=\"your_github_token_here\""
   echo -e "2. Review and adjust settings in ${project_path}/.devcontainer/devcontainer.json if needed"
   echo -e "3. Review and adjust tool versions in ${project_path}/.mise.toml if needed"
-  echo -e "4. See README.md for detailed configuration instructions"
+  if [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" ]]; then
+    echo -e "4. ${YELLOW}Python Development:${NC} Complete pyproject.toml configuration:"
+    echo -e "   - Update project name, description, and author information"
+    echo -e "   - Review [tool.pybuild] repository settings"
+    echo -e "   - Configure authentication credentials for your package repository"
+    echo -e "   - Run: cd ${project_path} && python pybuild.py --help"
+    echo -e "5. See README.md for detailed configuration instructions"
+  else
+    echo -e "4. See README.md for detailed configuration instructions"
+  fi
   echo ""
   echo -e "${BLUE}You can now run:${NC} cd ${project_path} && ./dev.sh"
 }
