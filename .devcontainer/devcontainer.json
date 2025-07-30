@@ -417,6 +417,11 @@
         "omnisharp.autoStart": false,
         // #### End PowerShell Settings ####
 
+        // #### Begin Mise Settings ####
+        "mise.checkForUpdates": false,
+        "mise.showUpdateNotifications": false,
+        // #### End Mise Settings ####
+
         // #### Begin Spell Checker Settings ####
         "cSpell": {
           "enabledLanguageIds": [
