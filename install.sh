@@ -21,12 +21,26 @@ INCLUDE_MARKDOWN_EXTENSIONS=false
 INCLUDE_SHELL_EXTENSIONS=false
 INCLUDE_JS_EXTENSIONS=false
 
+# Python Project Setup Configuration
+INSTALL_PYTHON_TOOLS=false
+
 # Python package repository configuration
 PYTHON_PUBLISH_URL=""
 PYTHON_INDEX_URL=""
 PYTHON_EXTRA_INDEX_URL=""
 PYTHON_DEV_SUFFIX=""
 PYTHON_PROD_SUFFIX=""
+PYTHON_REPOSITORY_TYPE=""
+
+# Python project metadata configuration
+PYTHON_PROJECT_NAME=""
+PYTHON_PROJECT_DESCRIPTION=""
+PYTHON_AUTHOR_NAME=""
+PYTHON_AUTHOR_EMAIL=""
+PYTHON_GITHUB_USERNAME=""
+PYTHON_GITHUB_PROJECT=""
+PYTHON_LICENSE=""
+PYTHON_KEYWORDS=""
 
 # Files and directories to copy to new projects
 FILES_TO_COPY=(
@@ -36,10 +50,15 @@ FILES_TO_COPY=(
   "cspell.json"
   "dev.sh"
   "package.json"
-  "pyproject.toml"
-  "requirements.txt"
   "run.sh"
   ".mise.toml"
+)
+
+# Python-specific files (copied only when INSTALL_PYTHON_TOOLS=true)
+PYTHON_FILES_TO_COPY=(
+  "pyproject.toml"
+  "requirements.txt"
+  "pybuild.py"
 )
 
 DIRECTORIES_TO_COPY=(
@@ -560,6 +579,7 @@ configure_python_repositories() {
   
   case "$repo_type" in
     "pypi")
+      PYTHON_REPOSITORY_TYPE="pypi"
       PYTHON_PUBLISH_URL="https://upload.pypi.org/legacy/"
       PYTHON_INDEX_URL="https://pypi.org/simple/"
       PYTHON_EXTRA_INDEX_URL=""
@@ -567,16 +587,20 @@ configure_python_repositories() {
       PYTHON_PROD_SUFFIX=""
       ;;
     "artifactory")
+      PYTHON_REPOSITORY_TYPE="artifactory"
       configure_artifactory_urls
       ;;
     "nexus")
+      PYTHON_REPOSITORY_TYPE="nexus"
       configure_nexus_urls
       ;;
     "custom")
+      PYTHON_REPOSITORY_TYPE="custom"
       configure_custom_urls
       ;;
     *)
       # Default to PyPI if cancelled
+      PYTHON_REPOSITORY_TYPE="pypi"
       PYTHON_PUBLISH_URL="https://upload.pypi.org/legacy/"
       PYTHON_INDEX_URL="https://pypi.org/simple/"
       PYTHON_EXTRA_INDEX_URL=""
@@ -656,6 +680,51 @@ configure_custom_urls() {
   fi
 }
 
+# Configure Python project metadata
+configure_python_project() {
+  if ! tui_yesno "Python Project Configuration" "Configure Python project metadata in pyproject.toml?" "y"; then
+    return
+  fi
+
+  # Project basic information
+  local form_result
+  form_result=$(tui_form "Python Project Information" \
+                        "Enter your Python project details:" \
+                        "Project Name:" 1 1 "$PROJECT_NAME" 1 15 40 0 \
+                        "Description:" 2 1 "A brief description of your project" 2 14 60 0 \
+                        "License:" 3 1 "MIT" 3 11 20 0 \
+                        "Keywords:" 4 1 "python,cli,automation" 4 12 50 0)
+  
+  if [[ -n "$form_result" ]]; then
+    PYTHON_PROJECT_NAME=$(echo "$form_result" | sed -n '1p')
+    PYTHON_PROJECT_DESCRIPTION=$(echo "$form_result" | sed -n '2p')
+    PYTHON_LICENSE=$(echo "$form_result" | sed -n '3p')
+    PYTHON_KEYWORDS=$(echo "$form_result" | sed -n '4p')
+  fi
+
+  # Author information
+  form_result=$(tui_form "Author Information" \
+                        "Enter author details:" \
+                        "Author Name:" 1 1 "Your Name" 1 15 40 0 \
+                        "Author Email:" 2 1 "your.email@example.com" 2 16 50 0)
+  
+  if [[ -n "$form_result" ]]; then
+    PYTHON_AUTHOR_NAME=$(echo "$form_result" | sed -n '1p')
+    PYTHON_AUTHOR_EMAIL=$(echo "$form_result" | sed -n '2p')
+  fi
+
+  # GitHub information for URLs
+  form_result=$(tui_form "GitHub Repository Information" \
+                        "Enter GitHub details for project URLs:" \
+                        "GitHub Username:" 1 1 "yourusername" 1 18 30 0 \
+                        "GitHub Project:" 2 1 "${PYTHON_PROJECT_NAME:-my-awesome-project}" 2 17 40 0)
+  
+  if [[ -n "$form_result" ]]; then
+    PYTHON_GITHUB_USERNAME=$(echo "$form_result" | sed -n '1p')
+    PYTHON_GITHUB_PROJECT=$(echo "$form_result" | sed -n '2p')
+  fi
+}
+
 # Development tools selection
 # shellcheck disable=SC2120  # Function uses positional parameters set by eval
 select_development_tools() {
@@ -727,26 +796,29 @@ select_development_tools() {
     fi
   done
 
+  # Ask about Python Tools (after tools selection, before VS Code extensions)
+  if dialog --title "Install Python Tools?" \
+            --yesno "Do you want to install Python development tools and configure a Python project?\n\nThis will:\n• Copy Python build tools (pybuild.py)\n• Copy Python configuration files (pyproject.toml, requirements.txt)\n• Install VS Code Python extensions\n• Guide you through project configuration\n\nNote: Select 'No' if you only want basic Python extension support." \
+            12 70; then
+    INSTALL_PYTHON_TOOLS=true
+    INCLUDE_PYTHON_EXTENSIONS=true  # Ensure Python extensions are included
+    configure_python_repositories
+    configure_python_project
+  fi
+
   # VS Code Extensions (for tools without automatic extensions)
   local extensions
   extensions=$(tui_checklist "VS Code Extensions" \
                             "Select VS Code extension categories to include.\nNote: Extensions for selected dev tools are automatically included:" \
-                            "python" "Python - Development extensions for Python programming" on \
                             "markdown" "Markdown - Enhanced editing and preview extensions" on \
                             "shell" "Shell/Bash - Scripting and development extensions" on)
   
   for ext in $extensions; do
     case "$ext" in
-      "python") INCLUDE_PYTHON_EXTENSIONS=true ;;
       "markdown") INCLUDE_MARKDOWN_EXTENSIONS=true ;;
       "shell") INCLUDE_SHELL_EXTENSIONS=true ;;
     esac
   done
-
-  # Python package repository configuration
-  if [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" ]]; then
-    configure_python_repositories
-  fi
 }
 
 
@@ -836,12 +908,23 @@ show_summary() {
   fi
   
   # Python repository configuration
-  if [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" && -n "$PYTHON_PUBLISH_URL" ]]; then
+  if [[ "$INSTALL_PYTHON_TOOLS" == "true" && -n "$PYTHON_PUBLISH_URL" ]]; then
     summary+="\nPython Package Repository:\n"
     summary+="  • Publish URL: $PYTHON_PUBLISH_URL\n"
     summary+="  • Index URL: $PYTHON_INDEX_URL\n"
     [[ -n "$PYTHON_EXTRA_INDEX_URL" ]] && summary+="  • Extra Index: $PYTHON_EXTRA_INDEX_URL\n"
     [[ -n "$PYTHON_DEV_SUFFIX" ]] && summary+="  • Dev Suffix: $PYTHON_DEV_SUFFIX\n"
+  fi
+  
+  # Python project configuration
+  if [[ "$INSTALL_PYTHON_TOOLS" == "true" && -n "$PYTHON_PROJECT_NAME" ]]; then
+    summary+="\nPython Project Configuration:\n"
+    summary+="  • Project Name: $PYTHON_PROJECT_NAME\n"
+    [[ -n "$PYTHON_PROJECT_DESCRIPTION" ]] && summary+="  • Description: $PYTHON_PROJECT_DESCRIPTION\n"
+    [[ -n "$PYTHON_AUTHOR_NAME" ]] && summary+="  • Author: $PYTHON_AUTHOR_NAME\n"
+    [[ -n "$PYTHON_AUTHOR_EMAIL" ]] && summary+="  • Email: $PYTHON_AUTHOR_EMAIL\n"
+    [[ -n "$PYTHON_LICENSE" ]] && summary+="  • License: $PYTHON_LICENSE\n"
+    [[ -n "$PYTHON_GITHUB_USERNAME" && -n "$PYTHON_GITHUB_PROJECT" ]] && summary+="  • GitHub: $PYTHON_GITHUB_USERNAME/$PYTHON_GITHUB_PROJECT\n"
   fi
   
   summary+="\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -1026,19 +1109,178 @@ update_dev_sh() {
   chmod +x "${project_path}/dev.sh"
 }
 
-# Update pyproject.toml with Python repository configuration
+# Generate the [tool.pybuild] section based on selected repository type
+generate_pybuild_section() {
+  local pyproject_file="$1"
+  
+  # Find the start and end of the [tool.pybuild] section
+  local start_line end_line
+  start_line=$(grep -n "^# Python Package Repository Configuration" "$pyproject_file" | cut -d: -f1)
+  end_line=$(grep -n "^# Development environment configuration for Hatch" "$pyproject_file" | cut -d: -f1)
+  
+  if [[ -n "$start_line" && -n "$end_line" ]]; then
+    # Create the new pybuild section content
+    local new_content=""
+    case "$PYTHON_REPOSITORY_TYPE" in
+      "pypi")
+        new_content="# Python Package Repository Configuration
+# Configure these settings for your package repository (PyPI, Artifactory, Nexus, etc.)
+[tool.pybuild]
+# PyPI configuration (public repository)
+publish_base_url = \"$PYTHON_PUBLISH_URL\"
+install_index_url = \"$PYTHON_INDEX_URL\"
+install_extra_index_url = \"$PYTHON_EXTRA_INDEX_URL\"
+
+# Environment suffixes (optional) - used for environment-specific repository URLs
+dev_suffix = \"$PYTHON_DEV_SUFFIX\"
+prod_suffix = \"$PYTHON_PROD_SUFFIX\"
+
+# Authentication Note:
+# Set these environment variables for repository authentication:
+#   export HATCH_INDEX_USER=your_username
+#   export HATCH_INDEX_AUTH=your_password_or_token
+# These variables are used by the pybuild.py script for repository authentication.
+"
+        ;;
+      "artifactory")
+        new_content="# Python Package Repository Configuration
+# Configure these settings for your package repository (PyPI, Artifactory, Nexus, etc.)
+[tool.pybuild]
+# JFrog Artifactory configuration
+publish_base_url = \"$PYTHON_PUBLISH_URL\"
+install_index_url = \"$PYTHON_INDEX_URL\"
+install_extra_index_url = \"$PYTHON_EXTRA_INDEX_URL\"
+
+# Environment suffixes for development/production environments
+dev_suffix = \"$PYTHON_DEV_SUFFIX\"
+prod_suffix = \"$PYTHON_PROD_SUFFIX\"
+
+# Authentication Note:
+# Set these environment variables for repository authentication:
+#   export HATCH_INDEX_USER=your_artifactory_username
+#   export HATCH_INDEX_AUTH=your_artifactory_password_or_token
+# These variables are used by the pybuild.py script for repository authentication.
+"
+        ;;
+      "nexus")
+        new_content="# Python Package Repository Configuration
+# Configure these settings for your package repository (PyPI, Artifactory, Nexus, etc.)
+[tool.pybuild]
+# Nexus Repository configuration
+publish_base_url = \"$PYTHON_PUBLISH_URL\"
+install_index_url = \"$PYTHON_INDEX_URL\"
+install_extra_index_url = \"$PYTHON_EXTRA_INDEX_URL\"
+
+# Environment suffixes for development/production environments
+dev_suffix = \"$PYTHON_DEV_SUFFIX\"
+prod_suffix = \"$PYTHON_PROD_SUFFIX\"
+
+# Authentication Note:
+# Set these environment variables for repository authentication:
+#   export HATCH_INDEX_USER=your_nexus_username
+#   export HATCH_INDEX_AUTH=your_nexus_password_or_token
+# These variables are used by the pybuild.py script for repository authentication.
+"
+        ;;
+      "custom")
+        new_content="# Python Package Repository Configuration
+# Configure these settings for your package repository (PyPI, Artifactory, Nexus, etc.)
+[tool.pybuild]
+# Custom repository configuration
+publish_base_url = \"$PYTHON_PUBLISH_URL\"
+install_index_url = \"$PYTHON_INDEX_URL\"
+install_extra_index_url = \"$PYTHON_EXTRA_INDEX_URL\"
+
+# Environment suffixes for development/production environments
+dev_suffix = \"$PYTHON_DEV_SUFFIX\"
+prod_suffix = \"$PYTHON_PROD_SUFFIX\"
+
+# Authentication Note:
+# Set these environment variables for repository authentication:
+#   export HATCH_INDEX_USER=your_username
+#   export HATCH_INDEX_AUTH=your_password_or_token
+# These variables are used by the pybuild.py script for repository authentication.
+"
+        ;;
+    esac
+    
+    # Create a temporary file with the replacement content
+    local temp_file="${pyproject_file}.tmp"
+    head -n $((start_line - 1)) "$pyproject_file" > "$temp_file"
+    echo -n "$new_content" >> "$temp_file"
+    tail -n +$((end_line)) "$pyproject_file" >> "$temp_file"
+    
+    # Replace the original file
+    mv "$temp_file" "$pyproject_file"
+  fi
+}
+
+# Update pyproject.toml with Python project configuration
 update_pyproject_toml() {
   local project_path="$1"
   local pyproject_file="${project_path}/pyproject.toml"
   
-  # Only update if Python extensions are enabled and configuration exists
-  if [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" && -n "$PYTHON_PUBLISH_URL" ]]; then
-    # Use sed to update the pybuild configuration section
-    sed -i "s|publish_base_url = \".*\"|publish_base_url = \"$PYTHON_PUBLISH_URL\"|" "$pyproject_file"
-    sed -i "s|install_index_url = \".*\"|install_index_url = \"$PYTHON_INDEX_URL\"|" "$pyproject_file"
-    sed -i "s|install_extra_index_url = \".*\"|install_extra_index_url = \"$PYTHON_EXTRA_INDEX_URL\"|" "$pyproject_file"
-    sed -i "s|dev_suffix = \".*\"|dev_suffix = \"$PYTHON_DEV_SUFFIX\"|" "$pyproject_file"
-    sed -i "s|prod_suffix = \".*\"|prod_suffix = \"$PYTHON_PROD_SUFFIX\"|" "$pyproject_file"
+  # Only proceed if Python extensions are enabled
+  if [[ "$INCLUDE_PYTHON_EXTENSIONS" != "true" ]]; then
+    return
+  fi
+
+  # Replace the entire [tool.pybuild] section with the selected repository configuration
+  if [[ -n "$PYTHON_REPOSITORY_TYPE" ]]; then
+    generate_pybuild_section "$pyproject_file"
+  fi
+
+  # Update project metadata if provided
+  if [[ -n "$PYTHON_PROJECT_NAME" ]]; then
+    # Convert project name to package name (lowercase, underscores, alphanumeric only)
+    local package_name
+    package_name=$(echo "$PYTHON_PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g' | sed 's/_\+/_/g' | sed 's/^_\|_$//g')
+    
+    # Ensure package name is valid (starts with letter, no consecutive underscores)
+    if [[ ! "$package_name" =~ ^[a-z][a-z0-9_]*$ ]]; then
+      package_name="my_${package_name}"
+    fi
+    
+    # Update project name and package references
+    sed -i "s|name = \"my-awesome-project\"|name = \"$PYTHON_PROJECT_NAME\"|" "$pyproject_file"
+    sed -i "s|my_awesome_project|$package_name|g" "$pyproject_file"
+    
+    # Create the package directory structure
+    mkdir -p "${project_path}/src/${package_name}"
+    echo "__version__ = \"0.1.0\"" > "${project_path}/src/${package_name}/__about__.py"
+    echo "# ${PYTHON_PROJECT_DESCRIPTION:-$PYTHON_PROJECT_NAME}" > "${project_path}/src/${package_name}/__init__.py"
+  fi
+
+  # Update project description
+  if [[ -n "$PYTHON_PROJECT_DESCRIPTION" ]]; then
+    sed -i "s|description = \"A brief description of your project\"|description = \"$PYTHON_PROJECT_DESCRIPTION\"|" "$pyproject_file"
+  fi
+
+  # Update license
+  if [[ -n "$PYTHON_LICENSE" ]]; then
+    sed -i "s|license = \"MIT\"|license = \"$PYTHON_LICENSE\"|" "$pyproject_file"
+  fi
+
+  # Update keywords
+  if [[ -n "$PYTHON_KEYWORDS" ]]; then
+    # Convert comma-separated keywords to proper TOML array format
+    # Remove spaces, split by comma, and format as TOML array
+    local keywords_array
+    keywords_array=$(echo "$PYTHON_KEYWORDS" | sed 's/ //g' | sed 's/,/", "/g' | sed 's/^/["/' | sed 's/$/"]/')
+    sed -i "s|keywords = \[\"python\", \"cli\", \"automation\"\]|keywords = $keywords_array|" "$pyproject_file"
+  fi
+
+  # Update author information
+  if [[ -n "$PYTHON_AUTHOR_NAME" && -n "$PYTHON_AUTHOR_EMAIL" ]]; then
+    sed -i "s|{ name = \"Your Name\", email = \"your.email@example.com\" }|{ name = \"$PYTHON_AUTHOR_NAME\", email = \"$PYTHON_AUTHOR_EMAIL\" }|" "$pyproject_file"
+  fi
+
+  # Update GitHub URLs
+  if [[ -n "$PYTHON_GITHUB_USERNAME" && -n "$PYTHON_GITHUB_PROJECT" ]]; then
+    local base_url="https://github.com/${PYTHON_GITHUB_USERNAME}/${PYTHON_GITHUB_PROJECT}"
+    sed -i "s|https://github.com/yourusername/my-awesome-project/blob/main/README.md|${base_url}/blob/main/README.md|" "$pyproject_file"
+    sed -i "s|https://github.com/yourusername/my-awesome-project/issues|${base_url}/issues|" "$pyproject_file"
+    sed -i "s|https://github.com/yourusername/my-awesome-project|${base_url}|g" "$pyproject_file"
   fi
 }
 
@@ -1340,6 +1582,22 @@ main() {
     fi
   done
 
+  # Copy Python-specific files if Python tools are being installed
+  if [[ "$INSTALL_PYTHON_TOOLS" == "true" ]]; then
+    for file in "${PYTHON_FILES_TO_COPY[@]}"; do
+      # Skip if file already exists in the target directory
+      if [[ -f "${project_path}/$file" ]]; then
+        echo "Skipping $file - already exists in target directory"
+        continue
+      fi
+      
+      if [[ -f "$file" ]]; then
+        cp "$file" "${project_path}/$file" 2>/dev/null || true
+        echo "Copied Python tool: $file"
+      fi
+    done
+  fi
+
   # Generate the customized configuration files
   generate_mise_toml "$project_path"
   generate_devcontainer_json "$project_path" "$PROJECT_NAME" "$CONTAINER_NAME" "$DISPLAY_NAME"
@@ -1347,8 +1605,10 @@ main() {
   # Update dev.sh with project settings
   update_dev_sh "$project_path" "$DOCKER_EXEC_COMMAND" "$PROJECT_NAME" "$CONTAINER_NAME"
 
-  # Update pyproject.toml with Python repository configuration
-  update_pyproject_toml "$project_path"
+  # Update pyproject.toml with Python repository configuration (only if Python tools are installed)
+  if [[ "$INSTALL_PYTHON_TOOLS" == "true" ]]; then
+    update_pyproject_toml "$project_path"
+  fi
 
   # Clean up dialog config
   rm -f $DIALOGRC
@@ -1368,13 +1628,20 @@ main() {
   echo -e "   export GITHUB_TOKEN=\"your_github_token_here\""
   echo -e "2. Review and adjust settings in ${project_path}/.devcontainer/devcontainer.json if needed"
   echo -e "3. Review and adjust tool versions in ${project_path}/.mise.toml if needed"
-  if [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" ]]; then
-    echo -e "4. ${YELLOW}Python Development:${NC} Complete pyproject.toml configuration:"
-    echo -e "   - Update project name, description, and author information"
-    echo -e "   - Review [tool.pybuild] repository settings"
-    echo -e "   - Configure authentication credentials for your package repository"
+  if [[ "$INSTALL_PYTHON_TOOLS" == "true" ]]; then
+    echo -e "4. ${YELLOW}Python Development:${NC} Your Python project has been automatically configured!"
+    if [[ -n "$PYTHON_PROJECT_NAME" ]]; then
+      echo -e "   - Project structure created in src/$(echo "$PYTHON_PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | tr '-' '_' | tr ' ' '_')/"
+      echo -e "   - Project metadata configured with your provided information"
+    fi
+    if [[ -n "$PYTHON_PUBLISH_URL" ]]; then
+      echo -e "   - Repository URLs configured for your package storage"
+      echo -e "   - Set authentication: export HATCH_INDEX_USER=username HATCH_INDEX_AUTH=token"
+    else
+      echo -e "   - Review [tool.pybuild] repository settings if you plan to publish packages"
+    fi
     echo -e "   - Run: cd ${project_path} && python pybuild.py --help"
-    echo -e "5. See README.md for detailed configuration instructions"
+    echo -e "5. See README.md and PYTHON_REPOSITORY_CONFIG.md for additional configuration"
   else
     echo -e "4. See README.md for detailed configuration instructions"
   fi

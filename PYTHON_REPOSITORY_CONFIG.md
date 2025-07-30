@@ -1,11 +1,71 @@
 # Python Package Repository Configuration
 
-The dynamic dev container now supports configurable Python package repositories, making it suitable for use with PyPI, Artifactory, Nexus, or any other Python package repository.
+This document explains how to configure Python package repositories and project metadata for the development container.
 
-- [Features](#features)
-- [Configuration](#configuration)
-  - [Repository Types](#repository-types)
+## Automated Configuration
+
+When you run `install.sh` and select Python extensions, the script will automatically guide you through configuring your Python project:
+
+### What the Script Configures Automatically
+
+1. **Project Metadata**: Project name, description, author information, license, and keywords
+2. **GitHub Integration**: Automatically configures project URLs based on your GitHub username and repository name
+3. **Package Structure**: Creates the proper `src/<package_name>/` directory structure with `__init__.py` and `__about__.py` files
+4. **Repository URLs**: Configures package repository URLs for PyPI, Artifactory, or Nexus based on your selection
+
+### Interactive Setup Process
+
+The installation script will prompt you for:
+
+- **Project Information**:
+  - Project name (will be used for both the package name and directory structure)
+  - Project description
+  - License type (e.g., MIT, Apache-2.0, GPL-3.0)
+  - Keywords for package discovery
+
+- **Author Information**:
+  - Your name
+  - Your email address
+
+- **GitHub Repository**:
+  - Your GitHub username
+  - GitHub project/repository name
+  - (Used to automatically configure Documentation, Homepage, Source, and Bug Tracker URLs)
+
+- **Package Repository Type**:
+  - PyPI (default public repository)
+  - JFrog Artifactory (enterprise)
+  - Nexus Repository (enterprise)
+  - Custom repository URLs
+
+### Quick Start Checklist
+
+After running the automated setup, verify your configuration:
+
+1. **Project Structure Created**: ✅ Automatically done
+   - `src/<your_package_name>/` directory created
+   - `__about__.py` with version information
+   - `__init__.py` with project description
+
+2. **Project Metadata Configured**: ✅ Automatically done
+   - Project name, description, license, keywords set
+   - Author information configured
+   - GitHub URLs properly set
+
+3. **Repository Configuration**: ✅ Automatically done (if selected)
+   - Package repository URLs configured
+   - Environment suffixes set (if applicable)
+
+## Manual Configuration (Advanced)
+
+If you need to manually modify the configuration after the automated setup, the dynamic dev container supports configurable Python package repositories, making it suitable for use with PyPI, Artifactory, Nexus, or any other Python package repository.
+
+- [Automated Configuration](#automated-configuration)
+  - [What the Script Configures Automatically](#what-the-script-configures-automatically)
+  - [Interactive Setup Process](#interactive-setup-process)
   - [Quick Start Checklist](#quick-start-checklist)
+- [Manual Configuration (Advanced)](#manual-configuration-advanced)
+  - [Repository Types](#repository-types)
   - [Configuration Files](#configuration-files)
     - [Required Repository Configuration](#required-repository-configuration)
     - [Optional Repository Configuration](#optional-repository-configuration)
@@ -39,20 +99,9 @@ The dynamic dev container now supports configurable Python package repositories,
   - [Repository URL Validation](#repository-url-validation)
 
 
-## Features
-
-- **Configurable Repository URLs**: Support for PyPI, Artifactory, Nexus, and custom repositories
-- **Environment-specific Publishing**: Separate dev and prod environments with configurable suffixes
-- **Automatic Configuration**: Interactive setup during container installation
-- **Generic pybuild.py**: Works with any Python package repository
-- **Configuration Validation**: Ensures all required settings are present before execution
-- **Clear Error Messages**: Helpful guidance when configuration is missing or invalid
-
-## Configuration
-
-When you select Python development during installation, you'll be prompted to configure your package repository:
-
 ### Repository Types
+
+The automated setup supports the following repository types:
 
 1. **PyPI (default)**: Public Python Package Index
 2. **Artifactory**: JFrog Artifactory enterprise repository
