@@ -1,4 +1,4 @@
-# cspell:ignore pyyaml pytest mypy pkgs datetimez Pyflakes Pylint isort pycodestyle pydocstyle pyupgrade pyproject orjson
+# cspell:ignore pyyaml pytest mypy pkgs datetimez Pyflakes Pylint isort pycodestyle pydocstyle pyupgrade pyproject orjson pybuild 
 
 ####### Example pyproject.toml file. #######
 # Edit this file for your own Python project.
@@ -73,14 +73,12 @@ dev = [
 ]
 
 [project.urls]
-Documentation = "<add link to documentation MD file, probably in GitHub>"
-Homepage = "<Add Link to project home page in GitHub>"
-Source = "<Add link to project source in Github>"
+Documentation = "https://www.github.com/yourusername/project-name/blob/main/README.md"
+Homepage = "https://www.github.com/yourusername/project-name"
+Source = "https://www.github.com/yourusername/project-name"
 
 [tool.hatch.version]
 path = "src/<project>/__about__.py"
-
-disable = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/<project>"]
@@ -122,7 +120,7 @@ check = "mypy --install-types --non-interactive {args:src tests}"
 source_pkgs = ["<project>", "tests"]
 branch = true
 parallel = true
-omit = ["src/<project>>/__about__.py"]
+omit = ["src/<project>/__about__.py"]
 
 [tool.coverage.paths]
 project = ["src", "*/<project>/src"]
@@ -138,118 +136,68 @@ markers = ["order(number): runs tests in the order given", "serial"]
 line-length = 120
 
 [tool.ruff.lint]
-#Default value: ["E4", "E7", "E9", "F"]
-# See: https://docs.astral.sh/ruff/linter/#rule-selection
-# and, https://docs.astral.sh/ruff/rules/
 select = [
-  # Pyflakes: https://docs.astral.sh/ruff/rules/#pyflakes-f
-  "F",
-  # pycodestyle: https://docs.astral.sh/ruff/rules/#error-e
-  "E",
-  # Warning: https://docs.astral.sh/ruff/rules/#warning-w
-  "W",
-  # isort: https://docs.astral.sh/ruff/rules/#isort-i
-  "I",
-  # pep8-naming: https://docs.astral.sh/ruff/rules/#pep8-naming-n
-  "N",
-  # pydocstyle: https://docs.astral.sh/ruff/rules/#pydocstyle-d
-  "D",
-  # pyupgrade: https://docs.astral.sh/ruff/rules/#pyupgrade-up
-  "UP",
-  # flake8-2020: https://docs.astral.sh/ruff/rules/#flake8-2020-ytt
-  "YTT",
-  # flake8-annotations: https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
-  "ANN",
-  # flake8-async: https://docs.astral.sh/ruff/rules/#flake8-async-async
-  "ASYNC",
-  # flake8-bandit: https://docs.astral.sh/ruff/rules/#flake8-bandit-s
-  "S",
-  # flake8-bugbear: https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
-  "B",
-  # flake8-builtins: https://docs.astral.sh/ruff/rules/#flake8-builtins-a
-  "A",
-  # flake8-commas: https://docs.astral.sh/ruff/rules/#flake8-commas-com
-  "COM",
-  # flake8-comprehensions: https://docs.astral.sh/ruff/rules/#flake8-comprehensions-c4
-  "C4",
-  # flake8-datetimez: https://docs.astral.sh/ruff/rules/#flake8-datetimez-dtz
-  "DTZ",
-  # flake8-debugger: https://docs.astral.sh/ruff/rules/#flake8-debugger-t10
-  "T10",
-  # flake8-errmsg: https://docs.astral.sh/ruff/rules/#flake8-errmsg-em
-  "EM",
-  # flake8-executable: https://docs.astral.sh/ruff/rules/#flake8-executable-exe
-  "EXE",
-  # flake8-implicit-str-concat: https://docs.astral.sh/ruff/rules/#flake8-implicit-str-concat-isc
-  "ISC",
-  # flake8-import-conventions: https://docs.astral.sh/ruff/rules/#flake8-import-conventions-icn
-  "ICN",
-  # flake8-logging: https://docs.astral.sh/ruff/rules/#flake8-logging-log
-  "LOG",
-  # flake8-logging-format: https://docs.astral.sh/ruff/rules/#flake8-logging-format-g
-  "G",
-  # flake8-no-pep420: https://docs.astral.sh/ruff/rules/#flake8-no-pep420-inp
-  "INP",
-  # flake8-pie: https://docs.astral.sh/ruff/rules/#flake8-pie-pie
-  "PIE",
-  # flake8-print: https://docs.astral.sh/ruff/rules/#flake8-print-t20
-  "T20",
-  # flake8-pyi: https://docs.astral.sh/ruff/rules/#flake8-pyi-pyi
-  "PYI",
-  # flake8-pytest-style: https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
-  "PT",
-  # flake8-quotes: https://docs.astral.sh/ruff/rules/#flake8-quotes-q
-  "Q",
-  # flake8-raise: https://docs.astral.sh/ruff/rules/#flake8-raise-rse
-  "RSE",
-  # flake8-return: https://docs.astral.sh/ruff/rules/#flake8-return-ret
-  "RET",
-  # flake8-self: https://docs.astral.sh/ruff/rules/#flake8-self-slf
-  "SLF",
-  # flake8-slots: https://docs.astral.sh/ruff/rules/#flake8-slots-slot
-  "SLOT",
-  # flake8-simplify: https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
-  "SIM",
-  # flake8-tidy-imports: https://docs.astral.sh/ruff/rules/#flake8-tidy-imports-tid
-  "TID",
-  # flake8-type-checking: https://docs.astral.sh/ruff/rules/#flake8-type-checking-tch
-  "TCH",
-  # flake8-gettext: https://docs.astral.sh/ruff/rules/#flake8-gettext-int
-  "INT",
-  # flake8-unused-arguments: https://docs.astral.sh/ruff/rules/#flake8-unused-arguments-arg
-  "ARG",
-  # flake8-todos: https://docs.astral.sh/ruff/rules/#flake8-todos-td
-  "TD",
-  # eradicate: https://docs.astral.sh/ruff/rules/#eradicate-era
-  "ERA",
-  # Pylint: https://docs.astral.sh/ruff/rules/#pylint-pl
-  "PL",
+  "F",     # Pyflakes
+  "E",     # pycodestyle errors
+  "W",     # pycodestyle warnings
+  "I",     # isort
+  "N",     # pep8-naming
+  "D",     # pydocstyle
+  "UP",    # pyupgrade
+  "YTT",   # flake8-2020
+  "ANN",   # flake8-annotations
+  "ASYNC", # flake8-async
+  "S",     # flake8-bandit
+  "B",     # flake8-bugbear
+  "A",     # flake8-builtins
+  "COM",   # flake8-commas
+  "C4",    # flake8-comprehensions
+  "DTZ",   # flake8-datetimez
+  "T10",   # flake8-debugger
+  "EM",    # flake8-errmsg
+  "EXE",   # flake8-executable
+  "ISC",   # flake8-implicit-str-concat
+  "ICN",   # flake8-import-conventions
+  "LOG",   # flake8-logging
+  "G",     # flake8-logging-format
+  "INP",   # flake8-no-pep420
+  "PIE",   # flake8-pie
+  "T20",   # flake8-print
+  "PYI",   # flake8-pyi
+  "PT",    # flake8-pytest-style
+  "Q",     # flake8-quotes
+  "RSE",   # flake8-raise
+  "RET",   # flake8-return
+  "SLF",   # flake8-self
+  "SLOT",  # flake8-slots
+  "SIM",   # flake8-simplify
+  "TID",   # flake8-tidy-imports
+  "TC",    # flake8-type-checking
+  "INT",   # flake8-gettext
+  "ARG",   # flake8-unused-arguments
+  "TD",    # flake8-todos
+  "ERA",   # eradicate
+  "PL",    # Pylint
 ]
-
-# 2. Avoid enforcing line-length violations (`E501`)
 ignore = [
-  "E501",
-  "BLE001",
-  "D202",
-  "T201",
-  "D401",
-  "D205",
-  "PLR0912",
-  "PLR0915",
-  "S603",
-  "TD002",
-  "TD003",
+  "E501",    # line-too-long
+  "BLE001",  # blind-except
+  "D202",    # no-blank-line-after-function
+  "T201",    # print
+  "D401",    # non-imperative-mood
+  "D205",    # blank-line-after-summary
+  "PLR0912", # too-many-branches
+  "PLR0915", # too-many-statements
+  "S603",    # subprocess-without-shell-equals-true
+  "TD002",   # missing-todo-author
+  "TD003",   # missing-todo-link
 ]
-
 task-tags = ["FIXME", "TODO"]
-
-# 3. Avoid trying to fix flake8-bugbear (`B`) violations.
 unfixable = ["B"]
 
 [tool.ruff.lint.pylint]
 max-args = 8
 
-# 4. Ignore `E402` (import violations) in all `__init__.py` files, and in select subdirectories.
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402"]
 "**/{tests,docs,tools}/*" = ["E402"]
