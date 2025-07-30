@@ -291,13 +291,109 @@ source_colors() {
   NO_NEW_LINE='\033[0K\r'
 }
 
+# Function to detect available container runtime
+detect_container_runtime() {
+  local container_cmd=""
+  local runtime_type=""
+  
+  # Check for available container runtimes in order of preference
+  if command -v docker >/dev/null 2>&1; then
+    container_cmd="docker"
+    runtime_type="docker"
+  elif command -v podman >/dev/null 2>&1; then
+    container_cmd="podman"
+    runtime_type="podman"
+  elif command -v nerdctl >/dev/null 2>&1; then
+    container_cmd="nerdctl"
+    runtime_type="nerdctl"
+  elif command -v crictl >/dev/null 2>&1; then
+    # crictl doesn't support running containers like docker/podman
+    echo "ERROR: crictl found but it doesn't support running containers. Please install docker, podman, or nerdctl." >&2
+    return 1
+  elif command -v buildah >/dev/null 2>&1; then
+    # buildah is primarily for building, not running containers
+    echo "ERROR: buildah found but it's for building images. Please install docker, podman, or nerdctl for running containers." >&2
+    return 1
+  else
+    return 1
+  fi
+  
+  echo "$container_cmd:$runtime_type"
+  return 0
+}
+
+# Function to run container command based on detected runtime
+run_container_command() {
+  local image="$1"
+  shift
+  local container_info
+  local container_cmd
+  local runtime_type
+  
+  container_info=$(detect_container_runtime 2>/dev/null)
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
+  
+  container_cmd=$(echo "$container_info" | cut -d':' -f1)
+  runtime_type=$(echo "$container_info" | cut -d':' -f2)
+  
+  case "$runtime_type" in
+    "docker"|"podman"|"nerdctl")
+      $container_cmd run --rm --quiet "$image" "$@" 2>/dev/null
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 # Get latest major versions for a tool
 get_latest_major_versions() {
   local tool_name="$1"
   local versions
   
+  # Special handling for Python versions
+  if [[ "$tool_name" == "python" ]]; then
+    # Fetch remote versions using mise, handle potential errors, and filter for standard CPython versions
+    if command -v mise >/dev/null 2>&1; then
+      versions=$(mise ls-remote "$tool_name" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -v -E 'rc|alpha|beta' 2>/dev/null || echo "")
+    elif detect_container_runtime >/dev/null 2>&1; then
+      versions=$(run_container_command jdxcode/mise mise ls-remote "$tool_name" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -v -E 'rc|alpha|beta' 2>/dev/null || echo "")
+    else
+      echo "ERROR: Neither mise nor any container runtime (docker/podman/nerdctl) is available." >&2
+      echo ""
+      return
+    fi
+    
+    if [[ -z "$versions" ]]; then
+      # Fallback to common Python versions if mise fails
+      echo "(e.g., 3.13, 3.12, 3.11, 3.10)"
+      return
+    fi
+    
+    # For Python, get major.minor versions (e.g., 3.13, 3.12, 3.11)
+    local major_versions
+    major_versions=$(echo "$versions" | awk -F. '{print $1"."$2}' | sort -rV | uniq | head -n 5 | tr '\n' ',' | sed 's/,$//')
+    
+    if [[ -n "$major_versions" ]]; then
+      echo "(e.g., ${major_versions})"
+    else
+      echo "(e.g., 3.13, 3.12, 3.11, 3.10)"
+    fi
+    return
+  fi
+  
   # Fetch remote versions using mise, handle potential errors, and filter out pre-release versions
-  versions=$(mise ls-remote "$tool_name" 2>/dev/null | grep -v -E 'rc|alpha|beta' || echo "")
+  if command -v mise >/dev/null 2>&1; then
+    versions=$(mise ls-remote "$tool_name" 2>/dev/null | grep -v -E 'rc|alpha|beta' 2>/dev/null || echo "")
+  elif detect_container_runtime >/dev/null 2>&1; then
+    versions=$(run_container_command jdxcode/mise mise ls-remote "$tool_name" 2>/dev/null | grep -v -E 'rc|alpha|beta' 2>/dev/null || echo "")
+  else
+    echo "ERROR: Neither mise nor any container runtime (docker/podman/nerdctl) is available." >&2
+    echo ""
+    return
+  fi
   
   if [[ -z "$versions" ]]; then
     echo ""
@@ -792,19 +888,21 @@ select_development_tools() {
         else
           TOOL_VERSION_VALUE["$tool"]="latest"
         fi
+        
+        # Special handling for Python: configure Python project after Python tool is selected
+        if [[ "$tool" == "python" ]]; then
+          INSTALL_PYTHON_TOOLS=true
+          INCLUDE_PYTHON_EXTENSIONS=true  # Ensure Python extensions are included
+          
+          # Ask if user wants to configure a Python project
+          if tui_yesno "Python Project Setup" "Configure Python project files and metadata?\n\nThis will:\n• Copy Python build tools (pybuild.py)\n• Copy Python configuration files (pyproject.toml, requirements.txt)\n• Guide you through project configuration\n\nSelect 'No' if you only want Python runtime without project setup." "y"; then
+            configure_python_repositories
+            configure_python_project
+          fi
+        fi
       done
     fi
   done
-
-  # Ask about Python Tools (after tools selection, before VS Code extensions)
-  if dialog --title "Install Python Tools?" \
-            --yesno "Do you want to install Python development tools and configure a Python project?\n\nThis will:\n• Copy Python build tools (pybuild.py)\n• Copy Python configuration files (pyproject.toml, requirements.txt)\n• Install VS Code Python extensions\n• Guide you through project configuration\n\nNote: Select 'No' if you only want basic Python extension support." \
-            12 70; then
-    INSTALL_PYTHON_TOOLS=true
-    INCLUDE_PYTHON_EXTENSIONS=true  # Ensure Python extensions are included
-    configure_python_repositories
-    configure_python_project
-  fi
 
   # VS Code Extensions (for tools without automatic extensions)
   local extensions
@@ -1341,6 +1439,10 @@ generate_devcontainer_json() {
         "powershell")
           echo "" >> "$temp_file"
           extract_devcontainer_section "// #### Begin PowerShell ####" "// #### End PowerShell ####" >> "$temp_file"
+          ;;
+        "python")
+          echo "" >> "$temp_file"
+          extract_devcontainer_section "// #### Begin Python ####" "// #### End Python ####" >> "$temp_file"
           ;;
       esac
     fi
