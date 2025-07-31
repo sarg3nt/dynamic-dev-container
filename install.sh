@@ -1551,12 +1551,35 @@ generate_devcontainer_json() {
   # Always include the final settings blocks
   extract_devcontainer_section "// #### Begin Spell Checker Settings ####" "// #### End PSI Header Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   
-  # Remove trailing comma from the last settings entry
-  # Find the last line that's a top-level setting property (8 spaces indentation + quoted property)  
+  # Fix settings entries to ensure proper JSON formatting
+  # Find all top-level setting properties (8 spaces indentation + quoted property)
   # This ensures we only target direct properties of the "settings" object, not nested properties
-  last_setting_line=$(grep -n '^        "[^"]*":.*,$' "$temp_file" | tail -n 1 | cut -d: -f1)
-  if [[ -n "$last_setting_line" ]]; then
-      sed -i "${last_setting_line}s/,$//" "$temp_file"
+  # Exclude lines that end with opening braces { or brackets [ as they don't need commas
+  
+  # First, ensure all settings lines (except the last one) have commas
+  # Get all setting lines that are complete property definitions (not opening objects/arrays)
+  setting_lines=$(grep -n '^        "[^"]*":' "$temp_file" | grep -v '[\{\[][\s]*$' | cut -d: -f1)
+  if [[ -n "$setting_lines" ]]; then
+    # Convert to array properly
+    mapfile -t lines_array <<< "$setting_lines"
+    
+    # Process all lines except the last one to ensure they have commas
+    for ((i=0; i<${#lines_array[@]}-1; i++)); do
+      line_num=${lines_array[i]}
+      # Check if line doesn't have comma and add one
+      if ! sed -n "${line_num}p" "$temp_file" | grep -q ',$'; then
+        sed -i "${line_num}s/$/,/" "$temp_file"
+      fi
+    done
+    
+    # Remove trailing comma from the last settings entry
+    # Find the actual last property line that should not have a comma
+    all_setting_lines=$(grep -n '^        "[^"]*":' "$temp_file" | cut -d: -f1)
+    if [[ -n "$all_setting_lines" ]]; then
+      mapfile -t all_lines_array <<< "$all_setting_lines"
+      last_line_num=${all_lines_array[-1]}
+      sed -i "${last_line_num}s/,$//" "$temp_file"
+    fi
   fi
 
   # Close settings and customizations
