@@ -17,7 +17,8 @@
     "context": "../",
     "args": {
       "BUILDKIT_PROGRESS": "plain",
-      "DOCKER_BUILDKIT": "1"
+      "DOCKER_BUILDKIT": "1",
+      "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
     },
     "options": ["--progress=plain"]
   },
@@ -167,6 +168,10 @@
         "szTheory.vscode-packer-powertools", // Packer tools
         // #### End Packer ####
 
+        // #### Begin PSI Header ####
+        "psioniq.psi-header", // File header management
+        // #### End PSI Header ####
+
         // #### Begin Core Extensions ####
         "albert.TabOut", // Tab out of brackets/quotes
         "ciiqr.encode", // Encode/decode utilities
@@ -179,7 +184,6 @@
         "hverlin.mise-vscode", // Mise VS Code integration
         "ms-azuretools.vscode-docker", // Docker support
         "naumovs.color-highlight", // Color highlighting
-        "psioniq.psi-header", // File header management
         "PKief.material-icon-theme", // Material icon theme
         "RapidAPI.vscode-rapidapi-client", // RapidAPI client
         "streetsidesoftware.code-spell-checker", // Spell checker
@@ -511,10 +515,9 @@
         // #### End TODO Tree Settings ####
         // #### Begin PSI Header Settings ####
         "psi-header.config": {
-          "company": "<Add your company name here>"
+          "company": "Add your company name here"
         },
         "psi-header.changes-tracking": {
-          "isActive": false,
           "autoHeader": "autoSave",
           "exclude": ["json"],
           "excludeGlob": ["**/.git/**"]
@@ -523,6 +526,30 @@
         "psi-header.lang-config": [
           {
             "language": "*",
+            "begin": "",
+            "end": "",
+            "prefix": "// "
+          },
+          {
+            "language": "go",
+            "begin": "",
+            "end": "",
+            "prefix": "// "
+          },
+          {
+            "language": "csharp",
+            "begin": "",
+            "end": "",
+            "prefix": "// "
+          },
+          {
+            "language": "javascript",
+            "begin": "",
+            "end": "",
+            "prefix": "// "
+          },
+          {
+            "language": "typescript",
             "begin": "",
             "end": "",
             "prefix": "// "
@@ -578,16 +605,44 @@
         ],
         "psi-header.templates": [
           {
-            "language": "markdown",
+            "language": "go",
+            "template": ["Add your template text here"]
+          },
+          {
+            "language": "csharp",
+            "template": ["Add your template text here"]
+          },
+          {
+            "language": "javascript",
+            "template": ["Add your template text here"]
+          },
+          {
+            "language": "typescript",
+            "template": ["Add your template text here"]
+          },
+          {
+            "language": "python",
+            "template": ["Add your template text here"]
+          },
+          {
+            "language": "shellscript",
+            "template": ["Add your template text here"]
+          },
+          {
+            "language": "terraform",
             "template": ["Add your template text here"]
           },
           {
             "language": "powershell",
-            "template": [".DESCRIPTION", "  Add your template text here"]
+            "template": [".DESCRIPTION", "Add your template text here"]
+          },
+          {
+            "language": "markdown",
+            "template": ["Add your template text here"]
           },
           {
             "language": "*",
-            "template": ["  Add your template text here"]
+            "template": ["Add your template text here"]
           }
         ]
         // #### End PSI Header Settings ####

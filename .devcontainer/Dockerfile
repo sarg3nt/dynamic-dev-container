@@ -8,6 +8,10 @@ FROM ghcr.io/sarg3nt/dynamic-dev-container:latest
 # Switch to vscode user for tool installation
 USER vscode
 
+ARG GITHUB_TOKEN=""
+ENV GITHUB_TOKEN=$GITHUB_TOKEN
+ENV GITHUB_API_TOKEN=$GITHUB_TOKEN
+
 # Install user system packages
 RUN --mount=type=bind,source=.,target=/tmp/src,ro --mount=type=bind,source=.devcontainer,target=/tmp/src/.devcontainer,ro bash -c "cd /tmp/src && .devcontainer/scripts/10_install_packages.sh"
 
