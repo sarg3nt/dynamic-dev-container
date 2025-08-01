@@ -390,6 +390,8 @@ main() {
   
   log_info "Starting dynamic dev container mise tools setup..."
   
+  log_info "GITHUB_TOKEN: ${GITHUB_TOKEN:-not set}"
+
   # Install mise tools
   if ! install_mise_tools; then
     log_error "Failed to install mise tools"
