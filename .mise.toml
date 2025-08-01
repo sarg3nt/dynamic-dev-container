@@ -54,7 +54,7 @@ dotnet = 'latest'
 
 #### Begin Node Development
 #version#
-node = 'latest'
+node = '22.0'
 pnpm = 'latest'
 yarn = 'latest'
 deno = 'latest'

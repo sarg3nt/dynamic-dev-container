@@ -16,10 +16,10 @@ declare -A TOOL_VERSION_CONFIGURABLE
 declare -A TOOL_VERSION_VALUE
 
 # Extension flags
-INCLUDE_PYTHON_EXTENSIONS=false
-INCLUDE_MARKDOWN_EXTENSIONS=false
-INCLUDE_SHELL_EXTENSIONS=false
-INCLUDE_JS_EXTENSIONS=false
+INCLUDE_PYTHON_EXTENSIONS=${INCLUDE_PYTHON_EXTENSIONS:-false}
+INCLUDE_MARKDOWN_EXTENSIONS=${INCLUDE_MARKDOWN_EXTENSIONS:-false}
+INCLUDE_SHELL_EXTENSIONS=${INCLUDE_SHELL_EXTENSIONS:-false}
+INCLUDE_JS_EXTENSIONS=${INCLUDE_JS_EXTENSIONS:-false}
 
 # Python Project Setup Configuration
 INSTALL_PYTHON_TOOLS=false
@@ -1019,12 +1019,16 @@ select_development_tools() {
                             "markdown" "Markdown - Enhanced editing and preview extensions" on \
                             "shell" "Shell/Bash - Scripting and development extensions" on)
   
-  for ext in $extensions; do
-    case "$ext" in
-      "markdown") INCLUDE_MARKDOWN_EXTENSIONS=true ;;
-      "shell") INCLUDE_SHELL_EXTENSIONS=true ;;
-    esac
-  done
+  # Parse the quoted dialog output properly
+  if [[ -n "$extensions" ]]; then
+    eval "set -- $extensions"
+    for ext in "$@"; do
+      case "$ext" in
+        "markdown") INCLUDE_MARKDOWN_EXTENSIONS=true ;;
+        "shell") INCLUDE_SHELL_EXTENSIONS=true ;;
+      esac
+    done
+  fi
   
   # Configure PSI Header extension
   configure_psi_header
@@ -1246,11 +1250,12 @@ extract_devcontainer_section() {
     return 1
   fi
   
-  # Escape forward slashes for awk pattern matching
+  # Escape forward slashes for sed pattern matching
   local escaped_start_marker="${start_marker//\//\\/}"
   local escaped_end_marker="${end_marker//\//\\/}"
   
-  awk "/${escaped_start_marker}/,/${escaped_end_marker}/" "$file"
+  # Use sed to extract the specific section between exact markers
+  sed -n "/${escaped_start_marker}/,/${escaped_end_marker}/p" "$file"
 }
 
 # Generate custom .mise.toml
@@ -1850,11 +1855,12 @@ generate_devcontainer_json() {
   fi
 
   # Include extensions based on selected tools
-  echo "DEBUG: Starting tools loop - TOOL_SELECTED keys: ${!TOOL_SELECTED[*]}" >&2
-  for tool in "${!TOOL_SELECTED[@]}"; do
-    echo "DEBUG: Processing tool: $tool, selected: ${TOOL_SELECTED[$tool]}" >&2
-    if [[ "${TOOL_SELECTED[$tool]}" == "true" ]]; then
-      echo "DEBUG: Tool $tool is selected, processing case statement..." >&2
+  echo "DEBUG: Starting tools loop - TOOL_SELECTED array processing..." >&2
+  if [[ ${#TOOL_SELECTED[@]} -gt 0 ]]; then
+    for tool in "${!TOOL_SELECTED[@]}"; do
+      echo "DEBUG: Processing tool: $tool, selected: ${TOOL_SELECTED[$tool]}" >&2
+      if [[ "${TOOL_SELECTED[$tool]}" == "true" ]]; then
+        echo "DEBUG: Tool $tool is selected, processing case statement..." >&2
       case "$tool" in
         "go"|"goreleaser")
           echo "DEBUG: Extracting Go extensions for tool: $tool" >&2
@@ -1930,11 +1936,12 @@ generate_devcontainer_json() {
       echo "DEBUG: Tool $tool is not selected" >&2
     fi
   done
+  fi
   echo "DEBUG: Completed tools loop" >&2
   
   # Include Python extensions if selected
   echo "DEBUG: Checking INCLUDE_PYTHON_EXTENSIONS: $INCLUDE_PYTHON_EXTENSIONS" >&2
-  if [ "$INCLUDE_PYTHON_EXTENSIONS" = true ]; then
+  if [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" ]]; then
     if ! grep -q "// #### Begin Python ####" "$temp_file"; then
       echo "DEBUG: Including Python extensions" >&2
       echo "" >> "$temp_file"
@@ -1947,7 +1954,7 @@ generate_devcontainer_json() {
   
   # Include Markdown extensions if selected
   echo "DEBUG: Checking INCLUDE_MARKDOWN_EXTENSIONS: $INCLUDE_MARKDOWN_EXTENSIONS" >&2
-  if [ "$INCLUDE_MARKDOWN_EXTENSIONS" = true ]; then
+  if [[ "$INCLUDE_MARKDOWN_EXTENSIONS" == "true" ]]; then
     if ! grep -q "// #### Begin Markdown ####" "$temp_file"; then
       echo "DEBUG: Including Markdown extensions" >&2
       echo "" >> "$temp_file"
@@ -1960,7 +1967,7 @@ generate_devcontainer_json() {
   
   # Include Shell/Bash extensions if selected
   echo "DEBUG: Checking INCLUDE_SHELL_EXTENSIONS: $INCLUDE_SHELL_EXTENSIONS" >&2
-  if [ "$INCLUDE_SHELL_EXTENSIONS" = true ]; then
+  if [[ "$INCLUDE_SHELL_EXTENSIONS" == "true" ]]; then
     if ! grep -q "// #### Begin Shell/Bash ####" "$temp_file"; then
       echo "DEBUG: Including Shell/Bash extensions" >&2
       echo "" >> "$temp_file"
@@ -1973,7 +1980,7 @@ generate_devcontainer_json() {
   
   # Include PSI Header extension if selected
   echo "DEBUG: Checking INSTALL_PSI_HEADER: $INSTALL_PSI_HEADER" >&2
-  if [ "$INSTALL_PSI_HEADER" = true ]; then
+  if [[ "$INSTALL_PSI_HEADER" == "true" ]]; then
     if ! grep -q "// #### Begin PSI Header ####" "$temp_file"; then
       echo "DEBUG: Including PSI Header extensions" >&2
       echo "" >> "$temp_file"
@@ -2097,7 +2104,7 @@ generate_devcontainer_json() {
   
   # Include Python settings if Python extensions were selected
   echo "DEBUG: Checking INCLUDE_PYTHON_EXTENSIONS for settings: $INCLUDE_PYTHON_EXTENSIONS" >&2
-  if [ "$INCLUDE_PYTHON_EXTENSIONS" = true ]; then
+  if [[ "$INCLUDE_PYTHON_EXTENSIONS" == "true" ]]; then
     if ! grep -q "python.defaultInterpreterPath" "$temp_file"; then
       echo "DEBUG: Including Python settings" >&2
       # shellcheck disable=SC2129
@@ -2110,8 +2117,8 @@ generate_devcontainer_json() {
   
   # Include Markdown settings if Markdown extensions were selected
   echo "DEBUG: Checking INCLUDE_MARKDOWN_EXTENSIONS for settings: $INCLUDE_MARKDOWN_EXTENSIONS" >&2
-  if [ "$INCLUDE_MARKDOWN_EXTENSIONS" = true ]; then
-    if ! grep -q "markdown.preview.breaks" "$temp_file"; then
+  if [[ "$INCLUDE_MARKDOWN_EXTENSIONS" == "true" ]]; then
+    if ! grep -q "markdown.extension.orderedList.autoRenumber" "$temp_file"; then
       echo "DEBUG: Including Markdown settings" >&2
       # shellcheck disable=SC2129
       extract_devcontainer_section "// #### Begin Markdown Settings ####" "// #### End Markdown Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
@@ -2123,8 +2130,8 @@ generate_devcontainer_json() {
   
   # Include Shell/Bash settings if Shell extensions were selected
   echo "DEBUG: Checking INCLUDE_SHELL_EXTENSIONS for settings: $INCLUDE_SHELL_EXTENSIONS" >&2
-  if [ "$INCLUDE_SHELL_EXTENSIONS" = true ]; then
-    if ! grep -q "shellcheck.enable" "$temp_file"; then
+  if [[ "$INCLUDE_SHELL_EXTENSIONS" == "true" ]]; then
+    if ! grep -q "shellcheck.customArgs" "$temp_file"; then
       echo "DEBUG: Including Shell/Bash settings" >&2
       # shellcheck disable=SC2129
       extract_devcontainer_section "// #### Begin Shell/Bash Settings ####" "// #### End Shell/Bash Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
@@ -2136,7 +2143,7 @@ generate_devcontainer_json() {
   
   # Include JavaScript/TypeScript settings if JS extensions were selected
   echo "DEBUG: Checking INCLUDE_JS_EXTENSIONS for settings: $INCLUDE_JS_EXTENSIONS" >&2
-  if [ "$INCLUDE_JS_EXTENSIONS" = true ]; then
+  if [[ "$INCLUDE_JS_EXTENSIONS" == "true" ]]; then
     if ! grep -q "typescript.preferences.includePackageJsonAutoImports" "$temp_file"; then
       echo "DEBUG: Including JavaScript/TypeScript settings" >&2
       # shellcheck disable=SC2129
@@ -2152,6 +2159,11 @@ generate_devcontainer_json() {
   extract_devcontainer_section "// #### Begin Spell Checker Settings ####" "// #### End Spell Checker Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
   echo "DEBUG: Spell Checker settings included successfully" >&2
   
+  # Always include Mise settings (since Mise extension is in Core Extensions)
+  echo "DEBUG: Including Mise settings" >&2
+  extract_devcontainer_section "// #### Begin Mise Settings ####" "// #### End Mise Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
+  echo "DEBUG: Mise settings included successfully" >&2
+  
   # Include TODO Tree settings
   echo "DEBUG: Including TODO Tree settings" >&2
   extract_devcontainer_section "// #### Begin TODO Tree Settings ####" "// #### End TODO Tree Settings ####" | grep -v "^\s*//.*Begin\|^\s*//.*End" >> "$temp_file"
@@ -2159,7 +2171,7 @@ generate_devcontainer_json() {
   
   # Include PSI Header settings if configured, otherwise include default ones
   echo "DEBUG: Checking INSTALL_PSI_HEADER for settings: $INSTALL_PSI_HEADER" >&2
-  if [ "$INSTALL_PSI_HEADER" = true ]; then
+  if [[ "$INSTALL_PSI_HEADER" == "true" ]]; then
     echo "DEBUG: Generating PSI Header settings" >&2
     generate_psi_header_settings "$temp_file"
     echo "DEBUG: PSI Header settings generated successfully" >&2
