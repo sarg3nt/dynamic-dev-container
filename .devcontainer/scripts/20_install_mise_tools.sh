@@ -20,8 +20,8 @@ source "$(dirname "$0")/log.sh"
 readonly MISE_CONFIG_FILE=".mise.toml"
 readonly BACKUP_FILE="${MISE_CONFIG_FILE}.backup"
 readonly TEMP_FILE="${MISE_CONFIG_FILE}.temp"
-readonly JS_BEGIN_MARKER="#### Begin JavaScript/Node.js Development ####"
-readonly JS_END_MARKER="#### End JavaScript/Node.js Development ####"
+readonly JS_BEGIN_MARKER="#### Begin Node Development"
+readonly JS_END_MARKER="#### End Node Development"
 readonly MAX_INSTALL_ATTEMPTS=10
 readonly RETRY_DELAY=6
 readonly ZSHRC_FILE="/home/vscode/.zshrc"
@@ -102,7 +102,7 @@ check_and_remove_javascript_section() {
     
     # Only write lines that are not in the JavaScript section
     if [[ "$in_js_section" == false ]]; then
-      if ! sudo sh -c "printf '%s\n' \"$line\" >> \"$TEMP_FILE\""; then
+      if ! printf '%s\n' "$line" | sudo tee -a "$TEMP_FILE" >/dev/null; then
         log_error "Failed to write to temporary file"
         sudo rm -f "$TEMP_FILE" 2>/dev/null || true
         return 1
