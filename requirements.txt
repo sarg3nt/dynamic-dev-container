@@ -12,7 +12,7 @@ pytest~=8.3.4
 # https://pypi.org/project/pytest-mock/
 pytest-mock~=3.14
 # https://pypi.org/project/pytest-cov/
-pytest-cov~=6.0
+pytest-cov~=6.2
 # https://pypi.org/project/loguru/
 loguru~=0.7.3
 # https://pypi.org/project/requests/
@@ -20,15 +20,15 @@ requests~=2.32
 # https://pypi.org/project/types-requests/
 types-requests~=2.32
 # https://pypi.org/project/ruff/
-ruff~=0.9.7
+ruff~=0.12.7
 # https://pypi.org/project/mypy/
 mypy~=1.17.1
 # https://pypi.org/project/watchdog/#description
 watchdog~=6.0
 # https://pypi.org/project/pylint/
-pylint~=3.3.6
+pylint~=3.3.7
 # https://pypi.org/project/python-dotenv/
-python-dotenv~=1.1.0
+python-dotenv~=1.1.1
 
 
 # https://pypi.org/project/fabric/
