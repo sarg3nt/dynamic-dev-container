@@ -4,6 +4,8 @@
 
 # cSpell:ignore kairos sysinfra pytest Dproject CREDS qube pybuild
 
+from __future__ import annotations
+
 import argparse
 import os
 import shutil
@@ -12,83 +14,117 @@ import sys
 import time
 import tomllib
 from pathlib import Path
+from typing import NamedTuple
 
 from loguru import logger
-from watchdog.events import FileSystemEventHandler
+from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-# Define a constant for the file change debounce interval (in seconds)
+# Define constants
 FILE_CHANGE_DEBOUNCE_SECONDS = 3
+SPINNER_STATES = ["|", "/", "-", "\\"]
+PYTHON_FILE_EXTENSION = ".py"
+DIST_DIR_NAME = "dist"
+WHEEL_EXTENSION = ".whl"
 
 
-def load_config() -> dict[str, object]:
+class PyBuildError(Exception):
+    """Base exception for PyBuild operations."""
+
+
+class ConfigurationError(PyBuildError):
+    """Raised when configuration is invalid or missing."""
+
+
+class CommandError(PyBuildError):
+    """Raised when a command execution fails."""
+
+
+class PyBuildConfig(NamedTuple):
+    """Configuration data for PyBuild operations."""
+
+    package_name: str
+    publish_base_url: str
+    install_index_url: str
+    install_extra_index_url: str | None = None
+    dev_suffix: str | None = None
+    prod_suffix: str | None = None
+
+
+def load_config() -> PyBuildConfig:
     """Load configuration from pyproject.toml.
 
     Returns
     -------
-    config : dict[str, object]
-        Configuration dictionary with repository URLs and settings.
+    PyBuildConfig
+        Configuration with repository URLs and settings.
 
     Raises
     ------
-    SystemExit
+    ConfigurationError
         If required configuration is missing from pyproject.toml.
 
     """
-
-    config: dict[str, object] = {}
+    pyproject_path = Path("pyproject.toml")
+    if not pyproject_path.exists():
+        msg = "pyproject.toml file not found. This file is required for configuration."
+        raise ConfigurationError(msg)
 
     try:
-        pyproject_path = Path("pyproject.toml")
-        if not pyproject_path.exists():
-            logger.error("pyproject.toml file not found. This file is required for configuration.")
-            sys.exit(1)
-
-        with open(pyproject_path, "rb") as f:
+        with pyproject_path.open("rb") as f:
             pyproject_data = tomllib.load(f)
-
-        # Get package name from project section
-        if "project" in pyproject_data and "name" in pyproject_data["project"]:
-            config["package_name"] = pyproject_data["project"]["name"]
-        else:
-            logger.error("Package name not found in pyproject.toml [project] section.")
-            sys.exit(1)
-
-        # Get repository configuration from tool.pybuild section
-        if "tool" in pyproject_data and "pybuild" in pyproject_data["tool"]:
-            pybuild_config = pyproject_data["tool"]["pybuild"]
-            # Load all pybuild configuration values
-            config.update(pybuild_config)
-        else:
-            logger.error("Repository configuration not found in pyproject.toml [tool.pybuild] section.")
-            logger.info("Please run the install.sh script to configure your repository settings.")
-            sys.exit(1)
-
-        # Validate required configuration
-        if not config.get("publish_base_url"):
-            logger.error("publish_base_url must be configured in pyproject.toml [tool.pybuild] section.")
-            sys.exit(1)
-        if not config.get("install_index_url"):
-            logger.error("install_index_url must be configured in pyproject.toml [tool.pybuild] section.")
-            sys.exit(1)
-
     except Exception as e:
-        logger.error(f"Could not load pyproject.toml configuration: {e}")
-        logger.info("Please check your pyproject.toml file format and configuration.")
-        sys.exit(1)
+        msg = f"Could not parse pyproject.toml file: {e}"
+        raise ConfigurationError(msg) from e
 
-    return config
+    # Get package name from project section
+    project_section = pyproject_data.get("project", {})
+    package_name = project_section.get("name")
+    if not package_name:
+        msg = "Package name not found in pyproject.toml [project] section."
+        raise ConfigurationError(msg)
+
+    # Get repository configuration from tool.pybuild section
+    tool_section = pyproject_data.get("tool", {})
+    pybuild_config = tool_section.get("pybuild", {})
+
+    if not pybuild_config:
+        msg = (
+            "Repository configuration not found in pyproject.toml [tool.pybuild] section. "
+            "Please run the install.sh script to configure your repository settings."
+        )
+        raise ConfigurationError(msg)
+
+    # Validate required configuration
+    publish_base_url = pybuild_config.get("publish_base_url")
+    if not publish_base_url:
+        msg = "publish_base_url must be configured in pyproject.toml [tool.pybuild] section."
+        raise ConfigurationError(msg)
+
+    install_index_url = pybuild_config.get("install_index_url")
+    if not install_index_url:
+        msg = "install_index_url must be configured in pyproject.toml [tool.pybuild] section."
+        raise ConfigurationError(msg)
+
+    return PyBuildConfig(
+        package_name=package_name,
+        publish_base_url=publish_base_url,
+        install_index_url=install_index_url,
+        install_extra_index_url=pybuild_config.get("install_extra_index_url"),
+        dev_suffix=pybuild_config.get("dev_suffix"),
+        prod_suffix=pybuild_config.get("prod_suffix"),
+    )
 
 
-def get_publish_url(env: str, config: dict[str, object]) -> str:
+def get_publish_url(env: str, config: PyBuildConfig) -> str:
     """Get the publish URL for the specified environment.
 
     Parameters
     ----------
     env : str
         Environment ('dev' or 'prod')
-    config : dict[str, object]
-        Configuration dictionary
+    config : PyBuildConfig
+        Configuration data
 
     Returns
     -------
@@ -96,9 +132,8 @@ def get_publish_url(env: str, config: dict[str, object]) -> str:
         Repository URL for publishing
 
     """
-
-    base_url = str(config["publish_base_url"])
-    suffix = str(config.get("dev_suffix", "")) if env == "dev" else str(config.get("prod_suffix", ""))
+    base_url = config.publish_base_url
+    suffix = config.dev_suffix if env == "dev" else config.prod_suffix
 
     # Handle different URL patterns
     if "artifactory" in base_url and suffix:
@@ -113,13 +148,13 @@ def get_publish_url(env: str, config: dict[str, object]) -> str:
     return base_url
 
 
-def get_install_urls(config: dict[str, object], use_dev: bool = False) -> tuple[str, str]:
+def get_install_urls(config: PyBuildConfig, use_dev: bool = False) -> tuple[str, str]:
     """Get the install URLs.
 
     Parameters
     ----------
-    config : dict[str, object]
-        Configuration dictionary
+    config : PyBuildConfig
+        Configuration data
     use_dev : bool
         Whether to use dev environment URLs
 
@@ -129,10 +164,10 @@ def get_install_urls(config: dict[str, object], use_dev: bool = False) -> tuple[
         Index URL and extra index URL
 
     """
-    base_index = str(config["install_index_url"])
-    extra_index = str(config.get("install_extra_index_url", ""))
+    base_index = config.install_index_url
+    extra_index = config.install_extra_index_url or ""
 
-    dev_suffix = str(config.get("dev_suffix", ""))
+    dev_suffix = config.dev_suffix or ""
     if use_dev and dev_suffix:
         # Modify URLs for dev environment if needed
         if "artifactory" in base_index:
@@ -145,17 +180,18 @@ def get_install_urls(config: dict[str, object], use_dev: bool = False) -> tuple[
 
 def static_analysis() -> None:
     """Run static analysis using SonarQube."""
-
     logger.info("Running static analysis.")
 
     # Check if sonar-scanner exists
     if not shutil.which("sonar-scanner"):
-        sys.tracebacklimit = 0  # Suppress traceback for this exception
-        file_not_found_error = "The 'sonar-scanner' binary is not found in PATH. Please install it.  This command is meant to be ran from the SonarQube docker container."
-        raise FileNotFoundError(file_not_found_error)
+        msg = (
+            "The 'sonar-scanner' binary is not found in PATH. Please install it. "
+            "This command is meant to be run from the SonarQube docker container."
+        )
+        raise CommandError(msg)
 
     sonar_memory_limit = os.getenv("SONAR_MEMORY_LIMIT", "1024")
-    repo_root = os.path.dirname(os.path.realpath(__file__))
+    repo_root = Path(__file__).parent
     command = [
         "sonar-scanner",
         "-X",
@@ -169,25 +205,23 @@ def static_analysis() -> None:
 
 def test() -> None:
     """Run Python tests using pytest."""
-
     logger.info("Running Python tests.")
 
     # Try to find tests directory in common locations
-    test_paths = ["tests", "test", "/workspaces/tests"]
+    test_paths = [Path("tests"), Path("test"), Path("/workspaces/tests")]
     test_path = None
 
     for path in test_paths:
-        if os.path.exists(path):
+        if path.exists():
             test_path = path
             break
 
     if not test_path:
         # Default to current directory if no test directory found
-        test_path = "."
+        test_path = Path(".")
         logger.warning("No dedicated test directory found, running tests from current directory")
 
-    run_command(["pytest", "-s", test_path])
-
+    run_command(["pytest", "-s", str(test_path)])
     logger.success("Tests complete.")
 
 
@@ -201,7 +235,7 @@ def dev(continuously: bool = False) -> None:
 
     """
     config = load_config()
-    package_name = config["package_name"]
+    package_name = config.package_name
 
     logger.info(f"Building and publishing {package_name} Python library to dev.")
 
@@ -217,62 +251,54 @@ def dev(continuously: bool = False) -> None:
     observer = Observer()
     observer.schedule(event_handler, path="src", recursive=True)
     observer.start()
-    spinner_states = ["|", "/", "-", "\\"]  # Spinner characters
 
     try:
-        last_modified_time = None
-        spinner_index = 0  # Index to track the current spinner state
-        while True:
-            if event_handler.modified:
-                last_modified_time = time.time()
-                event_handler.modified = False
-                print(
-                    "  \033[94m\033[0m  ",
-                    end="",
-                    flush=True,
-                )  # Blue save icon for file change
-
-            if last_modified_time and time.time() - last_modified_time >= FILE_CHANGE_DEBOUNCE_SECONDS:
-                build(quiet=True)
-                print(
-                    "  \033[92m\033[0m ",
-                    end="",
-                    flush=False,
-                )  # Green python icon for build complete
-                install_local(quiet=True)
-                print(
-                    "\033[92m\033[0m",
-                    end="",
-                    flush=False,
-                )  # Green -> icon for install complete
-
-                last_modified_time = None  # Reset the timer after running commands
-            elif last_modified_time and time.time() - last_modified_time < FILE_CHANGE_DEBOUNCE_SECONDS:
-                print(
-                    f"\r\033[97m{spinner_states[spinner_index]}\033[0m",
-                    end="",
-                    flush=False,
-                )  # Spinner animation
-                spinner_index = (spinner_index + 1) % len(
-                    spinner_states,
-                )  # Update spinner index
-
-            if not last_modified_time:
-                print(
-                    f"\r\033[97m{spinner_states[spinner_index]}\033[0m",
-                    end="",
-                    flush=False,
-                )  # Spinner animation
-                spinner_index = (spinner_index + 1) % len(
-                    spinner_states,
-                )  # Update spinner index
-
-            time.sleep(0.1)  # Polling interval
+        _continuous_build_loop(event_handler)
     except KeyboardInterrupt:
         logger.info("Stopping continuous mode.")
     finally:
         observer.stop()
         observer.join()
+
+
+def _continuous_build_loop(event_handler: ChangeHandler) -> None:
+    """Main loop for continuous building."""
+    last_modified_time = None
+    spinner_index = 0
+
+    while True:
+        if event_handler.modified:
+            last_modified_time = time.time()
+            event_handler.modified = False
+            print("  \033[94m\033[0m  ", end="", flush=True)  # Blue save icon
+
+        current_time = time.time()
+        if last_modified_time and current_time - last_modified_time >= FILE_CHANGE_DEBOUNCE_SECONDS:
+            _execute_build_cycle()
+            last_modified_time = None
+
+        elif last_modified_time and current_time - last_modified_time < FILE_CHANGE_DEBOUNCE_SECONDS:
+            _show_spinner(spinner_index)
+            spinner_index = (spinner_index + 1) % len(SPINNER_STATES)
+
+        if not last_modified_time:
+            _show_spinner(spinner_index)
+            spinner_index = (spinner_index + 1) % len(SPINNER_STATES)
+
+        time.sleep(0.1)
+
+
+def _execute_build_cycle() -> None:
+    """Execute a single build and install cycle."""
+    build(quiet=True)
+    print("  \033[92m\033[0m ", end="", flush=False)  # Green python icon
+    install_local(quiet=True)
+    print("\033[92m\033[0m", end="", flush=False)  # Green -> icon
+
+
+def _show_spinner(index: int) -> None:
+    """Show a spinner animation."""
+    print(f"\r\033[97m{SPINNER_STATES[index]}\033[0m", end="", flush=False)
 
 
 def build(quiet: bool = False) -> None:
@@ -285,7 +311,7 @@ def build(quiet: bool = False) -> None:
 
     """
     config = load_config()
-    package_name = config["package_name"]
+    package_name = config.package_name
 
     if not quiet:
         logger.info(f"Building {package_name} Python library.")
@@ -306,7 +332,7 @@ def publish(env: str, quiet: bool = False) -> None:
 
     """
     config = load_config()
-    package_name = config["package_name"]
+    package_name = config.package_name
 
     if not quiet:
         logger.info(f"Publishing {package_name} Python library to {env}.")
@@ -328,14 +354,14 @@ def install(quiet: bool = False) -> None:
 
     """
     config = load_config()
-    package_name = config["package_name"]
+    package_name = config.package_name
 
     if not quiet:
         logger.info(f"Installing {package_name} Python library.")
 
     index_url, extra_index_url = get_install_urls(config, use_dev=True)
 
-    no_deps = "--no-deps" if is_package_installed(str(package_name)) else ""
+    no_deps = "--no-deps" if is_package_installed(package_name) else ""
 
     install_cmd = [
         "pip",
@@ -350,7 +376,7 @@ def install(quiet: bool = False) -> None:
     if extra_index_url:
         install_cmd.extend(["--extra-index-url", extra_index_url])
 
-    install_cmd.append(str(package_name))
+    install_cmd.append(package_name)
 
     run_command(install_cmd, quiet=quiet)
 
@@ -368,21 +394,22 @@ def install_local(quiet: bool = False) -> None:
 
     """
     config = load_config()
-    package_name = config["package_name"]
+    package_name = config.package_name
 
     if not quiet:
         logger.info(f"Installing {package_name} Python library from local build.")
 
-    dist_dir = os.path.join(os.path.dirname(__file__), "dist")
-    wheel_files = [f for f in os.listdir(dist_dir) if f.endswith(".whl")]
+    dist_dir = Path(__file__).parent / DIST_DIR_NAME
+    if not dist_dir.exists():
+        msg = "No 'dist' directory found. Please build the library first."
+        raise CommandError(msg)
 
+    wheel_files = list(dist_dir.glob(f"*{WHEEL_EXTENSION}"))
     if not wheel_files:
-        logger.error(
-            "No wheel file found in the 'dist' directory. Please build the library first.",
-        )
-        return
+        msg = "No wheel file found in the 'dist' directory. Please build the library first."
+        raise CommandError(msg)
 
-    no_deps = "--no-deps" if is_package_installed(str(package_name)) else ""
+    no_deps = "--no-deps" if is_package_installed(package_name) else ""
     latest_wheel = sorted(wheel_files)[-1]  # Pick the latest wheel file
     run_command(
         [
@@ -391,7 +418,7 @@ def install_local(quiet: bool = False) -> None:
             "--force-reinstall",
             "--disable-pip-version-check",
             no_deps,
-            os.path.join(dist_dir, latest_wheel),
+            str(latest_wheel),
         ],
         quiet=quiet,
     )
@@ -431,21 +458,29 @@ def is_package_installed(package_name: str) -> bool:
         return False
 
 
-def check_requirements() -> None:
-    """Check required environment variables."""
+def check_requirements(task: str) -> None:
+    """Check required environment variables based on the task.
 
+    Parameters
+    ----------
+    task : str
+        The task being performed (dev, build, publish, test, static_analysis)
+
+    """
     logger.info("Checking environment variables.")
 
-    hatch_user = os.getenv("HATCH_INDEX_USER")
-    hatch_auth = os.getenv("HATCH_INDEX_AUTH")
+    # Only check publishing credentials for publish task
+    if task == "publish":
+        hatch_user = os.getenv("HATCH_INDEX_USER")
+        hatch_auth = os.getenv("HATCH_INDEX_AUTH")
 
-    if not hatch_user:
-        logger.error("HATCH_INDEX_USER environment variable must be set.")
-        sys.exit(1)
+        if not hatch_user:
+            logger.error("HATCH_INDEX_USER environment variable must be set for publishing.")
+            sys.exit(1)
 
-    if not hatch_auth:
-        logger.error("HATCH_INDEX_AUTH environment variable must be set.")
-        sys.exit(1)
+        if not hatch_auth:
+            logger.error("HATCH_INDEX_AUTH environment variable must be set for publishing.")
+            sys.exit(1)
 
     logger.success("Environment variables are set.")
 
@@ -468,12 +503,14 @@ def run_command(
 
     Raises
     ------
-    subprocess.CalledProcessError
+    CommandError
         If the command fails.
 
     """
-
     logger.debug(f"Running command: {' '.join(command)}")
+
+    # Filter out empty strings from command
+    command = [arg for arg in command if arg]
 
     try:
         subprocess.run(
@@ -484,21 +521,19 @@ def run_command(
             stderr=subprocess.DEVNULL if quiet else None,
         )
     except subprocess.CalledProcessError as e:
+        error_msg = f"Command failed with exit code {e.returncode}: {' '.join(command)}"
         if not quiet:
-            logger.error(f"Command failed: {e}")
-        raise
+            logger.error(error_msg)
+        raise CommandError(error_msg) from e
 
 
 class ChangeHandler(FileSystemEventHandler):
     """Handler to track file changes in the src directory."""
 
-    modified: bool
-
     def __init__(self) -> None:
         """Initialize the ChangeHandler and set the modified flag to False."""
+        super().__init__()
         self.modified = False
-
-    from watchdog.events import FileSystemEvent
 
     def on_modified(self, event: FileSystemEvent) -> None:
         """Handle the event when a file is modified.
@@ -509,9 +544,11 @@ class ChangeHandler(FileSystemEventHandler):
             The file system event object containing information about the modified file.
 
         """
+        if event.is_directory:
+            return
 
-        src_path = event.src_path.decode() if isinstance(event.src_path, bytes) else event.src_path
-        if src_path.endswith(".py"):  # Monitor only Python files
+        src_path = str(event.src_path)
+        if src_path.endswith(PYTHON_FILE_EXTENSION):  # Monitor only Python files
             self.modified = True
 
 
@@ -579,7 +616,6 @@ def parse_arguments() -> argparse.ArgumentParser:
 
 def main() -> None:
     """Main entry point for the script."""
-
     logger.remove()
     logger.level("INFO", color="<fg 92,168,255>")
     logger.add(
@@ -597,22 +633,36 @@ def main() -> None:
         parser.print_help()
         sys.exit(0)
 
-    check_requirements()
+    try:
+        check_requirements(args.task)
 
-    match args.task:
-        case "dev":
-            dev(continuously=args.continuously)
-        case "build":
-            build()
-        case "publish":
-            publish(args.env)
-        case "test":
-            test()
-        case "static_analysis":
-            static_analysis()
-        case _:
-            logger.error(f"Invalid task: {args.task}")
-            sys.exit(1)
+        match args.task:
+            case "dev":
+                dev(continuously=args.continuously)
+            case "build":
+                build()
+            case "publish":
+                publish(args.env)
+            case "test":
+                test()
+            case "static_analysis":
+                static_analysis()
+            case _:
+                logger.error(f"Invalid task: {args.task}")
+                sys.exit(1)
+
+    except ConfigurationError as e:
+        logger.error(f"Configuration error: {e}")
+        sys.exit(1)
+    except CommandError as e:
+        logger.error(f"Command error: {e}")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        logger.info("Operation cancelled by user.")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

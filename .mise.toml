@@ -71,6 +71,7 @@ gitui = 'latest'
 cosign = 'latest'
 tealdeer = 'latest'
 micro = 'latest'
+shellcheck = "latest"
 #### End Miscellaneous Tools
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.

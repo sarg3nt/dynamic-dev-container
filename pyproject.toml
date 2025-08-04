@@ -1,4 +1,4 @@
-# cspell:ignore pyyaml pytest mypy pkgs datetimez Pyflakes Pylint isort pycodestyle pydocstyle pyupgrade pyproject orjson pybuild 
+# cspell:ignore pytest mypy pkgs datetimez Pyflakes Pylint isort pycodestyle pydocstyle pyupgrade pyproject pydantic dotenv sdist artifactory nexus jfrog sonatype testpypi
 
 ####### Example pyproject.toml file for Python projects #######
 # This is a template configuration file for Python projects using modern tools.
@@ -17,11 +17,11 @@ index-url = "https://pypi.org/simple/"  # Replace with your package index URL if
 [project]
 name = "my-awesome-project"                           # Your package name (no spaces, lowercase recommended)
 dynamic = ["version"]                                 # Version will be read from __about__.py
-description = "A brief description of your project"  # One-line summary of what your project does
-readme = "README.md"                                 # Path to your README file
-requires-python = ">=3.12"                          # Minimum Python version required
-license = "MIT"                                      # Your project's license (MIT, Apache-2.0, GPL-3.0, etc.)
-keywords = ["python", "cli", "automation"]          # Keywords to help users find your project
+description = "A brief description of your project"   # One-line summary of what your project does
+readme = "README.md"                                  # Path to your README file
+requires-python = ">=3.12"                            # Minimum Python version required
+license = {text = "MIT"}                              # Your project's license (MIT, Apache-2.0, GPL-3.0, etc.)
+keywords = ["python", "cli", "automation"]            # Keywords to help users find your project
 authors = [
   { name = "Your Name", email = "your.email@example.com" }
 ]
@@ -46,10 +46,13 @@ dependencies = [
 # Development tools (install with: pip install -e .[dev])
 dev = [
   "hatch>=1.14,<2.0",           # Build and project management tool
-  "pytest>=8.0,<9.0",          # Testing framework
-  "pytest-cov>=4.0,<5.0",      # Coverage reporting for tests
+  "pytest>=8.3,<9.0",          # Testing framework
+  "pytest-mock>=3.14,<4.0",    # Mock objects for pytest
+  "pytest-cov>=6.0,<7.0",      # Coverage reporting for tests
   "ruff>=0.9,<1.0",             # Fast Python linter and formatter
-  "mypy>=1.15,<2.0",            # Static type checker
+  "mypy>=1.17,<2.0",            # Static type checker
+  "watchdog>=6.0,<7.0",        # File system event monitoring
+  "python-dotenv>=1.1,<2.0",   # Environment variable management
 ]
 
 # Project URLs - links displayed on PyPI and in documentation
@@ -67,37 +70,103 @@ path = "src/my_awesome_project/__about__.py"  # Replace 'my_awesome_project' wit
 [tool.hatch.build.targets.wheel]
 packages = ["src/my_awesome_project"]  # Replace 'my_awesome_project' with your package name
 
-# Python Package Repository Configuration
-# Configure these settings for your package repository (PyPI, Artifactory, Nexus, etc.)
-[tool.pybuild]
-# Default PyPI configuration (for public packages)
-publish_base_url = "https://upload.pypi.org/legacy/"
-install_index_url = "https://pypi.org/simple/"
-install_extra_index_url = ""
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.github",
+  "/docs",
+  "/.vscode",
+  "/.devcontainer",
+]
 
-# Example: Private Artifactory configuration
-# publish_base_url = "https://your-artifactory.com/artifactory/api/pypi/your-repo"
-# install_index_url = "https://your-artifactory.com/artifactory/api/pypi/your-repo/simple"
-# install_extra_index_url = "https://your-artifactory.com/artifactory/api/pypi/your-other-repo/simple"
+# Hatch publish configuration for package repositories
+# This section configures where your Python packages will be published.
+# By default, it's set up for PyPI (the main Python package index).
+# 
+# To publish to PyPI:
+# 1. Create an account at https://pypi.org/
+# 2. Generate an API token at https://pypi.org/manage/account/
+# 3. Set environment variables:
+#    export HATCH_INDEX_USER=__token__
+#    export HATCH_INDEX_AUTH=your_pypi_api_token
+# 4. Run: hatch publish
+#
+# For TestPyPI (recommended for testing):
+# 1. Create an account at https://test.pypi.org/
+# 2. Generate an API token at https://test.pypi.org/manage/account/
+# 3. Run: hatch publish -r test
 
-# Example: Nexus Repository configuration
-# publish_base_url = "https://your-nexus.com/repository/pypi-internal/"
-# install_index_url = "https://your-nexus.com/repository/pypi-internal/simple"
-# install_extra_index_url = "https://your-nexus.com/repository/pypi-public/simple"
+[tool.hatch.publish.index]
+disable = false  # Set to true to disable publishing entirely
 
-# Environment suffixes (optional) - used for environment-specific repository URLs
-dev_suffix = "-dev"   # Appended to URLs for development environment
-prod_suffix = ""      # Appended to URLs for production environment (usually empty)
+# Default repository (PyPI)
+# Remove the # to enable a specific repository configuration
+# [tool.hatch.publish.index.repos.main]
+# url = "https://upload.pypi.org/legacy/"  # PyPI upload URL
 
-# Authentication Note:
-# Set these environment variables for repository authentication:
-#   export HATCH_INDEX_USER=your_username
-#   export HATCH_INDEX_AUTH=your_password_or_token
-# These variables are used by the pybuild.py script for repository authentication.
+# Test PyPI repository (recommended for testing before publishing to main PyPI)
+# [tool.hatch.publish.index.repos.test]
+# url = "https://test.pypi.org/legacy/"
+
+# Example: JFrog Artifactory configuration
+# Replace with your actual Artifactory URL and repository names
+# [tool.hatch.publish.index.repos.artifactory-dev]
+# url = "https://your-company.jfrog.io/artifactory/api/pypi/your-repo-dev/simple/"
+# 
+# [tool.hatch.publish.index.repos.artifactory-prod]
+# url = "https://your-company.jfrog.io/artifactory/api/pypi/your-repo-prod/simple/"
+
+# Example: Sonatype Nexus configuration
+# Replace with your actual Nexus URL and repository names
+# [tool.hatch.publish.index.repos.nexus-dev]
+# url = "https://your-nexus-server.com/repository/your-repo-dev/simple/"
+# 
+# [tool.hatch.publish.index.repos.nexus-prod]
+# url = "https://your-nexus-server.com/repository/your-repo-prod/simple/"
+
+# Example: Azure DevOps Artifacts configuration
+# [tool.hatch.publish.index.repos.azure-artifacts]
+# url = "https://pkgs.dev.azure.com/your-org/_packaging/your-feed/pypi/upload/"
+
+# Example: GitHub Packages configuration
+# [tool.hatch.publish.index.repos.github]
+# url = "https://upload.pypi.org/legacy/"  # GitHub uses PyPI protocol
+# username = "your-github-username"
+
+# Authentication methods:
+# 1. Environment variables (recommended):
+#    export HATCH_INDEX_USER=your_username
+#    export HATCH_INDEX_AUTH=your_password_or_token
+# 
+# 2. For repository-specific auth:
+#    export HATCH_INDEX_REPOS_YOUR_REPO_USER=your_username
+#    export HATCH_INDEX_REPOS_YOUR_REPO_AUTH=your_password_or_token
+#
+# 3. Interactive prompt (Hatch will ask for credentials when needed)
+
+# To publish to a specific repository:
+# hatch publish -r repository-name
+# Example: hatch publish -r test
 
 # Development environment configuration for Hatch
+[tool.hatch.envs.default]
+dependencies = [
+  "pytest>=8.3,<9.0",
+  "pytest-mock>=3.14,<4.0",
+  "pytest-cov>=6.0,<7.0",
+  "ruff>=0.9,<1.0",
+  "mypy>=1.17,<2.0",
+]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "pytest --cov=my_awesome_project --cov-report=term-missing --cov-report=html {args:tests}"
+lint = "ruff check {args:src tests}"
+format = "ruff format {args:src tests}"
+type-check = "mypy {args:src tests}"
+all = ["lint", "format", "type-check", "test-cov"]
+
 [tool.hatch.envs.types]
-extra-dependencies = ["mypy>=1.15,<2.0"]
+extra-dependencies = ["mypy>=1.17,<2.0"]
 
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src tests}"
@@ -126,16 +195,35 @@ exclude_lines = [
 
 # Pytest configuration
 [tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+  "--strict-markers",
+  "--strict-config",
+  "--doctest-modules",
+  "--import-mode=importlib",
+]
+# Test discovery
+testpaths = ["tests"]
 # Custom markers for test organization
 markers = [
   "order(number): runs tests in the order given",
   "serial: marks tests as serial (not parallel)",
+  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+  "integration: marks tests as integration tests",
+  "unit: marks tests as unit tests",
+]
+# Filter warnings
+filterwarnings = [
+  "error",
+  "ignore::UserWarning",
+  "ignore::DeprecationWarning",
 ]
 
 # Ruff configuration - Python linter and formatter
 [tool.ruff]
 line-length = 120           # Maximum line length
 target-version = "py312"    # Target Python version for rules
+src = ["src"]               # Source directories for import detection
 
 [tool.ruff.lint]
 # Rule selection - see https://docs.astral.sh/ruff/rules/ for details
@@ -187,6 +275,8 @@ select = [
 ignore = [
   "E501",    # line-too-long (handled by formatter)
   "D202",    # no-blank-line-after-function (stylistic preference)
+  "D203",    # one-blank-line-before-class (conflicts with D211)
+  "D213",    # multi-line-summary-second-line (conflicts with D212)
   "T201",    # print statements (useful for CLI tools)
   "D401",    # non-imperative-mood (docstring style preference)
   "D205",    # blank-line-after-summary (docstring style preference)
@@ -231,6 +321,13 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
+show_error_codes = true         # Show error codes in output
+pretty = true                   # Use colored output
+
+# Module-specific configurations
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false  # Allow untyped test functions
 
 # Ruff formatter configuration (optional)
 [tool.ruff.format]
