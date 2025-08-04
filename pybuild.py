@@ -44,11 +44,9 @@ class PyBuildConfig(NamedTuple):
     """Configuration data for PyBuild operations."""
 
     package_name: str
-    publish_base_url: str
     install_index_url: str
     install_extra_index_url: str | None = None
-    dev_suffix: str | None = None
-    prod_suffix: str | None = None
+    hatch_repos: dict[str, str] | None = None
 
 
 def load_config() -> PyBuildConfig:
@@ -84,79 +82,38 @@ def load_config() -> PyBuildConfig:
         msg = "Package name not found in pyproject.toml [project] section."
         raise ConfigurationError(msg)
 
-    # Get repository configuration from tool.pybuild section
+    # Get pip configuration for install URLs
     tool_section = pyproject_data.get("tool", {})
-    pybuild_config = tool_section.get("pybuild", {})
+    pip_config = tool_section.get("pip", {})
+    install_index_url = pip_config.get("index-url", "https://pypi.org/simple/")
 
-    if not pybuild_config:
-        msg = (
-            "Repository configuration not found in pyproject.toml [tool.pybuild] section. "
-            "Please run the install.sh script to configure your repository settings."
-        )
-        raise ConfigurationError(msg)
+    # Get Hatch repository configuration (optional)
+    hatch_section = tool_section.get("hatch", {})
+    publish_section = hatch_section.get("publish", {})
+    index_section = publish_section.get("index", {})
+    repos_section = index_section.get("repos", {})
 
-    # Validate required configuration
-    publish_base_url = pybuild_config.get("publish_base_url")
-    if not publish_base_url:
-        msg = "publish_base_url must be configured in pyproject.toml [tool.pybuild] section."
-        raise ConfigurationError(msg)
-
-    install_index_url = pybuild_config.get("install_index_url")
-    if not install_index_url:
-        msg = "install_index_url must be configured in pyproject.toml [tool.pybuild] section."
-        raise ConfigurationError(msg)
+    # Extract repository URLs from Hatch configuration
+    hatch_repos = {}
+    for repo_name, repo_config in repos_section.items():
+        if isinstance(repo_config, dict) and "url" in repo_config:
+            hatch_repos[repo_name] = repo_config["url"]
 
     return PyBuildConfig(
         package_name=package_name,
-        publish_base_url=publish_base_url,
         install_index_url=install_index_url,
-        install_extra_index_url=pybuild_config.get("install_extra_index_url"),
-        dev_suffix=pybuild_config.get("dev_suffix"),
-        prod_suffix=pybuild_config.get("prod_suffix"),
+        install_extra_index_url=None,  # Can be added to pip config if needed
+        hatch_repos=hatch_repos if hatch_repos else None,
     )
 
 
-def get_publish_url(env: str, config: PyBuildConfig) -> str:
-    """Get the publish URL for the specified environment.
-
-    Parameters
-    ----------
-    env : str
-        Environment ('dev' or 'prod')
-    config : PyBuildConfig
-        Configuration data
-
-    Returns
-    -------
-    str
-        Repository URL for publishing
-
-    """
-    base_url = config.publish_base_url
-    suffix = config.dev_suffix if env == "dev" else config.prod_suffix
-
-    # Handle different URL patterns
-    if "artifactory" in base_url and suffix:
-        # For Artifactory: append suffix to repository name
-        return base_url + suffix
-
-    if suffix and base_url and "pypi.org" not in base_url:
-        # For custom repositories with suffix (but not PyPI)
-        return base_url + suffix
-
-    # For PyPI or repositories without suffix
-    return base_url
-
-
-def get_install_urls(config: PyBuildConfig, use_dev: bool = False) -> tuple[str, str]:
+def get_install_urls(config: PyBuildConfig) -> tuple[str, str]:
     """Get the install URLs.
 
     Parameters
     ----------
     config : PyBuildConfig
         Configuration data
-    use_dev : bool
-        Whether to use dev environment URLs
 
     Returns
     -------
@@ -166,14 +123,6 @@ def get_install_urls(config: PyBuildConfig, use_dev: bool = False) -> tuple[str,
     """
     base_index = config.install_index_url
     extra_index = config.install_extra_index_url or ""
-
-    dev_suffix = config.dev_suffix or ""
-    if use_dev and dev_suffix:
-        # Modify URLs for dev environment if needed
-        if "artifactory" in base_index:
-            base_index = base_index.replace("/simple", dev_suffix + "/simple")
-        if extra_index and "artifactory" in extra_index:
-            extra_index = extra_index.replace("/simple", dev_suffix + "/simple")
 
     return base_index, extra_index
 
@@ -219,7 +168,9 @@ def test() -> None:
     if not test_path:
         # Default to current directory if no test directory found
         test_path = Path(".")
-        logger.warning("No dedicated test directory found, running tests from current directory")
+        logger.warning(
+            "No dedicated test directory found, running tests from current directory",
+        )
 
     run_command(["pytest", "-s", str(test_path)])
     logger.success("Tests complete.")
@@ -266,34 +217,49 @@ def _continuous_build_loop(event_handler: ChangeHandler) -> None:
     last_modified_time = None
     spinner_index = 0
 
-    while True:
-        if event_handler.modified:
-            last_modified_time = time.time()
-            event_handler.modified = False
-            print("  \033[94m\033[0m  ", end="", flush=True)  # Blue save icon
+    # Hide cursor at start of continuous mode
+    print("\033[?25l", end="", flush=True)
 
-        current_time = time.time()
-        if last_modified_time and current_time - last_modified_time >= FILE_CHANGE_DEBOUNCE_SECONDS:
-            _execute_build_cycle()
-            last_modified_time = None
+    try:
+        while True:
+            if event_handler.modified:
+                last_modified_time = time.time()
+                event_handler.modified = False
+                print(
+                    "  \033[94m\033[0m  ",
+                    end="",
+                    flush=True,
+                )  # Blue save icon for file change
 
-        elif last_modified_time and current_time - last_modified_time < FILE_CHANGE_DEBOUNCE_SECONDS:
-            _show_spinner(spinner_index)
-            spinner_index = (spinner_index + 1) % len(SPINNER_STATES)
+            current_time = time.time()
+            if last_modified_time and current_time - last_modified_time >= FILE_CHANGE_DEBOUNCE_SECONDS:
+                _execute_build_cycle()
+                last_modified_time = None
 
-        if not last_modified_time:
-            _show_spinner(spinner_index)
-            spinner_index = (spinner_index + 1) % len(SPINNER_STATES)
+            elif last_modified_time and current_time - last_modified_time < FILE_CHANGE_DEBOUNCE_SECONDS:
+                _show_spinner(spinner_index)
+                spinner_index = (spinner_index + 1) % len(SPINNER_STATES)
 
-        time.sleep(0.1)
+            if not last_modified_time:
+                _show_spinner(spinner_index)
+                spinner_index = (spinner_index + 1) % len(SPINNER_STATES)
+
+            time.sleep(0.1)
+    finally:
+        # Show cursor again when exiting
+        print("\033[?25h", end="", flush=True)
 
 
 def _execute_build_cycle() -> None:
     """Execute a single build and install cycle."""
     build(quiet=True)
-    print("  \033[92m\033[0m ", end="", flush=False)  # Green python icon
+    print(
+        "  \033[92m🐍\033[0m ",
+        end="",
+        flush=False,
+    )  # Green python icon for build complete
     install_local(quiet=True)
-    print("\033[92m\033[0m", end="", flush=False)  # Green -> icon
+    print("\033[92m➡\033[0m", end="", flush=False)  # Green -> icon for install complete
 
 
 def _show_spinner(index: int) -> None:
@@ -315,6 +281,30 @@ def build(quiet: bool = False) -> None:
 
     if not quiet:
         logger.info(f"Building {package_name} Python library.")
+
+    # Check if this is actually a buildable Python package
+    # Look for version file or source directory
+    version_path = Path("src") / package_name.replace("-", "_") / "__about__.py"
+    src_dir = Path("src")
+
+    if not src_dir.exists():
+        msg = (
+            f"No 'src' directory found. This appears to be a template or development environment "
+            f"rather than a Python package. To build a package, you need:\n"
+            f"1. A 'src' directory with your package code\n"
+            f"2. A version file at: {version_path}\n"
+            f"3. Proper package structure as defined in pyproject.toml"
+        )
+        raise CommandError(msg)
+
+    if not version_path.exists():
+        msg = (
+            f"Version file not found at: {version_path}\n"
+            f"Please create this file with a __version__ variable, for example:\n"
+            f'__version__ = "0.1.0"'
+        )
+        raise CommandError(msg)
+
     run_command(["hatch", "build"], quiet=quiet)
     if not quiet:
         logger.success("Build complete.")
@@ -337,8 +327,41 @@ def publish(env: str, quiet: bool = False) -> None:
     if not quiet:
         logger.info(f"Publishing {package_name} Python library to {env}.")
 
-    repo_url = get_publish_url(env, config)
-    run_command(["hatch", "publish", "-y", "--repo", repo_url], quiet=quiet)
+    # For Hatch-based publishing, we try to find a matching repository
+    repo_name = None
+    repo_url = None
+    if config.hatch_repos:
+        # Look for environment-specific repos
+        env_repo_key = f"sysinfra-{env}"  # Updated to match actual repo names
+        alt_env_repo_key = f"artifactory-{env}" if env in ["dev", "prod"] else None
+        nexus_env_repo_key = f"nexus-{env}" if env in ["dev", "prod"] else None
+
+        # Try different naming patterns
+        for key in [env_repo_key, alt_env_repo_key, nexus_env_repo_key]:
+            if key and key in config.hatch_repos:
+                repo_name = key
+                repo_url = config.hatch_repos[key]
+                break
+
+        # If no environment-specific repo found, use the first available repo
+        if not repo_name and config.hatch_repos:
+            repo_name = next(iter(config.hatch_repos.keys()))
+            repo_url = config.hatch_repos[repo_name]
+
+    # Build the hatch publish command
+    publish_cmd = ["hatch", "publish", "-y"]
+
+    # Use environment variable approach since pyproject.toml repos aren't being read properly
+    if repo_url:
+        # Set HATCH_INDEX_REPO to the URL directly
+        env_vars = {"HATCH_INDEX_REPO": repo_url}
+        run_command(publish_cmd, env=env_vars, quiet=quiet)
+    elif repo_name:
+        publish_cmd.extend(["-r", repo_name])
+        run_command(publish_cmd, quiet=quiet)
+    else:
+        # If no repo specified, Hatch will use the default (PyPI)
+        run_command(publish_cmd, quiet=quiet)
 
     if not quiet:
         logger.success("Publish complete.")
@@ -359,7 +382,7 @@ def install(quiet: bool = False) -> None:
     if not quiet:
         logger.info(f"Installing {package_name} Python library.")
 
-    index_url, extra_index_url = get_install_urls(config, use_dev=True)
+    index_url, extra_index_url = get_install_urls(config)
 
     no_deps = "--no-deps" if is_package_installed(package_name) else ""
 
@@ -475,11 +498,15 @@ def check_requirements(task: str) -> None:
         hatch_auth = os.getenv("HATCH_INDEX_AUTH")
 
         if not hatch_user:
-            logger.error("HATCH_INDEX_USER environment variable must be set for publishing.")
+            logger.error(
+                "HATCH_INDEX_USER environment variable must be set for publishing.",
+            )
             sys.exit(1)
 
         if not hatch_auth:
-            logger.error("HATCH_INDEX_AUTH environment variable must be set for publishing.")
+            logger.error(
+                "HATCH_INDEX_AUTH environment variable must be set for publishing.",
+            )
             sys.exit(1)
 
     logger.success("Environment variables are set.")
@@ -512,11 +539,16 @@ def run_command(
     # Filter out empty strings from command
     command = [arg for arg in command if arg]
 
+    # Prepare environment - merge with current environment
+    final_env = os.environ.copy()
+    if env:
+        final_env.update(env)
+
     try:
         subprocess.run(
             command,
             check=True,
-            env=env,
+            env=final_env,
             stdout=subprocess.DEVNULL if quiet else None,
             stderr=subprocess.DEVNULL if quiet else None,
         )
