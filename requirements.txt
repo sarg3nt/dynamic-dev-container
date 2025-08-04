@@ -1,4 +1,4 @@
-# cspell:ignore hvac ipython pylint pyyaml orjson pytest pybuild dotenv ruff hatch watchdog
+# cspell:ignore hvac ipython pylint pyyaml orjson pytest pybuild dotenv ruff hatch watchdog mypy
 
 # An example requirements file.
 
@@ -21,6 +21,8 @@ requests~=2.32
 types-requests~=2.32
 # https://pypi.org/project/ruff/
 ruff~=0.12.7
+# https://pypi.org/project/mypy/
+mypy~=1.17.1
 # https://pypi.org/project/watchdog/#description
 watchdog~=6.0
 # https://pypi.org/project/pylint/

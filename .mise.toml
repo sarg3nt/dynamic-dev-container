@@ -7,6 +7,11 @@ MISE_PYTHON_COMPILE = false
 #### End Environment
 
 [tools]
+#### Begin Python
+#version#
+python = '3.13'
+#### End Python
+
 #### Begin HashiCorp Tools
 #version#
 opentofu = 'latest'
@@ -49,7 +54,7 @@ dotnet = 'latest'
 
 #### Begin Node Development
 #version#
-node = 'latest'
+node = '22.0'
 pnpm = 'latest'
 yarn = 'latest'
 deno = 'latest'
@@ -66,6 +71,7 @@ gitui = 'latest'
 cosign = 'latest'
 tealdeer = 'latest'
 micro = 'latest'
+shellcheck = "latest"
 #### End Miscellaneous Tools
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
