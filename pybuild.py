@@ -17,13 +17,16 @@ from loguru import logger
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
+# Define a constant for the file change debounce interval (in seconds)
+FILE_CHANGE_DEBOUNCE_SECONDS = 3
 
-def load_config() -> dict:
+
+def load_config() -> dict[str, object]:
     """Load configuration from pyproject.toml.
 
     Returns
     -------
-    dict
+    config : dict[str, object]
         Configuration dictionary with repository URLs and settings.
 
     Raises
@@ -32,7 +35,8 @@ def load_config() -> dict:
         If required configuration is missing from pyproject.toml.
 
     """
-    config = {}
+
+    config: dict[str, object] = {}
 
     try:
         pyproject_path = Path("pyproject.toml")
@@ -76,14 +80,14 @@ def load_config() -> dict:
     return config
 
 
-def get_publish_url(env: str, config: dict) -> str:
+def get_publish_url(env: str, config: dict[str, object]) -> str:
     """Get the publish URL for the specified environment.
 
     Parameters
     ----------
     env : str
         Environment ('dev' or 'prod')
-    config : dict
+    config : dict[str, object]
         Configuration dictionary
 
     Returns
@@ -92,26 +96,29 @@ def get_publish_url(env: str, config: dict) -> str:
         Repository URL for publishing
 
     """
-    base_url = config["publish_base_url"]
-    suffix = config.get("dev_suffix", "") if env == "dev" else config.get("prod_suffix", "")
+
+    base_url = str(config["publish_base_url"])
+    suffix = str(config.get("dev_suffix", "")) if env == "dev" else str(config.get("prod_suffix", ""))
 
     # Handle different URL patterns
     if "artifactory" in base_url and suffix:
         # For Artifactory: append suffix to repository name
         return base_url + suffix
+
     if suffix and base_url and "pypi.org" not in base_url:
         # For custom repositories with suffix (but not PyPI)
         return base_url + suffix
+
     # For PyPI or repositories without suffix
     return base_url
 
 
-def get_install_urls(config: dict, use_dev: bool = False) -> tuple[str, str]:
+def get_install_urls(config: dict[str, object], use_dev: bool = False) -> tuple[str, str]:
     """Get the install URLs.
 
     Parameters
     ----------
-    config : dict
+    config : dict[str, object]
         Configuration dictionary
     use_dev : bool
         Whether to use dev environment URLs
@@ -122,10 +129,10 @@ def get_install_urls(config: dict, use_dev: bool = False) -> tuple[str, str]:
         Index URL and extra index URL
 
     """
-    base_index = config["install_index_url"]
-    extra_index = config.get("install_extra_index_url", "")
+    base_index = str(config["install_index_url"])
+    extra_index = str(config.get("install_extra_index_url", ""))
 
-    dev_suffix = config.get("dev_suffix", "")
+    dev_suffix = str(config.get("dev_suffix", ""))
     if use_dev and dev_suffix:
         # Modify URLs for dev environment if needed
         if "artifactory" in base_index:
@@ -144,9 +151,8 @@ def static_analysis() -> None:
     # Check if sonar-scanner exists
     if not shutil.which("sonar-scanner"):
         sys.tracebacklimit = 0  # Suppress traceback for this exception
-        raise FileNotFoundError(
-            "The 'sonar-scanner' binary is not found in PATH. Please install it.  This command is meant to be ran from the SonarQube docker container.",
-        )
+        file_not_found_error = "The 'sonar-scanner' binary is not found in PATH. Please install it.  This command is meant to be ran from the SonarQube docker container."
+        raise FileNotFoundError(file_not_found_error)
 
     sonar_memory_limit = os.getenv("SONAR_MEMORY_LIMIT", "1024")
     repo_root = os.path.dirname(os.path.realpath(__file__))
@@ -212,6 +218,7 @@ def dev(continuously: bool = False) -> None:
     observer.schedule(event_handler, path="src", recursive=True)
     observer.start()
     spinner_states = ["|", "/", "-", "\\"]  # Spinner characters
+
     try:
         last_modified_time = None
         spinner_index = 0  # Index to track the current spinner state
@@ -225,7 +232,7 @@ def dev(continuously: bool = False) -> None:
                     flush=True,
                 )  # Blue save icon for file change
 
-            if last_modified_time and time.time() - last_modified_time >= 3:
+            if last_modified_time and time.time() - last_modified_time >= FILE_CHANGE_DEBOUNCE_SECONDS:
                 build(quiet=True)
                 print(
                     "  \033[92m\033[0m ",
@@ -240,7 +247,7 @@ def dev(continuously: bool = False) -> None:
                 )  # Green -> icon for install complete
 
                 last_modified_time = None  # Reset the timer after running commands
-            elif last_modified_time and time.time() - last_modified_time < 3:
+            elif last_modified_time and time.time() - last_modified_time < FILE_CHANGE_DEBOUNCE_SECONDS:
                 print(
                     f"\r\033[97m{spinner_states[spinner_index]}\033[0m",
                     end="",
@@ -328,7 +335,7 @@ def install(quiet: bool = False) -> None:
 
     index_url, extra_index_url = get_install_urls(config, use_dev=True)
 
-    no_deps = "--no-deps" if is_package_installed(package_name) else ""
+    no_deps = "--no-deps" if is_package_installed(str(package_name)) else ""
 
     install_cmd = [
         "pip",
@@ -343,7 +350,7 @@ def install(quiet: bool = False) -> None:
     if extra_index_url:
         install_cmd.extend(["--extra-index-url", extra_index_url])
 
-    install_cmd.append(package_name)
+    install_cmd.append(str(package_name))
 
     run_command(install_cmd, quiet=quiet)
 
@@ -375,7 +382,7 @@ def install_local(quiet: bool = False) -> None:
         )
         return
 
-    no_deps = "--no-deps" if is_package_installed(package_name) else ""
+    no_deps = "--no-deps" if is_package_installed(str(package_name)) else ""
     latest_wheel = sorted(wheel_files)[-1]  # Pick the latest wheel file
     run_command(
         [
@@ -415,7 +422,7 @@ def is_package_installed(package_name: str) -> bool:
 
     try:
         subprocess.run(
-            ["pip", "show", package_name],
+            [sys.executable, "-m", "pip", "show", package_name],
             check=True,
             stdout=subprocess.DEVNULL,
         )
@@ -485,11 +492,26 @@ def run_command(
 class ChangeHandler(FileSystemEventHandler):
     """Handler to track file changes in the src directory."""
 
-    def __init__(self):
+    modified: bool
+
+    def __init__(self) -> None:
+        """Initialize the ChangeHandler and set the modified flag to False."""
         self.modified = False
 
-    def on_modified(self, event):
-        if event.src_path.endswith(".py"):  # Monitor only Python files
+    from watchdog.events import FileSystemEvent
+
+    def on_modified(self, event: FileSystemEvent) -> None:
+        """Handle the event when a file is modified.
+
+        Parameters
+        ----------
+        event : FileSystemEvent
+            The file system event object containing information about the modified file.
+
+        """
+
+        src_path = event.src_path.decode() if isinstance(event.src_path, bytes) else event.src_path
+        if src_path.endswith(".py"):  # Monitor only Python files
             self.modified = True
 
 
