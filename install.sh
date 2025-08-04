@@ -1439,6 +1439,293 @@ disable = false
   fi
 }
 
+# Generate custom PSI Header settings
+generate_psi_header_settings() {
+  local temp_file="$1"
+  
+  echo "DEBUG: Starting generate_psi_header_settings function" >&2
+  echo "DEBUG: PSI_HEADER_COMPANY: $PSI_HEADER_COMPANY" >&2
+  echo "DEBUG: PSI_HEADER_TEMPLATES array length: ${#PSI_HEADER_TEMPLATES[@]}" >&2
+  
+  # Add PSI Header settings comment
+  echo "DEBUG: Adding PSI Header settings comment" >&2
+  echo '        // #### Begin PSI Header Settings ####' >> "$temp_file"
+  
+  # Company configuration - escape quotes in company name
+  echo "DEBUG: Adding company configuration" >&2
+  local escaped_company
+  escaped_company=$(echo "$PSI_HEADER_COMPANY" | sed 's/"/\\"/g')
+  echo '        "psi-header.config": {' >> "$temp_file"
+  echo "          \"company\": \"$escaped_company\"" >> "$temp_file"
+  echo '        },' >> "$temp_file"
+  
+  # Changes tracking configuration
+  echo "DEBUG: Adding changes tracking configuration" >&2
+  echo '        "psi-header.changes-tracking": {' >> "$temp_file"
+  echo '          "autoHeader": "autoSave",' >> "$temp_file"
+  echo '          "exclude": ["json"],' >> "$temp_file"
+  echo '          "excludeGlob": ["**/.git/**"]' >> "$temp_file"
+  echo '        },' >> "$temp_file"
+  
+  # Project creation year (current year)
+  echo "DEBUG: Adding project creation year" >&2
+  local current_year
+  current_year=$(date +%Y)
+  echo "        \"psi-header.variables\": [[\"projectCreationYear\", \"$current_year\"]]," >> "$temp_file"
+  
+  # Language configurations - include all available languages from the devcontainer.json
+  echo "DEBUG: Starting language configurations" >&2
+  echo '        "psi-header.lang-config": [' >> "$temp_file"
+  
+  # Default configuration for all languages
+  echo '          {' >> "$temp_file"
+  echo '            "language": "*",' >> "$temp_file"
+  echo '            "begin": "",' >> "$temp_file"
+  echo '            "end": "",' >> "$temp_file"
+  echo '            "prefix": "// "' >> "$temp_file"
+  echo '          },' >> "$temp_file"
+  
+  # Add language-specific configurations only if tools are selected
+  local added_languages=()
+  
+  # Helper function to check if language is already added
+  language_already_added() {
+    local lang="$1"
+    local element
+    for element in "${added_languages[@]}"; do
+      [[ "$element" == "$lang" ]] && return 0
+    done
+    return 1
+  }
+  
+  for tool in "${!TOOL_SELECTED[@]}"; do
+    if [[ "${TOOL_SELECTED[$tool]}" == "true" ]]; then
+      case "$tool" in
+        "go"|"golang")
+          if ! language_already_added "go"; then
+            echo '          {' >> "$temp_file"
+            echo '            "language": "go",' >> "$temp_file"
+            echo '            "begin": "",' >> "$temp_file"
+            echo '            "end": "",' >> "$temp_file"
+            echo '            "prefix": "// "' >> "$temp_file"
+            echo '          },' >> "$temp_file"
+            added_languages+=("go")
+          fi
+          ;;
+        "dotnet")
+          if ! language_already_added "csharp"; then
+            echo '          {' >> "$temp_file"
+            echo '            "language": "csharp",' >> "$temp_file"
+            echo '            "begin": "",' >> "$temp_file"
+            echo '            "end": "",' >> "$temp_file"
+            echo '            "prefix": "// "' >> "$temp_file"
+            echo '          },' >> "$temp_file"
+            added_languages+=("csharp")
+          fi
+          ;;
+        "node"|"pnpm"|"yarn"|"deno"|"bun")
+          if ! language_already_added "javascript"; then
+            echo '          {' >> "$temp_file"
+            echo '            "language": "javascript",' >> "$temp_file"
+            echo '            "begin": "",' >> "$temp_file"
+            echo '            "end": "",' >> "$temp_file"
+            echo '            "prefix": "// "' >> "$temp_file"
+            echo '          },' >> "$temp_file"
+            added_languages+=("javascript")
+          fi
+          if ! language_already_added "typescript"; then
+            echo '          {' >> "$temp_file"
+            echo '            "language": "typescript",' >> "$temp_file"
+            echo '            "begin": "",' >> "$temp_file"
+            echo '            "end": "",' >> "$temp_file"
+            echo '            "prefix": "// "' >> "$temp_file"
+            echo '          },' >> "$temp_file"
+            added_languages+=("typescript")
+          fi
+          ;;
+        "python")
+          if ! language_already_added "python"; then
+            echo '          {' >> "$temp_file"
+            echo '            "language": "python",' >> "$temp_file"
+            echo '            "begin": "",' >> "$temp_file"
+            echo '            "end": "",' >> "$temp_file"
+            echo '            "prefix": "# "' >> "$temp_file"
+            echo '          },' >> "$temp_file"
+            added_languages+=("python")
+          fi
+          ;;
+        "powershell")
+          if ! language_already_added "powershell"; then
+            echo '          {' >> "$temp_file"
+            echo '            "language": "powershell",' >> "$temp_file"
+            echo '            "begin": "<#",' >> "$temp_file"
+            echo '            "end": "#>",' >> "$temp_file"
+            echo '            "prefix": ""' >> "$temp_file"
+            echo '          },' >> "$temp_file"
+            added_languages+=("powershell")
+          fi
+          ;;
+        "opentofu")
+          if ! language_already_added "terraform"; then
+            echo '          {' >> "$temp_file"
+            echo '            "language": "terraform",' >> "$temp_file"
+            echo '            "begin": "",' >> "$temp_file"
+            echo '            "end": "",' >> "$temp_file"
+            echo '            "prefix": "# "' >> "$temp_file"
+            echo '          },' >> "$temp_file"
+            added_languages+=("terraform")
+          fi
+          ;;
+      esac
+    fi
+  done
+  
+  # Always include common languages
+  if ! language_already_added "dockerfile"; then
+    echo '          {' >> "$temp_file"
+    echo '            "language": "dockerfile",' >> "$temp_file"
+    echo '            "begin": "",' >> "$temp_file"
+    echo '            "end": "",' >> "$temp_file"
+    echo '            "prefix": "# "' >> "$temp_file"
+    echo '          },' >> "$temp_file"
+    added_languages+=("dockerfile")
+  fi
+  
+  # Always include shellscript since shell scripts are common in dev environments
+  if ! language_already_added "shellscript"; then
+    echo '          {' >> "$temp_file"
+    echo '            "language": "shellscript",' >> "$temp_file"
+    echo '            "begin": "",' >> "$temp_file"
+    echo '            "end": "",' >> "$temp_file"
+    echo '            "prefix": "# "' >> "$temp_file"
+    echo '          },' >> "$temp_file"
+    added_languages+=("shellscript")
+  fi
+  
+  if [[ "$INCLUDE_MARKDOWN_EXTENSIONS" == "true" ]] && ! language_already_added "markdown"; then
+    echo '          {' >> "$temp_file"
+    echo '            "language": "markdown",' >> "$temp_file"
+    echo '            "begin": "",' >> "$temp_file"
+    echo '            "end": "",' >> "$temp_file"
+    echo '            "prefix": "> "' >> "$temp_file"
+    echo '          },' >> "$temp_file"
+    added_languages+=("markdown")
+  fi
+  
+  # Always include YAML and env files
+  if ! language_already_added "yaml"; then
+    echo '          {' >> "$temp_file"
+    echo '            "language": "yaml",' >> "$temp_file"
+    echo '            "begin": "",' >> "$temp_file"
+    echo '            "end": "",' >> "$temp_file"
+    echo '            "prefix": "# "' >> "$temp_file"
+    echo '          },' >> "$temp_file"
+    added_languages+=("yaml")
+  fi
+  
+  if ! language_already_added "env"; then
+    echo '          {' >> "$temp_file"
+    echo '            "language": "env",' >> "$temp_file"
+    echo '            "begin": "",' >> "$temp_file"
+    echo '            "end": "",' >> "$temp_file"
+    echo '            "prefix": "# "' >> "$temp_file"
+    echo '          }' >> "$temp_file"
+    added_languages+=("env")
+  fi
+  
+  echo '        ],' >> "$temp_file"
+  
+  # Generate templates section
+  echo "DEBUG: Starting templates section" >&2
+  echo '        "psi-header.templates": [' >> "$temp_file"
+  
+  local template_count=0
+  echo "DEBUG: Initialized template_count to: $template_count" >&2
+  
+  # Only iterate if array has elements
+  if [[ ${#PSI_HEADER_TEMPLATES[@]} -gt 0 ]]; then
+    echo "DEBUG: Processing ${#PSI_HEADER_TEMPLATES[@]} custom templates" >&2
+    for template_entry in "${PSI_HEADER_TEMPLATES[@]}"; do
+      echo "DEBUG: Processing template entry: $template_entry" >&2
+      local language="${template_entry%%|||*}"
+      local template_text="${template_entry#*|||}"
+      echo "DEBUG: Extracted language: $language" >&2
+      echo "DEBUG: Extracted template_text: $template_text" >&2
+      
+      # Escape quotes and newlines in template text for JSON
+      echo "DEBUG: Starting template text escaping" >&2
+      local escaped_template
+      # First escape backslashes, then quotes, then handle newlines, then copyright symbol
+      escaped_template=$(echo "$template_text" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/©/\\u00A9/g')
+      echo "DEBUG: Escaped template: $escaped_template" >&2
+      
+      if [[ $template_count -gt 0 ]]; then
+        echo "DEBUG: Adding comma separator" >&2
+        echo ',' >> "$temp_file"
+      fi
+      
+      echo "DEBUG: Adding template JSON structure" >&2
+      echo '          {' >> "$temp_file"
+      echo "            \"language\": \"$language\"," >> "$temp_file"
+      
+      # Handle PowerShell special case with .DESCRIPTION
+      if [[ "$language" == "powershell" && "$template_text" == *".DESCRIPTION"* ]]; then
+        echo "DEBUG: Processing PowerShell special case" >&2
+        # Split .DESCRIPTION and content for PowerShell
+        local description_part
+        local content_part
+        description_part=$(echo "$template_text" | head -n1)
+        content_part=$(echo "$template_text" | tail -n+2)
+        
+        # Escape each part separately
+        local escaped_description
+        local escaped_content
+        escaped_description=$(echo "$description_part" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/©/\\u00A9/g')
+        escaped_content=$(echo "$content_part" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/©/\\u00A9/g')
+        
+        echo "            \"template\": [\"$escaped_description\", \"$escaped_content\"]" >> "$temp_file"
+      else
+        echo "DEBUG: Processing regular template" >&2
+        echo "            \"template\": [\"$escaped_template\"]" >> "$temp_file"
+      fi
+      
+      echo "DEBUG: Closing template JSON structure" >&2
+      echo -n '          }' >> "$temp_file"
+      
+      echo "DEBUG: Incrementing template count" >&2
+      template_count=$((template_count + 1))
+      echo "DEBUG: Template count is now: $template_count" >&2
+      echo "DEBUG: Completed processing template for language: $language" >&2
+    done
+    echo "DEBUG: Finished processing all templates" >&2
+  else
+    echo "DEBUG: No custom templates found, PSI_HEADER_TEMPLATES array is empty" >&2
+  fi
+  echo "DEBUG: Template processing section completed" >&2
+  
+  # Add default template if no custom templates were configured
+  if [[ $template_count -eq 0 ]]; then
+    echo "DEBUG: Adding default template since no custom templates were configured" >&2
+    local default_template_text
+    local escaped_default
+    default_template_text="Copyright © $(date +%Y) $PSI_HEADER_COMPANY. All rights reserved."
+    escaped_default=$(echo "$default_template_text" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed 's/©/\\u00A9/g')
+    
+    echo '          {' >> "$temp_file"
+    echo '            "language": "*",' >> "$temp_file"
+    echo "            \"template\": [\"$escaped_default\"]" >> "$temp_file"
+    echo '          }' >> "$temp_file"
+  else
+    echo "DEBUG: Using custom templates, adding newline" >&2
+    echo '' >> "$temp_file"
+  fi
+  
+  echo "DEBUG: Closing templates section" >&2
+  echo '        ]' >> "$temp_file"
+  echo '        // #### End PSI Header Settings ####' >> "$temp_file"
+  echo "DEBUG: generate_psi_header_settings function completed successfully" >&2
+}
+
 # Update pyproject.toml with Python project configuration
 update_pyproject_toml() {
   local project_path="$1"
