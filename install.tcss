@@ -1,0 +1,230 @@
+/* Dynamic Dev Container TUI Stylesheet */
+
+/* Title styles */
+.title {
+    text-style: bold;
+    color: $primary;
+    margin: 0 0 1 0;
+    height: auto;
+}
+
+.subtitle {
+    color: $text-muted;
+    margin: 0 0 1 0;
+    height: auto;
+}
+
+/* Compact element styles */
+.compact {
+    margin: 0;
+    padding: 0;
+    height: auto;
+}
+
+.compact-input {
+    margin: 0 0 1 0;
+    height: 3;
+    padding: 0 1;
+}
+
+.compact-group {
+    height: auto;
+    margin: 0 0 1 0;
+    padding: 0;
+}
+
+.compact-group Checkbox {
+    margin: 0;
+    height: auto;
+}
+
+.section-header {
+    text-style: bold;
+    color: $accent;
+    margin: 1 0 0 0;
+    height: auto;
+}
+
+.column-title {
+    text-style: bold;
+    color: $secondary;
+    margin: 0 0 1 0;
+    height: auto;
+}
+
+.highlight {
+    color: $warning;
+    text-style: bold;
+}
+
+.muted {
+    color: $text-muted;
+    text-style: italic;
+}
+
+.info {
+    color: $text;
+    text-style: italic;
+    margin: 1 0 0 0;
+}
+
+/* Container styles */
+#welcome-container, #project-container, #summary-container, #install-container {
+    padding: 1;
+    margin: 0;
+    height: auto;
+}
+
+#tools-container {
+    padding: 1;
+    margin: 0;
+    height: 1fr;
+}
+
+#main-layout {
+    height: 1fr;
+    margin: 1 0;
+}
+
+/* Column layout */
+.left-column {
+    width: 1fr;
+    height: 1fr;
+    margin: 0 1 0 0;
+}
+
+.right-column {
+    width: 1fr;
+    height: 1fr;
+    margin: 0;
+}
+
+.tools-list {
+    height: 1fr;
+    scrollbar-size: 1 1;
+    scrollbar-background: $surface;
+    scrollbar-color: $primary;
+}
+
+.config-area {
+    height: 1fr;
+    scrollbar-size: 1 1;
+    scrollbar-background: $surface;
+    scrollbar-color: $primary;
+}
+
+/* Button styling */
+#button-row {
+    height: auto;
+    margin-top: 1;
+    align: center middle;
+}
+
+Button {
+    margin: 0 1;
+    height: 3;
+    min-width: 10;
+    color: $text;
+    background: $surface;
+    border: solid $primary;
+}
+
+Button:hover {
+    background: $primary;
+    color: $text;
+}
+
+Button.-primary {
+    background: $primary;
+}
+
+/* Version button styling - small, horizontal, text-like */
+.version-btn-small {
+    height: 1;
+    min-width: 0;
+    width: auto;
+    margin: 0 1 0 0;
+    padding: 0 1;
+    border: none;
+    background: transparent;
+    color: $accent;
+    text-style: none;
+}
+
+.version-btn-small:hover {
+    background: $accent;
+    color: $text;
+    text-style: bold;
+}
+
+.tool-version-row {
+    layout: horizontal;
+    height: auto;
+    margin: 0 0 1 0;
+    align: left middle;
+}
+
+.tool-label {
+    width: auto;
+    margin: 0 1 0 0;
+    height: auto;
+}
+
+/* Input field styling */
+Input {
+    margin: 0 0 1 0;
+    height: 3;
+    padding: 0 1;
+    color: $text;
+    background: $surface;
+    border: solid $primary;
+}
+
+Input:focus {
+    border: solid $accent;
+    background: $background;
+}
+
+/* Label styling */
+Label {
+    margin: 0 0 1 0;
+    height: auto;
+    color: $text;
+}
+
+/* Checkbox styling */
+Checkbox {
+    margin: 0 0 1 0;
+    height: auto;
+    color: $text;
+}
+
+Checkbox:hover {
+    background: $surface;
+}
+
+/* Container styling */
+Container {
+    height: auto;
+}
+
+/* Scroll containers */
+#tools-scroll, #summary-scroll, #config-scroll {
+    height: 1fr;
+    margin: 0;
+    scrollbar-size: 1 1;
+    scrollbar-background: $surface;
+    scrollbar-color: $primary;
+}
+
+ScrollableContainer {
+    scrollbar-size: 1 1;
+    scrollbar-background: $surface;
+    scrollbar-color: $primary;
+}
+
+/* Progress bar styling */
+ProgressBar {
+    height: 1;
+    margin: 1 0;
+}

@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 # Configure logging for debugging
@@ -22,7 +23,7 @@ logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("/tmp/install_debug.log"),
+        logging.FileHandler(tempfile.gettempdir() + "/install_debug.log"),
         logging.StreamHandler(sys.stderr),
     ],
 )
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 # Check if required dependencies are available
-def check_and_install_dependencies():
+def check_and_install_dependencies() -> None:
     """Check for required dependencies and install them if needed."""
     required_packages = [
         ("textual", "textual[dev]>=0.41.0"),
@@ -95,7 +96,7 @@ except ImportError as e:
 class ProjectConfig:
     """Container for project configuration data."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Project information
         self.project_path: str = ""
         self.project_name: str = ""
@@ -174,9 +175,8 @@ class OSDetector:
                     if shutil.which("apk"):
                         return "apk"
 
-        elif system == "darwin":
-            if shutil.which("brew"):
-                return "brew"
+        elif system == "darwin" and shutil.which("brew"):
+            return "brew"
 
         return "unknown"
 
@@ -365,7 +365,7 @@ class FileManager:
     DIRECTORIES_TO_COPY = [".devcontainer"]
 
     @staticmethod
-    def copy_files_and_directories(source_dir: Path, target_dir: Path, include_python: bool = False):
+    def copy_files_and_directories(source_dir: Path, target_dir: Path, include_python: bool = False) -> None:
         """Copy required files and directories to target."""
         # Copy directories
         for dir_name in FileManager.DIRECTORIES_TO_COPY:
@@ -398,6 +398,7 @@ class WelcomeScreen(Screen):
     ]
 
     def compose(self) -> ComposeResult:
+        """Create the layout for this screen."""
         yield Header()
         yield Container(
             Markdown("""
@@ -419,13 +420,15 @@ Press **ENTER** to continue...
         )
         yield Footer()
 
-    def action_continue(self):
+    def action_continue(self) -> None:
+        """Continue to the next screen."""
         """Continue to the next screen."""
         # Call the next step directly
         self.app.call_later(self.app.after_welcome)
         self.app.pop_screen()
 
-    def action_quit(self):
+    def action_quit(self) -> None:
+        """Quit the application."""
         """Quit the application."""
         self.app.exit()
 
@@ -438,11 +441,12 @@ class PythonRepositoryScreen(Screen):
         Binding("escape", "back", "Back"),
     ]
 
-    def __init__(self, config: ProjectConfig):
+    def __init__(self, config: ProjectConfig) -> None:
         super().__init__()
         self.config = config
 
     def compose(self) -> ComposeResult:
+        """Create the layout for this screen."""
         yield Header()
         yield Container(
             Label("Python Repository Configuration", classes="title"),
@@ -474,7 +478,8 @@ class PythonRepositoryScreen(Screen):
         )
         yield Footer()
 
-    def on_checkbox_changed(self, event: Checkbox.Changed):
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        """Handle checkbox state changes."""
         """Handle repository type selection - only one can be selected."""
         if event.value:  # If checking this box
             repo_types = ["repo_pypi", "repo_artifactory", "repo_nexus", "repo_custom"]
@@ -483,13 +488,15 @@ class PythonRepositoryScreen(Screen):
                     checkbox = self.query_one(f"#{repo_id}", Checkbox)
                     checkbox.value = False
 
-    def on_button_pressed(self, event: Button.Pressed):
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events."""
         if event.button.id == "next_btn":
             self.save_config()
         elif event.button.id == "back_btn":
             self.action_back()
 
-    def save_config(self):
+    def save_config(self) -> None:
+        """Save current configuration."""
         """Save Python repository configuration."""
         # Determine repository type
         if self.query_one("#repo_pypi", Checkbox).value:
@@ -513,11 +520,13 @@ class PythonRepositoryScreen(Screen):
         self.app.call_later(self.app.after_python_repository)
         self.app.pop_screen()
 
-    def action_next(self):
+    def action_next(self) -> None:
+        """Go to next step."""
         """Continue to next screen."""
         self.save_config()
 
-    def action_back(self):
+    def action_back(self) -> None:
+        """Go to previous step."""
         """Go back to previous screen."""
         self.app.pop_screen()
 
@@ -530,11 +539,12 @@ class PythonProjectScreen(Screen):
         Binding("escape", "back", "Back"),
     ]
 
-    def __init__(self, config: ProjectConfig):
+    def __init__(self, config: ProjectConfig) -> None:
         super().__init__()
         self.config = config
 
     def compose(self) -> ComposeResult:
+        """Create the layout for this screen."""
         # Generate defaults from project name
         default_description = f"A Python project: {self.config.project_name}"
         default_github_project = self.config.project_name.lower().replace(" ", "-")
@@ -575,7 +585,8 @@ class PythonProjectScreen(Screen):
         )
         yield Footer()
 
-    def on_checkbox_changed(self, event: Checkbox.Changed):
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        """Handle checkbox state changes."""
         """Handle license selection - only one can be selected."""
         if event.value:  # If checking this box
             license_types = ["license_mit", "license_apache", "license_gpl", "license_bsd", "license_other"]
@@ -584,13 +595,15 @@ class PythonProjectScreen(Screen):
                     checkbox = self.query_one(f"#{license_id}", Checkbox)
                     checkbox.value = False
 
-    def on_button_pressed(self, event: Button.Pressed):
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events."""
         if event.button.id == "next_btn":
             self.save_config()
         elif event.button.id == "back_btn":
             self.action_back()
 
-    def save_config(self):
+    def save_config(self) -> None:
+        """Save current configuration."""
         """Save Python project metadata."""
         self.config.python_project_name = self.query_one("#python_project_name", Input).value
         self.config.python_project_description = self.query_one("#project_description", Input).value
@@ -617,11 +630,13 @@ class PythonProjectScreen(Screen):
         self.app.call_later(self.app.after_python_project)
         self.app.pop_screen()
 
-    def action_next(self):
+    def action_next(self) -> None:
+        """Go to next step."""
         """Continue to next screen."""
         self.save_config()
 
-    def action_back(self):
+    def action_back(self) -> None:
+        """Go to previous step."""
         """Go back to previous screen."""
         self.app.pop_screen()
 
@@ -634,11 +649,12 @@ class PSIHeaderScreen(Screen):
         Binding("escape", "back", "Back"),
     ]
 
-    def __init__(self, config: ProjectConfig):
+    def __init__(self, config: ProjectConfig) -> None:
         super().__init__()
         self.config = config
 
     def compose(self) -> ComposeResult:
+        """Create the layout for this screen."""
         yield Header()
         yield Container(
             Label("PSI Header Configuration", classes="title"),
@@ -667,13 +683,15 @@ class PSIHeaderScreen(Screen):
         )
         yield Footer()
 
-    def on_button_pressed(self, event: Button.Pressed):
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events."""
         if event.button.id == "next_btn":
             self.save_config()
         elif event.button.id == "back_btn":
             self.action_back()
 
-    def save_config(self):
+    def save_config(self) -> None:
+        """Save current configuration."""
         """Save PSI Header configuration."""
         self.config.install_psi_header = self.query_one("#install_psi", Checkbox).value
         self.config.psi_header_company = self.query_one("#company_name", Input).value
@@ -697,11 +715,13 @@ class PSIHeaderScreen(Screen):
         self.app.call_later(self.app.after_psi_header)
         self.app.pop_screen()
 
-    def action_next(self):
+    def action_next(self) -> None:
+        """Go to next step."""
         """Continue to next screen."""
         self.save_config()
 
-    def action_back(self):
+    def action_back(self) -> None:
+        """Go to previous step."""
         """Go back to previous screen."""
         self.app.pop_screen()
 
@@ -714,7 +734,7 @@ class ToolVersionScreen(Screen):
         Binding("escape", "back", "Back"),
     ]
 
-    def __init__(self, config: ProjectConfig):
+    def __init__(self, config: ProjectConfig) -> None:
         super().__init__()
         self.config = config
         # Get tools that have version configuration enabled
@@ -725,6 +745,7 @@ class ToolVersionScreen(Screen):
         ]
 
     def compose(self) -> ComposeResult:
+        """Create the layout for this screen."""
         yield Header()
 
         if not self.configurable_tools:
@@ -749,7 +770,8 @@ class ToolVersionScreen(Screen):
 
         yield Footer()
 
-    def on_mount(self):
+    def on_mount(self) -> None:
+        """Initialize the screen when mounted."""
         """Populate version inputs when screen mounts."""
         if not self.configurable_tools:
             return
@@ -772,13 +794,15 @@ class ToolVersionScreen(Screen):
             )
             scroll_container.mount(Label(""))  # Spacing
 
-    def on_button_pressed(self, event: Button.Pressed):
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events."""
         if event.button.id == "next_btn":
             self.save_config()
         elif event.button.id == "back_btn":
             self.action_back()
 
-    def save_config(self):
+    def save_config(self) -> None:
+        """Save current configuration."""
         """Save tool version configurations."""
         for tool in self.configurable_tools:
             version_input = self.query_one(f"#version_{tool}", Input)
@@ -788,11 +812,13 @@ class ToolVersionScreen(Screen):
         self.app.call_later(self.app.after_tool_versions)
         self.app.pop_screen()
 
-    def action_next(self):
+    def action_next(self) -> None:
+        """Go to next step."""
         """Continue to next screen."""
         self.save_config()
 
-    def action_back(self):
+    def action_back(self) -> None:
+        """Go to previous step."""
         """Go back to previous screen."""
         self.app.pop_screen()
 
@@ -805,11 +831,12 @@ class ProjectConfigScreen(Screen):
         Binding("escape", "back", "Back"),
     ]
 
-    def __init__(self, config: ProjectConfig):
+    def __init__(self, config: ProjectConfig) -> None:
         super().__init__()
         self.config = config
 
     def compose(self) -> ComposeResult:
+        """Create the layout for this screen."""
         # Generate defaults - handle empty or problematic project paths gracefully
         try:
             if self.config.project_path and self.config.project_path.strip():
@@ -855,21 +882,25 @@ class ProjectConfigScreen(Screen):
         )
         yield Footer()
 
-    def on_button_pressed(self, event: Button.Pressed):
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events."""
         if event.button.id == "next_btn":
             self.save_config()
         elif event.button.id == "back_btn":
             self.action_back()
 
-    def action_next(self):
+    def action_next(self) -> None:
+        """Go to next step."""
         """Save configuration and continue."""
         self.save_config()
 
-    def action_back(self):
+    def action_back(self) -> None:
+        """Go to previous step."""
         """Go back to previous screen."""
         self.app.pop_screen()
 
-    def save_config(self):
+    def save_config(self) -> None:
+        """Save current configuration."""
         """Save the configuration and continue."""
         # Get values from inputs
         self.config.project_path = self.query_one("#project_path", Input).value
@@ -930,6 +961,7 @@ class ToolSelectionScreen(Screen):
         self._active_version_inputs = set()  # Track currently active version input IDs
 
     def compose(self) -> ComposeResult:
+        """Create the layout for this screen."""
         yield Header()
 
         if not self.sections:
@@ -977,6 +1009,7 @@ class ToolSelectionScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
+        """Initialize the screen when mounted."""
         """Called when the screen is mounted."""
         self.refresh_tools()
 
@@ -999,15 +1032,11 @@ class ToolSelectionScreen(Screen):
         for tool in tools:
             description = ToolManager.get_tool_description(tool)
 
-            if self.tool_version_configurable.get(tool, False):
-                version_info = ToolManager.get_latest_major_versions(tool)
-                description += f" (configurable: {version_info})"
-
+            # Add checkbox for the tool (no version buttons in left panel anymore)
             checkbox = Checkbox(description, id=f"tool_{tool}", classes="compact")
             checkbox.value = self.tool_selected.get(tool, False)
-            tools_container.mount(checkbox)
 
-        # Update configuration panel
+            tools_container.mount(checkbox)  # Update configuration panel
         self.refresh_configuration()
 
     def refresh_configuration(self) -> None:
@@ -1103,7 +1132,37 @@ class ToolSelectionScreen(Screen):
                 config_container.mount(Label("Tool Versions:", classes="compact"))
                 for tool in configurable_tools_in_current_section:
                     current_version = self.tool_version_value.get(tool, "latest")
-                    config_container.mount(Label(f"{tool}:", classes="compact"))
+
+                    # Create a horizontal container for tool name and version buttons
+                    tool_version_container = Horizontal(classes="tool-version-row")
+
+                    # Mount the tool version container to config FIRST
+                    config_container.mount(tool_version_container)
+
+                    # Now mount child widgets to the mounted container
+                    # Tool name label
+                    tool_version_container.mount(Label(f"{tool}:", classes="compact tool-label"))
+
+                    # Version buttons - get available versions for this tool
+                    if tool == "python":
+                        versions = ["latest", "3.13", "3.12", "3.11", "3.10"]
+                    elif tool in ["node", "nodejs"]:
+                        versions = ["latest", "22", "20", "18"]
+                    elif tool == "golang":
+                        versions = ["latest", "1.23", "1.22", "1.21"]
+                    else:
+                        versions = ["latest"]
+
+                    for version in versions:
+                        # Replace dots with underscores for valid CSS identifiers
+                        safe_version = version.replace(".", "_")
+                        version_btn = Button(
+                            version,
+                            id=f"version_btn_{tool}_{safe_version}",
+                            classes="version-btn-small",
+                        )
+                        tool_version_container.mount(version_btn)
+
                     # Use generation-based ID to ensure uniqueness
                     version_id = f"version_{tool}_gen_{self._widget_generation}"
                     self._active_version_inputs.add(version_id)
@@ -1122,6 +1181,7 @@ class ToolSelectionScreen(Screen):
             self._refreshing_config = False
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        """Handle checkbox state changes."""
         """Handle tool selection changes."""
         # Extract tool name from checkbox ID
         if event.checkbox.id.startswith("tool_"):
@@ -1170,7 +1230,32 @@ class ToolSelectionScreen(Screen):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
+        """Handle button press events."""
         button_id = event.button.id
+
+        # Handle version button clicks
+        if button_id.startswith("version_btn_"):
+            # Extract tool and version from button ID: "version_btn_{tool}_{safe_version}"
+            parts = button_id.split("_")
+            if len(parts) >= 4:
+                tool = parts[2]
+                safe_version = "_".join(parts[3:])  # Handle safe versions that have underscores
+                # Convert safe version back to original version (replace underscores with dots)
+                version = safe_version.replace("_", ".")
+
+                # Update the tool version value
+                self.tool_version_value[tool] = version
+
+                # Update the version input field if it exists
+                try:
+                    version_id = f"version_{tool}_gen_{self._widget_generation}"
+                    if version_id in self._active_version_inputs:
+                        version_input = self.query_one(f"#{version_id}", Input)
+                        version_input.value = version
+                except Exception:
+                    # Input might not exist yet, which is fine
+                    pass
+            return
 
         if button_id == "prev_btn":
             self.save_current_section()
@@ -1296,11 +1381,13 @@ class ToolSelectionScreen(Screen):
         self.app.pop_screen()
 
     def action_next(self) -> None:
+        """Go to next step."""
         """Continue to next screen."""
         self.save_current_section()
         self.finalize_selection()
 
     def action_back(self) -> None:
+        """Go to previous step."""
         """Go back to previous screen."""
         self.app.pop_screen()
 
@@ -1313,11 +1400,12 @@ class SummaryScreen(Screen):
         Binding("escape", "back", "Back"),
     ]
 
-    def __init__(self, config: ProjectConfig):
+    def __init__(self, config: ProjectConfig) -> None:
         super().__init__()
         self.config = config
 
     def compose(self) -> ComposeResult:
+        """Create the layout for this screen."""
         summary_text = self.generate_summary()
 
         yield Header()
@@ -1417,7 +1505,8 @@ class SummaryScreen(Screen):
 
         return summary
 
-    def on_button_pressed(self, event: Button.Pressed):
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events."""
         if event.button.id == "install_btn":
             self.action_install()
         elif event.button.id == "back_btn":
@@ -1428,7 +1517,8 @@ class SummaryScreen(Screen):
         self.app.call_later(self.app.after_summary)
         self.app.pop_screen()
 
-    def action_back(self):
+    def action_back(self) -> None:
+        """Go to previous step."""
         """Go back to previous screen."""
         self.app.pop_screen()
 
@@ -1444,6 +1534,7 @@ class InstallationScreen(Screen):
         self.total_steps = 6
 
     def compose(self) -> ComposeResult:
+        """Create the layout for this screen."""
         yield Header()
         yield Container(
             Label("Installing Dev Container Configuration...", classes="title"),
@@ -1453,7 +1544,8 @@ class InstallationScreen(Screen):
         )
         yield Footer()
 
-    def on_mount(self):
+    def on_mount(self) -> None:
+        """Initialize the screen when mounted."""
         """Start installation when screen is mounted."""
         self.call_after_refresh(self.start_installation)
 
@@ -1656,7 +1748,7 @@ class InstallationScreen(Screen):
             f.write(content)
 
         # Make executable
-        os.chmod(target_file, 0o755)
+        os.chmod(target_file, 0o744)
 
     def update_pyproject_toml(self):
         """Update pyproject.toml with Python project configuration."""
@@ -1774,8 +1866,6 @@ class InstallationScreen(Screen):
         existing_settings = {}
         if settings_file.exists():
             try:
-                import json
-
                 with open(settings_file) as f:
                     existing_settings = json.load(f)
             except (json.JSONDecodeError, FileNotFoundError):
@@ -1785,7 +1875,6 @@ class InstallationScreen(Screen):
         existing_settings.update(psi_config)
 
         # Write updated settings
-        import json
 
         with open(settings_file, "w") as f:
             json.dump(existing_settings, f, indent=2)
@@ -1838,206 +1927,7 @@ class InstallationScreen(Screen):
 class DynamicDevContainerApp(App):
     """Main application class."""
 
-    CSS = """
-    /* Title styles */
-    .title {
-        text-style: bold;
-        color: $primary;
-        margin: 0 0 1 0;
-        height: auto;
-    }
-    
-    .subtitle {
-        color: $text-muted;
-        margin: 0 0 1 0;
-        height: auto;
-    }
-    
-    /* Compact element styles */
-    .compact {
-        margin: 0;
-        padding: 0;
-        height: auto;
-    }
-    
-    .compact-input {
-        margin: 0 0 1 0;
-        height: 3;
-        padding: 0 1;
-    }
-    
-    .compact-group {
-        height: auto;
-        margin: 0 0 1 0;
-        padding: 0;
-    }
-    
-    .compact-group Checkbox {
-        margin: 0;
-        height: auto;
-    }
-    
-    .section-header {
-        text-style: bold;
-        color: $accent;
-        margin: 1 0 0 0;
-        height: auto;
-    }
-    
-    .column-title {
-        text-style: bold;
-        color: $secondary;
-        margin: 0 0 1 0;
-        height: auto;
-    }
-    
-    .highlight {
-        color: $warning;
-        text-style: bold;
-    }
-    
-    .muted {
-        color: $text-muted;
-        text-style: italic;
-    }
-    
-    .info {
-        color: $text;
-        text-style: italic;
-        margin: 1 0 0 0;
-    }
-    
-    /* Container styles */
-    #welcome-container, #project-container, #summary-container, #install-container {
-        padding: 1;
-        margin: 0;
-        height: auto;
-    }
-    
-    #tools-container {
-        padding: 1;
-        margin: 0;
-        height: 1fr;
-    }
-    
-    #main-layout {
-        height: 1fr;
-        margin: 1 0;
-    }
-    
-    /* Column layout */
-    .left-column {
-        width: 1fr;
-        height: 1fr;
-        margin: 0 1 0 0;
-    }
-    
-    .right-column {
-        width: 1fr;
-        height: 1fr;
-        margin: 0;
-    }
-    
-    .tools-list {
-        height: 1fr;
-        scrollbar-size: 1 1;
-        scrollbar-background: $surface;
-        scrollbar-color: $primary;
-    }
-    
-    .config-area {
-        height: 1fr;
-        scrollbar-size: 1 1;
-        scrollbar-background: $surface;
-        scrollbar-color: $primary;
-    }
-    
-    /* Button styling */
-    #button-row {
-        height: auto;
-        margin-top: 1;
-        align: center middle;
-    }
-    
-    Button {
-        margin: 0 1;
-        height: 3;
-        min-width: 10;
-        color: $text;
-        background: $surface;
-        border: solid $primary;
-    }
-    
-    Button:hover {
-        background: $primary;
-        color: $text;
-    }
-    
-    Button.-primary {
-        background: $primary;
-        color: $text;
-        border: solid $primary;
-    }
-    
-    /* Input field styling */
-    Input {
-        margin: 0 0 1 0;
-        height: 3;
-        padding: 0 1;
-        color: $text;
-        background: $surface;
-        border: solid $primary;
-    }
-    
-    Input:focus {
-        border: solid $accent;
-        background: $background;
-    }
-    
-    /* Label styling */
-    Label {
-        margin: 0 0 1 0;
-        height: auto;
-        color: $text;
-    }
-    
-    /* Checkbox styling */
-    Checkbox {
-        margin: 0 0 1 0;
-        height: auto;
-        color: $text;
-    }
-    
-    Checkbox:hover {
-        background: $surface;
-    }
-    
-    /* Container styling */
-    Container {
-        height: auto;
-    }
-    
-    /* Scroll containers */
-    #tools-scroll, #summary-scroll, #config-scroll {
-        height: 1fr;
-        margin: 0;
-        scrollbar-size: 1 1;
-        scrollbar-background: $surface;
-        scrollbar-color: $primary;
-    }
-    
-    ScrollableContainer {
-        scrollbar-size: 1 1;
-        scrollbar-background: $surface;
-        scrollbar-color: $primary;
-    }
-    
-    /* Progress bar styling */
-    ProgressBar {
-        height: 1;
-        margin: 1 0;
-    }
-    """
+    CSS_PATH = "install.tcss"
 
     def __init__(self, project_path: str = ""):
         super().__init__()
@@ -2054,7 +1944,8 @@ class DynamicDevContainerApp(App):
             MiseParser.parse_mise_sections(self.source_dir / ".mise.toml")
         )
 
-    def on_mount(self):
+    def on_mount(self) -> None:
+        """Initialize the screen when mounted."""
         """Called when app is mounted."""
         self.push_screen(WelcomeScreen(), self.after_welcome)
 
@@ -2154,7 +2045,7 @@ class DynamicDevContainerApp(App):
         self.push_screen(InstallationScreen(self.config, self.source_dir))
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description="Dynamic Dev Container TUI Setup - Python Version",
