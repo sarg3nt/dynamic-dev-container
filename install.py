@@ -7,7 +7,10 @@ into a project directory to use the dev container in a new project.
 This is a Python conversion of the original install.sh script with enhanced TUI capabilities.
 """
 
+from __future__ import annotations
+
 import argparse
+import json
 import logging
 import os
 import platform
@@ -17,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 # Configure logging for debugging
 logging.basicConfig(
@@ -91,6 +95,11 @@ except ImportError as e:
     print(f"Error importing required packages: {e}")
     print("Please ensure all dependencies are installed correctly.")
     sys.exit(1)
+
+
+# Constants
+MIN_VERSION_PARTS = 2
+VERSION_BUTTON_PARTS = 4
 
 
 class ProjectConfig:
@@ -214,10 +223,22 @@ class ToolManager:
         return None
 
     @staticmethod
-    def run_container_command(image: str, *args) -> str:
-        """Run a command in a container using available runtime."""
-        import subprocess
+    def run_container_command(image: str, *args: str) -> str:
+        """Run a command in a container using available runtime.
 
+        Parameters
+        ----------
+        image : str
+            Container image to run
+        args : str
+            Additional command arguments
+
+        Returns
+        -------
+        str
+            Command output or empty string if failed
+
+        """
         runtime_info = ToolManager.detect_container_runtime()
         if not runtime_info:
             return ""
@@ -236,10 +257,19 @@ class ToolManager:
 
     @staticmethod
     def get_tool_versions(tool_name: str) -> list[str]:
-        """Get available versions for a tool using mise ls-remote."""
-        import shutil
-        import subprocess
+        """Get available versions for a tool using mise ls-remote.
 
+        Parameters
+        ----------
+        tool_name : str
+            Name of the tool to get versions for
+
+        Returns
+        -------
+        list[str]
+            List of available versions
+
+        """
         versions_output = ""
 
         # First try to use mise if installed locally
@@ -266,14 +296,12 @@ class ToolManager:
         versions = []
 
         for line in lines:
-            line = line.strip()
+            stripped_line = line.strip()
             # Filter out pre-release versions and non-version lines
-            if line and not any(x in line.lower() for x in ["rc", "alpha", "beta", "dev", "pre"]):
+            if stripped_line and not any(x in stripped_line.lower() for x in ["rc", "alpha", "beta", "dev", "pre"]):
                 # Basic version pattern matching
-                import re
-
-                if re.match(r"^\d+\.\d+(\.\d+)?", line):
-                    versions.append(line)
+                if re.match(r"^\d+\.\d+(\.\d+)?", stripped_line):
+                    versions.append(stripped_line)
 
         return versions
 
@@ -291,7 +319,7 @@ class ToolManager:
             major_minor_versions = set()
             for version in versions:
                 parts = version.split(".")
-                if len(parts) >= 2:
+                if len(parts) >= MIN_VERSION_PARTS:
                     major_minor = f"{parts[0]}.{parts[1]}"
                     major_minor_versions.add(major_minor)
 
@@ -305,7 +333,7 @@ class ToolManager:
             major_minor_versions = set()
             for version in versions:
                 parts = version.split(".")
-                if len(parts) >= 2:
+                if len(parts) >= MIN_VERSION_PARTS:
                     major_minor = f"{parts[0]}.{parts[1]}"
                     major_minor_versions.add(major_minor)
 
@@ -515,7 +543,7 @@ class FileManager:
                 shutil.copy2(source_path, target_path)
 
 
-class WelcomeScreen(Screen):
+class WelcomeScreen(Screen[None]):
     """Welcome screen for the installer."""
 
     BINDINGS = [
@@ -559,7 +587,7 @@ Press **ENTER** to continue...
         self.app.exit()
 
 
-class PythonRepositoryScreen(Screen):
+class PythonRepositoryScreen(Screen[None]):
     """Screen for configuring Python repository settings."""
 
     BINDINGS = [
@@ -657,7 +685,7 @@ class PythonRepositoryScreen(Screen):
         self.app.pop_screen()
 
 
-class PythonProjectScreen(Screen):
+class PythonProjectScreen(Screen[None]):
     """Screen for Python project metadata configuration."""
 
     BINDINGS = [
@@ -767,7 +795,7 @@ class PythonProjectScreen(Screen):
         self.app.pop_screen()
 
 
-class PSIHeaderScreen(Screen):
+class PSIHeaderScreen(Screen[None]):
     """Screen for PSI Header configuration."""
 
     BINDINGS = [
@@ -852,7 +880,7 @@ class PSIHeaderScreen(Screen):
         self.app.pop_screen()
 
 
-class ToolVersionScreen(Screen):
+class ToolVersionScreen(Screen[None]):
     """Screen for configuring specific tool versions."""
 
     BINDINGS = [
@@ -916,6 +944,7 @@ class ToolVersionScreen(Screen):
                     value=current_version,
                     placeholder="Enter version or 'latest'",
                     id=f"version_{tool}",
+                    classes="version-input",  # Add a CSS class for width control
                 ),
             )
             scroll_container.mount(Label(""))  # Spacing
@@ -949,7 +978,7 @@ class ToolVersionScreen(Screen):
         self.app.pop_screen()
 
 
-class ProjectConfigScreen(Screen):
+class ProjectConfigScreen(Screen[None]):
     """Screen for project configuration."""
 
     BINDINGS = [
@@ -1057,7 +1086,7 @@ class ProjectConfigScreen(Screen):
         self.app.pop_screen()
 
 
-class ToolSelectionScreen(Screen):
+class ToolSelectionScreen(Screen[None]):
     """Screen for selecting development tools."""
 
     BINDINGS = [
@@ -1081,10 +1110,10 @@ class ToolSelectionScreen(Screen):
         self.tool_version_value = tool_version_value
         self.current_section = 0
         self.show_python_config = False
-        self.show_other_config = {}  # Track which tools are being configured
+        self.show_other_config: dict[str, Any] = {}  # Track which tools are being configured
         self._refreshing_config = False  # Flag to prevent concurrent refresh calls
         self._widget_generation = 0  # Track widget generation to prevent ID conflicts
-        self._active_version_inputs = set()  # Track currently active version input IDs
+        self._active_version_inputs: set[str] = set()  # Track currently active version input IDs
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
@@ -1207,9 +1236,6 @@ class ToolSelectionScreen(Screen):
             selected_tools_in_section = [
                 tool for tool in tools_in_current_section if self.tool_selected.get(tool, False)
             ]
-            configurable_tools_in_section = [
-                tool for tool in selected_tools_in_section if self.tool_version_configurable.get(tool, False)
-            ]
 
             # Also show summary of ALL selected tools across all sections
             all_selected_tools = [tool for tool, selected in self.tool_selected.items() if selected]
@@ -1290,7 +1316,7 @@ class ToolSelectionScreen(Screen):
                             value=current_version,
                             placeholder="version or 'latest'",
                             id=version_id,
-                            classes="compact-input",
+                            classes="version-input",
                         ),
                     )  # Show summary of ALL selected tools across sections
 
@@ -1300,8 +1326,17 @@ class ToolSelectionScreen(Screen):
             self._refreshing_config = False
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        """Handle checkbox state changes."""
-        """Handle tool selection changes."""
+        """Handle checkbox state changes.
+
+        Parameters
+        ----------
+        event : Checkbox.Changed
+            The checkbox change event
+
+        """
+        if not event.checkbox.id:
+            return
+
         # Extract tool name from checkbox ID
         if event.checkbox.id.startswith("tool_"):
             tool = event.checkbox.id[5:]  # Remove "tool_" prefix
@@ -1335,28 +1370,45 @@ class ToolSelectionScreen(Screen):
             pass  # Ignore cleanup errors
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        """Handle input field changes."""
+        """Handle input field changes.
+
+        Parameters
+        ----------
+        event : Input.Changed
+            The input change event
+
+        """
+        if not event.input.id:
+            return
+
         if event.input.id.startswith("version_"):
             # Parse generation-based format: version_{tool}_gen_{generation}
-            if "_gen_" in event.input.id:
-                tool = event.input.id.split("_gen_")[0][8:]  # Remove "version_" prefix
-            else:
-                # Fallback for old format
-                tool = event.input.id[8:]  # Remove "version_" prefix
+            tool = (
+                event.input.id.split("_gen_")[0][8:] if "_gen_" in event.input.id else event.input.id[8:]
+            )  # Remove "version_" prefix
             self.tool_version_value[tool] = event.value
         elif event.input.id == "py_index_url":
             self.config.python_index_url = event.value
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button press events."""
-        """Handle button press events."""
+        """Handle button press events.
+
+        Parameters
+        ----------
+        event : Button.Pressed
+            The button press event
+
+        """
+        if not event.button.id:
+            return
+
         button_id = event.button.id
 
         # Handle version button clicks
         if button_id.startswith("version_btn_"):
             # Extract tool and version from button ID: "version_btn_{tool}_{safe_version}"
             parts = button_id.split("_")
-            if len(parts) >= 4:
+            if len(parts) >= VERSION_BUTTON_PARTS:
                 tool = parts[2]
                 safe_version = "_".join(parts[3:])  # Handle safe versions that have underscores
                 # Convert safe version back to original version (replace underscores with dots)
@@ -1511,7 +1563,7 @@ class ToolSelectionScreen(Screen):
         self.app.pop_screen()
 
 
-class SummaryScreen(Screen):
+class SummaryScreen(Screen[None]):
     """Summary screen showing final configuration."""
 
     BINDINGS = [
@@ -1631,7 +1683,7 @@ class SummaryScreen(Screen):
         elif event.button.id == "back_btn":
             self.action_back()
 
-    def action_install(self):
+    def action_install(self) -> None:
         """Start the installation process."""
         self.app.call_later(self.app.after_summary)
         self.app.pop_screen()
@@ -1642,10 +1694,20 @@ class SummaryScreen(Screen):
         self.app.pop_screen()
 
 
-class InstallationScreen(Screen):
+class InstallationScreen(Screen[None]):
     """Screen showing installation progress."""
 
-    def __init__(self, config: ProjectConfig, source_dir: Path):
+    def __init__(self, config: ProjectConfig, source_dir: Path) -> None:
+        """Initialize the installation screen.
+
+        Parameters
+        ----------
+        config : ProjectConfig
+            Project configuration data
+        source_dir : Path
+            Source directory for template files
+
+        """
         super().__init__()
         self.config = config
         self.source_dir = source_dir
@@ -1668,7 +1730,7 @@ class InstallationScreen(Screen):
         """Start installation when screen is mounted."""
         self.call_after_refresh(self.start_installation)
 
-    def start_installation(self):
+    def start_installation(self) -> None:
         """Start the installation process."""
         try:
             self.update_progress("Creating project directory...")
@@ -1701,8 +1763,15 @@ class InstallationScreen(Screen):
             self.query_one("#status", Label).update(f"Error: {str(e)}")
             self.notify(f"Installation failed: {str(e)}", severity="error")
 
-    def update_progress(self, status: str):
-        """Update progress bar and status."""
+    def update_progress(self, status: str) -> None:
+        """Update progress bar and status.
+
+        Parameters
+        ----------
+        status : str
+            Progress status message
+
+        """
         self.progress_step += 1
         progress_bar = self.query_one("#progress", ProgressBar)
         status_label = self.query_one("#status", Label)
@@ -1966,7 +2035,7 @@ class InstallationScreen(Screen):
             psi_config["psi-header.config"]["company"] = self.config.psi_header_company
 
         # Add language-specific templates
-        for lang_id, lang_name in self.config.psi_header_templates:
+        for lang_id, _lang_name in self.config.psi_header_templates:
             template_config = {
                 "language": lang_id,
                 "template": [
@@ -2056,7 +2125,8 @@ class DynamicDevContainerApp(App):
 
         # Verify required files exist
         if not (self.source_dir / ".devcontainer" / "devcontainer.json").exists():
-            raise FileNotFoundError("Required template files not found. Must run from dynamic-dev-container directory.")
+            msg = "Required template files not found. Must run from dynamic-dev-container directory."
+            raise FileNotFoundError(msg)
 
         # Parse .mise.toml
         self.sections, self.tool_selected, self.tool_version_value, self.tool_version_configurable = (

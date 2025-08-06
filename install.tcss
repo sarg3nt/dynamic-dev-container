@@ -17,13 +17,21 @@
 /* Compact element styles */
 .compact {
     margin: 0;
-    padding: 0;
+    padding: 0 1;
     height: auto;
+    width: 100%;
 }
 
 .compact-input {
     margin: 0 0 1 0;
     height: 3;
+    padding: 0 1;
+}
+
+.version-input {
+    margin: 0 0 1 0;
+    height: 3;
+    width: 13; /* Set a fixed width for version inputs */
     padding: 0 1;
 }
 
