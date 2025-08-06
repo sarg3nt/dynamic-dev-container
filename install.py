@@ -200,14 +200,140 @@ class ToolManager:
     """Manages development tools and their versions."""
 
     @staticmethod
-    def get_latest_major_versions(tool_name: str) -> str:
-        """Get latest major versions for a tool."""
-        if tool_name == "python":
-            # Return common Python versions
-            return "(e.g., 3.13, 3.12, 3.11, 3.10)"
+    def detect_container_runtime() -> tuple[str, str] | None:
+        """Detect available container runtime."""
+        import shutil
 
-        # For other tools, we'd ideally query mise or use container
-        # For now, return a generic message
+        # Check for available container runtimes in order of preference
+        if shutil.which("docker"):
+            return ("docker", "docker")
+        if shutil.which("podman"):
+            return ("podman", "podman")
+        if shutil.which("nerdctl"):
+            return ("nerdctl", "nerdctl")
+        return None
+
+    @staticmethod
+    def run_container_command(image: str, *args) -> str:
+        """Run a command in a container using available runtime."""
+        import subprocess
+
+        runtime_info = ToolManager.detect_container_runtime()
+        if not runtime_info:
+            return ""
+
+        container_cmd, runtime_type = runtime_info
+
+        try:
+            cmd = [container_cmd, "run", "--rm", "--quiet", image] + list(args)
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+        return ""
+
+    @staticmethod
+    def get_tool_versions(tool_name: str) -> list[str]:
+        """Get available versions for a tool using mise ls-remote."""
+        import shutil
+        import subprocess
+
+        versions_output = ""
+
+        # First try to use mise if installed locally
+        if shutil.which("mise"):
+            try:
+                result = subprocess.run(
+                    ["mise", "ls-remote", tool_name],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                if result.returncode == 0:
+                    versions_output = result.stdout.strip()
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+                pass
+
+        # If mise not available or failed, try using container
+        if not versions_output:
+            versions_output = ToolManager.run_container_command("jdxcode/mise", "mise", "ls-remote", tool_name)
+
+        # Parse versions from output
+        lines = versions_output.split("\n")
+        versions = []
+
+        for line in lines:
+            line = line.strip()
+            # Filter out pre-release versions and non-version lines
+            if line and not any(x in line.lower() for x in ["rc", "alpha", "beta", "dev", "pre"]):
+                # Basic version pattern matching
+                import re
+
+                if re.match(r"^\d+\.\d+(\.\d+)?", line):
+                    versions.append(line)
+
+        return versions
+
+    @staticmethod
+    def get_version_list(tool_name: str) -> list[str]:
+        """Get latest major versions for a tool, similar to install.sh logic."""
+        versions = ToolManager.get_tool_versions(tool_name)
+
+        if not versions:
+            return ["latest"]
+
+        # Special handling for Python - get major.minor versions
+        if tool_name == "python":
+            # Extract major.minor versions (e.g., 3.13, 3.12, 3.11)
+            major_minor_versions = set()
+            for version in versions:
+                parts = version.split(".")
+                if len(parts) >= 2:
+                    major_minor = f"{parts[0]}.{parts[1]}"
+                    major_minor_versions.add(major_minor)
+
+            # Sort in reverse order and take top 5
+            sorted_versions = sorted(major_minor_versions, key=lambda x: [int(i) for i in x.split(".")], reverse=True)
+            return ["latest"] + sorted_versions[:4]  # latest + top 4 versions
+
+        # For tools that use major.minor versioning
+        if tool_name in ["kubectl", "go", "golang", "opentofu", "openbao", "packer"]:
+            # For versions like 1.31.2, major is 1.31
+            major_minor_versions = set()
+            for version in versions:
+                parts = version.split(".")
+                if len(parts) >= 2:
+                    major_minor = f"{parts[0]}.{parts[1]}"
+                    major_minor_versions.add(major_minor)
+
+            # Sort in reverse order and take top 5
+            sorted_versions = sorted(major_minor_versions, key=lambda x: [int(i) for i in x.split(".")], reverse=True)
+            return ["latest"] + sorted_versions[:4]  # latest + top 4 versions
+
+        # For versions like 22.10.0, major is 22
+        major_versions = set()
+        for version in versions:
+            parts = version.split(".")
+            if len(parts) >= 1:
+                major_versions.add(parts[0])
+
+        # Sort in reverse order and take top 5
+        try:
+            sorted_versions = sorted(major_versions, key=int, reverse=True)
+        except ValueError:
+            # If major versions aren't pure numbers, sort as strings
+            sorted_versions = sorted(major_versions, reverse=True)
+        return ["latest"] + sorted_versions[:4]  # latest + top 4 versions
+
+    @staticmethod
+    def get_latest_major_versions(tool_name: str) -> str:
+        """Get latest major versions for a tool (legacy method for compatibility)."""
+        versions = ToolManager.get_latest_major_versions(tool_name)
+        if len(versions) > 1:
+            return f"(e.g., {', '.join(versions[1:])})"  # Skip 'latest' for display
         return "(latest version available)"
 
     @staticmethod
@@ -1143,15 +1269,8 @@ class ToolSelectionScreen(Screen):
                     # Tool name label
                     tool_version_container.mount(Label(f"{tool}:", classes="compact tool-label"))
 
-                    # Version buttons - get available versions for this tool
-                    if tool == "python":
-                        versions = ["latest", "3.13", "3.12", "3.11", "3.10"]
-                    elif tool in ["node", "nodejs"]:
-                        versions = ["latest", "22", "20", "18"]
-                    elif tool == "golang":
-                        versions = ["latest", "1.23", "1.22", "1.21"]
-                    else:
-                        versions = ["latest"]
+                    # Version buttons - get available versions for this tool dynamically
+                    versions = ToolManager.get_version_list(tool)
 
                     for version in versions:
                         # Replace dots with underscores for valid CSS identifiers
