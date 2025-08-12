@@ -1,5 +1,5 @@
 // Dev Container Configuration File
-// cspell: ignore pwsh Gruntfuggly darkriszty ciiqr sarg3nt dbaeumer docomment doesnt esbenp euskadi githd hediet huizhou kato koehler mhutchie mypy naumovs omnisharp psioniq tamasfe tftpl tomoki yzhang gofumpt gopls csdevkit bradlc kohler hverlin
+// cspell: ignore pwsh Gruntfuggly darkriszty ciiqr sarg3nt dbaeumer docomment doesnt esbenp euskadi githd hediet huizhou kato koehler mhutchie mypy naumovs omnisharp psioniq tamasfe tftpl tomoki yzhang gofumpt gopls csdevkit bradlc kohler hverlin Textualize
 {
   // See the root README.md file for more detailed instructions!
   // You must change the following when using this file in a new project:
@@ -142,6 +142,7 @@
         "ms-python.python", // Python language support
         "ms-python.mypy-type-checker", // MyPy type checker
         "charliermarsh.ruff", // Ruff linter and formatter
+        "Textualize.textual-syntax-highlighter", // Textual syntax highlighter
         // #### End Python ####
 
         // #### Begin Markdown ####

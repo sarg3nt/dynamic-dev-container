@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# cspell:ignore gitui cmctl jdxcode sles noconfirm, nerdctl, openbao kubectx kubens krew pybuild tcss kubebench distros
 """Dynamic Dev Container TUI Setup.
 
 A Python Terminal User Interface (TUI) for installing .devcontainer and other files
@@ -20,17 +21,104 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
+
+# Global debug flag - can be set via environment variable or command line
+DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
+
+
+# Define a protocol for our app interface
+class DevContainerApp(Protocol):
+    """Protocol defining the interface needed by screens."""
+
+    def after_welcome(self, result: None = None) -> None:
+        """Called after welcome screen completes."""
+
+    def after_project_config(self, result: None = None) -> None:
+        """Called after project config screen completes."""
+
+    def after_tool_selection(self, result: None = None) -> None:
+        """Called after tool selection screen completes."""
+
+    def after_python_repository(self, result: None = None) -> None:
+        """Called after Python repository screen completes."""
+
+    def after_python_project(self, result: None = None) -> None:
+        """Called after Python project screen completes."""
+
+    def after_tool_versions(self, result: None = None) -> None:
+        """Called after tool versions screen completes."""
+
+    def after_psi_header(self, result: None = None) -> None:
+        """Called after PSI header screen completes."""
+
+    def after_summary(self, result: None = None) -> None:
+        """Called after summary screen completes."""
+
+
+class TUILogHandler(logging.Handler):
+    """Custom logging handler that captures messages for TUI display."""
+
+    def __init__(self) -> None:
+        """Initialize the TUI log handler."""
+        super().__init__()
+        self.messages: list[str] = []
+        self.max_messages = 100  # Keep only the last 100 messages
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Emit a log record by storing it for TUI display."""
+        try:
+            msg = self.format(record)
+            self.messages.append(msg)
+            # Keep only the most recent messages
+            if len(self.messages) > self.max_messages:
+                self.messages.pop(0)
+        except Exception:
+            self.handleError(record)
+
+    def get_messages(self) -> list[str]:
+        """Get all captured log messages."""
+        return self.messages.copy()
+
+    def clear_messages(self) -> None:
+        """Clear all captured messages."""
+        self.messages.clear()
+
+
+# Global TUI log handler for debug output
+tui_log_handler = TUILogHandler()
+
 
 # Configure logging for debugging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler(tempfile.gettempdir() + "/install_debug.log"),
-        logging.StreamHandler(sys.stderr),
-    ],
-)
+def setup_logging(debug_mode: bool = False) -> None:
+    """Set up logging configuration based on debug mode."""
+    # Always add the TUI handler for capturing debug messages
+    tui_log_handler.setLevel(logging.DEBUG)
+
+    if debug_mode:
+        # In debug mode, log to both file and TUI handler
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[
+                logging.FileHandler(tempfile.gettempdir() + "/install_debug.log"),
+                tui_log_handler,
+            ],
+        )
+    else:
+        # In normal mode, only log warnings/errors to file, debug to TUI handler only
+        logging.basicConfig(
+            level=logging.WARNING,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[
+                logging.FileHandler(tempfile.gettempdir() + "/install_debug.log"),
+                tui_log_handler,
+            ],
+        )
+
+
+# Initialize logging based on debug mode
+setup_logging(DEBUG_MODE)
 logger = logging.getLogger(__name__)
 
 
@@ -73,7 +161,6 @@ check_and_install_dependencies()
 
 # Now import the required packages
 try:
-    import toml
     from rich.console import Console
     from textual.app import App, ComposeResult
     from textual.binding import Binding
@@ -90,6 +177,7 @@ try:
         ProgressBar,
         RadioButton,
         RadioSet,
+        RichLog,
     )
 except ImportError as e:
     print(f"Error importing required packages: {e}")
@@ -106,6 +194,7 @@ class ProjectConfig:
     """Container for project configuration data."""
 
     def __init__(self) -> None:
+        """Initialize the ProjectConfig with default values for project, tool, and extension settings."""
         # Project information
         self.project_path: str = ""
         self.project_name: str = ""
@@ -158,34 +247,29 @@ class OSDetector:
         """Detect the OS and return the appropriate package manager."""
         system = platform.system().lower()
 
-        if system == "linux":
-            # Check for different Linux distributions
-            if Path("/etc/os-release").exists():
-                with open("/etc/os-release") as f:
-                    content = f.read()
-
-                if any(distro in content.lower() for distro in ["rocky", "rhel", "centos", "fedora", "almalinux"]):
-                    if shutil.which("dnf"):
-                        return "dnf"
-                    if shutil.which("yum"):
-                        return "yum"
-                elif any(distro in content.lower() for distro in ["ubuntu", "debian"]):
-                    if shutil.which("apt-get"):
-                        return "apt-get"
-                    if shutil.which("apt"):
-                        return "apt"
-                elif any(distro in content.lower() for distro in ["arch", "manjaro"]):
-                    if shutil.which("pacman"):
-                        return "pacman"
-                elif "opensuse" in content.lower() or "sles" in content.lower():
-                    if shutil.which("zypper"):
-                        return "zypper"
-                elif "alpine" in content.lower():
-                    if shutil.which("apk"):
-                        return "apk"
-
-        elif system == "darwin" and shutil.which("brew"):
+        if system == "darwin" and shutil.which("brew"):
             return "brew"
+
+        if system != "linux" or not Path("/etc/os-release").exists():
+            return "unknown"
+
+        with open("/etc/os-release") as f:
+            content = f.read().lower()
+
+        # Define package manager priorities for different distributions
+        distro_managers = [
+            (["rocky", "rhel", "centos", "fedora", "almalinux"], ["dnf", "yum"]),
+            (["ubuntu", "debian"], ["apt-get", "apt"]),
+            (["arch", "manjaro"], ["pacman"]),
+            (["opensuse", "sles"], ["zypper"]),
+            (["alpine"], ["apk"]),
+        ]
+
+        for distros, managers in distro_managers:
+            if any(distro in content for distro in distros):
+                for manager in managers:
+                    if shutil.which(manager):
+                        return manager
 
         return "unknown"
 
@@ -211,7 +295,6 @@ class ToolManager:
     @staticmethod
     def detect_container_runtime() -> tuple[str, str] | None:
         """Detect available container runtime."""
-        import shutil
 
         # Check for available container runtimes in order of preference
         if shutil.which("docker"):
@@ -276,7 +359,7 @@ class ToolManager:
         if shutil.which("mise"):
             try:
                 result = subprocess.run(
-                    ["mise", "ls-remote", tool_name],
+                    ["mise", "ls-remote", tool_name],  # noqa: S607
                     check=False,
                     capture_output=True,
                     text=True,
@@ -298,10 +381,12 @@ class ToolManager:
         for line in lines:
             stripped_line = line.strip()
             # Filter out pre-release versions and non-version lines
-            if stripped_line and not any(x in stripped_line.lower() for x in ["rc", "alpha", "beta", "dev", "pre"]):
-                # Basic version pattern matching
-                if re.match(r"^\d+\.\d+(\.\d+)?", stripped_line):
-                    versions.append(stripped_line)
+            if (
+                stripped_line
+                and not any(x in stripped_line.lower() for x in ["rc", "alpha", "beta", "dev", "pre"])
+                and re.match(r"^\d+\.\d+(\.\d+)?", stripped_line)
+            ):
+                versions.append(stripped_line)
 
         return versions
 
@@ -427,32 +512,32 @@ class MiseParser:
         previous_line = ""
 
         for line in lines:
-            line = line.strip()
+            stripped_line = line.strip()
 
-            if line == "[tools]":
+            if stripped_line == "[tools]":
                 in_tools_section = True
                 continue
 
-            if in_tools_section and line.startswith("[") and line != "[tools]":
+            if in_tools_section and stripped_line.startswith("[") and stripped_line != "[tools]":
                 break
 
             if in_tools_section:
                 # Check for section markers (these start with ####)
-                begin_match = re.match(r"^#### Begin (.+)$", line)
+                begin_match = re.match(r"^#### Begin (.+)$", stripped_line)
                 if begin_match:
                     current_section = begin_match.group(1)
                     if current_section not in sections:
                         sections.append(current_section)
                     continue
 
-                end_match = re.match(r"^#### End (.+)$", line)
+                end_match = re.match(r"^#### End (.+)$", stripped_line)
                 if end_match:
                     current_section = None
                     continue
 
                 # Check for tool definitions (only when we're in a section)
                 if current_section:
-                    tool_match = re.match(r"^([a-zA-Z0-9_-]+)\s*=\s*", line)
+                    tool_match = re.match(r"^([a-zA-Z0-9_-]+)\s*=\s*", stripped_line)
                     if tool_match:
                         tool_name = tool_match.group(1)
                         tool_selected[tool_name] = False  # Default to not selected
@@ -478,17 +563,17 @@ class MiseParser:
         in_section = False
 
         for line in content.split("\n"):
-            line = line.strip()
+            stripped_line = line.strip()
 
-            if line == f"#### Begin {section_name}":
+            if stripped_line == f"#### Begin {section_name}":
                 in_section = True
                 continue
 
-            if line == f"#### End {section_name}":
+            if stripped_line == f"#### End {section_name}":
                 break
 
             if in_section:
-                tool_match = re.match(r"^([a-zA-Z0-9_-]+)\s*=\s*", line)
+                tool_match = re.match(r"^([a-zA-Z0-9_-]+)\s*=\s*", stripped_line)
                 if tool_match:
                     tools.append(tool_match.group(1))
 
@@ -543,6 +628,46 @@ class FileManager:
                 shutil.copy2(source_path, target_path)
 
 
+class DebugMixin:
+    """Mixin class to add debug functionality to screens."""
+
+    def get_debug_widget(self) -> Container:
+        """Create a debug output widget for the screen."""
+        debug_log = RichLog(
+            max_lines=50,
+            wrap=True,
+            highlight=True,
+            markup=True,
+            id="debug_log",
+        )
+
+        # Populate with existing debug messages
+        messages = tui_log_handler.get_messages()
+        for msg in messages[-20:]:  # Show last 20 messages
+            debug_log.write(msg)
+
+        return Container(
+            Label("Debug Output:", classes="debug-title"),
+            debug_log,
+            id="debug_container",
+            classes="debug-panel",
+        )
+
+    def update_debug_output(self) -> None:
+        """Update the debug output with new messages."""
+        try:
+            debug_log = self.query_one("#debug_log", RichLog)
+            messages = tui_log_handler.get_messages()
+            # Clear and repopulate with recent messages
+            debug_log.clear()
+            for msg in messages[-20:]:  # Show last 20 messages
+                debug_log.write(msg)
+        except Exception:
+            # Debug log widget not found or error occurred - silently ignore
+            # This is expected when debug widget is not present
+            pass
+
+
 class WelcomeScreen(Screen[None]):
     """Welcome screen for the installer."""
 
@@ -564,7 +689,7 @@ This wizard will guide you through configuring your development container with t
 
 ## Navigation:
 - Use **TAB/SHIFT+TAB** to navigate between elements
-- Use **SPACE** to select/deselect checkboxes  
+- Use **SPACE** to select/deselect checkboxes
 - Use **ENTER** to confirm selections
 - Use **Q** to quit at any time
 
@@ -578,7 +703,7 @@ Press **ENTER** to continue...
         """Continue to the next screen."""
         """Continue to the next screen."""
         # Call the next step directly
-        self.app.call_later(self.app.after_welcome)
+        self.app.call_later(self.app.after_welcome)  # type: ignore[attr-defined]
         self.app.pop_screen()
 
     def action_quit(self) -> None:
@@ -596,6 +721,14 @@ class PythonRepositoryScreen(Screen[None]):
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
+        """Initialize the Python Repository screen.
+
+        Parameters
+        ----------
+        config : ProjectConfig
+            Project configuration data
+
+        """
         super().__init__()
         self.config = config
 
@@ -671,7 +804,7 @@ class PythonRepositoryScreen(Screen[None]):
         self.config.python_dev_suffix = self.query_one("#dev_suffix", Input).value or "dev"
         self.config.python_prod_suffix = self.query_one("#prod_suffix", Input).value or "prod"
 
-        self.app.call_later(self.app.after_python_repository)
+        self.app.call_later(self.app.after_python_repository)  # type: ignore[attr-defined]
         self.app.pop_screen()
 
     def action_next(self) -> None:
@@ -694,6 +827,14 @@ class PythonProjectScreen(Screen[None]):
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
+        """Initialize the Python Project screen.
+
+        Parameters
+        ----------
+        config : ProjectConfig
+            Project configuration data
+
+        """
         super().__init__()
         self.config = config
 
@@ -781,7 +922,7 @@ class PythonProjectScreen(Screen[None]):
         else:
             self.config.python_license = "MIT"  # Default
 
-        self.app.call_later(self.app.after_python_project)
+        self.app.call_later(self.app.after_python_project)  # type: ignore[attr-defined]
         self.app.pop_screen()
 
     def action_next(self) -> None:
@@ -804,6 +945,14 @@ class PSIHeaderScreen(Screen[None]):
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
+        """Initialize the PSI Header screen.
+
+        Parameters
+        ----------
+        config : ProjectConfig
+            Project configuration data
+
+        """
         super().__init__()
         self.config = config
 
@@ -866,7 +1015,7 @@ class PSIHeaderScreen(Screen[None]):
             if self.query_one(f"#{checkbox_id}", Checkbox).value:
                 self.config.psi_header_templates.append((lang_id, lang_name))
 
-        self.app.call_later(self.app.after_psi_header)
+        self.app.call_later(self.app.after_psi_header)  # type: ignore[attr-defined]
         self.app.pop_screen()
 
     def action_next(self) -> None:
@@ -889,6 +1038,14 @@ class ToolVersionScreen(Screen[None]):
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
+        """Initialize the Tool Version screen.
+
+        Parameters
+        ----------
+        config : ProjectConfig
+            Project configuration data
+
+        """
         super().__init__()
         self.config = config
         # Get tools that have version configuration enabled
@@ -964,7 +1121,7 @@ class ToolVersionScreen(Screen[None]):
             version = version_input.value.strip() or "latest"
             self.config.tool_version_value[tool] = version
 
-        self.app.call_later(self.app.after_tool_versions)
+        self.app.call_later(self.app.after_tool_versions)  # type: ignore[attr-defined]
         self.app.pop_screen()
 
     def action_next(self) -> None:
@@ -987,6 +1144,14 @@ class ProjectConfigScreen(Screen[None]):
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
+        """Initialize the Project Config screen.
+
+        Parameters
+        ----------
+        config : ProjectConfig
+            Project configuration data
+
+        """
         super().__init__()
         self.config = config
 
@@ -998,7 +1163,8 @@ class ProjectConfigScreen(Screen[None]):
                 default_name = Path(self.config.project_path).name
             else:
                 default_name = "my-project"
-        except Exception:
+        except Exception as e:
+            logger.debug("Error parsing project path '%s': %s", self.config.project_path, e)
             default_name = "my-project"
 
         if not default_name or default_name in [".", ".."]:
@@ -1009,10 +1175,7 @@ class ProjectConfigScreen(Screen[None]):
 
         # Generate docker exec command from display name
         words = default_display.split()
-        if words:
-            default_exec = "".join(word[0].lower() for word in words if word)
-        else:
-            default_exec = "mp"  # fallback
+        default_exec = "".join(word[0].lower() for word in words if word) if words else "mp"  # fallback
 
         yield Header()
         yield Container(
@@ -1082,16 +1245,17 @@ class ProjectConfigScreen(Screen[None]):
             self.config.container_name = f"{self.config.project_name}-container"
 
         # Schedule the callback and pop the screen
-        self.app.call_later(self.app.after_project_config)
+        self.app.call_later(self.app.after_project_config)  # type: ignore[attr-defined]
         self.app.pop_screen()
 
 
-class ToolSelectionScreen(Screen[None]):
+class ToolSelectionScreen(Screen[None], DebugMixin):
     """Screen for selecting development tools."""
 
     BINDINGS = [
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
 
     def __init__(
@@ -1101,7 +1265,23 @@ class ToolSelectionScreen(Screen[None]):
         tool_selected: dict[str, bool],
         tool_version_configurable: dict[str, bool],
         tool_version_value: dict[str, str],
-    ):
+    ) -> None:
+        """Initialize the Tool Selection screen.
+
+        Parameters
+        ----------
+        config : ProjectConfig
+            Project configuration data
+        sections : list[str]
+            List of tool sections from .mise.toml
+        tool_selected : dict[str, bool]
+            Dictionary tracking which tools are selected
+        tool_version_configurable : dict[str, bool]
+            Dictionary tracking which tools have configurable versions
+        tool_version_value : dict[str, str]
+            Dictionary storing version values for tools
+
+        """
         super().__init__()
         self.config = config
         self.sections = sections
@@ -1114,6 +1294,7 @@ class ToolSelectionScreen(Screen[None]):
         self._refreshing_config = False  # Flag to prevent concurrent refresh calls
         self._widget_generation = 0  # Track widget generation to prevent ID conflicts
         self._active_version_inputs: set[str] = set()  # Track currently active version input IDs
+        self.show_debug = DEBUG_MODE  # Show debug by default if debug mode is enabled
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
@@ -1126,7 +1307,7 @@ class ToolSelectionScreen(Screen[None]):
                 id="tools-container",
             )
         else:
-            yield Container(
+            main_container = Container(
                 Label(
                     f"Development Tools - {self.sections[self.current_section]} - Section {self.current_section + 1} of {len(self.sections)}",
                     classes="title",
@@ -1160,6 +1341,11 @@ class ToolSelectionScreen(Screen[None]):
                 ),
                 id="tools-container",
             )
+            yield main_container
+
+            # Add debug output if enabled
+            if self.show_debug:
+                yield self.get_debug_widget()
 
         yield Footer()
 
@@ -1167,6 +1353,9 @@ class ToolSelectionScreen(Screen[None]):
         """Initialize the screen when mounted."""
         """Called when the screen is mounted."""
         self.refresh_tools()
+        # Set up a timer to periodically update debug output
+        if self.show_debug:
+            self.set_interval(1.0, self.update_debug_output)
 
     def refresh_tools(self) -> None:
         """Refresh the tools display for current section."""
@@ -1245,31 +1434,29 @@ class ToolSelectionScreen(Screen[None]):
                 return
 
             # Show current section configuration first
-            if selected_tools_in_section:
-                # Show Python configuration if selected in current section
-                if "python" in selected_tools_in_section:
-                    # Repository type
-                    config_container.mount(Label("Repository Type:", classes="compact section-header"))
-                    python_repo_container = Container(
-                        RadioSet(
-                            RadioButton("PyPI", id="py_repo_pypi", value=True, classes="compact"),
-                            RadioButton("Artifactory", id="py_repo_artifactory", classes="compact"),
-                            RadioButton("Custom", id="py_repo_custom", classes="compact"),
-                            id="py_repo_radioset",
-                        ),
-                        classes="compact-group",
-                    )
-                    config_container.mount(python_repo_container)
+            if selected_tools_in_section and "python" in selected_tools_in_section:
+                # Repository type
+                config_container.mount(Label("Repository Type:", classes="compact section-header"))
+                python_repo_container = Container(
+                    RadioSet(
+                        RadioButton("PyPI", id="py_repo_pypi", value=True, classes="compact"),
+                        RadioButton("Artifactory", id="py_repo_artifactory", classes="compact"),
+                        RadioButton("Custom", id="py_repo_custom", classes="compact"),
+                        id="py_repo_radioset",
+                    ),
+                    classes="compact-group",
+                )
+                config_container.mount(python_repo_container)
 
-                    # URLs (compact inputs)
-                    config_container.mount(Label("Index URL:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            placeholder="https://pypi.org/simple/",
-                            id="py_index_url",
-                            classes="compact-input",
-                        ),
-                    )
+                # URLs (compact inputs)
+                config_container.mount(Label("Index URL:", classes="compact"))
+                config_container.mount(
+                    Input(
+                        placeholder="https://pypi.org/simple/",
+                        id="py_index_url",
+                        classes="compact-input",
+                    ),
+                )
 
             # Clean up any existing version inputs before creating new ones
             self._cleanup_version_inputs()
@@ -1353,21 +1540,35 @@ class ToolSelectionScreen(Screen[None]):
                         try:
                             checkbox = self.query_one(f"#{repo_type}", Checkbox)
                             checkbox.value = False
-                        except Exception:
-                            pass  # Checkbox might not exist yet
+                        except Exception as e:
+                            # Only log checkbox errors in debug mode
+                            if DEBUG_MODE:
+                                logger.debug(
+                                    "Checkbox '%s' not found during repository type selection: %s",
+                                    repo_type,
+                                    e,
+                                )
 
     def _cleanup_version_inputs(self) -> None:
         """Remove any existing version input widgets to prevent duplicates."""
+        # Silently clean up version inputs - only log if in debug mode
+        if DEBUG_MODE:
+            logger.debug("Cleaning up version input widgets")
+
         try:
             # Find and remove all version input widgets
             for tool in list(self.tool_version_configurable.keys()):
                 try:
                     version_widget = self.query_one(f"#version_{tool}", Input)
                     version_widget.remove()
+                    if DEBUG_MODE:
+                        logger.debug("Removed version widget for tool: %s", tool)
                 except Exception:
-                    pass  # Widget might not exist
-        except Exception:
-            pass  # Ignore cleanup errors
+                    # Don't log missing widgets - this is expected behavior
+                    pass
+        except Exception as e:
+            if DEBUG_MODE:
+                logger.debug("Error during version input cleanup: %s", e)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle input field changes.
@@ -1423,9 +1624,8 @@ class ToolSelectionScreen(Screen[None]):
                     if version_id in self._active_version_inputs:
                         version_input = self.query_one(f"#{version_id}", Input)
                         version_input.value = version
-                except Exception:
-                    # Input might not exist yet, which is fine
-                    pass
+                except Exception as e:
+                    logger.debug("Version input widget '%s' not found for tool '%s': %s", version_id, tool, e)
             return
 
         if button_id == "prev_btn":
@@ -1451,16 +1651,15 @@ class ToolSelectionScreen(Screen[None]):
         next_section_btn.disabled = self.current_section >= len(self.sections) - 1
 
         # Update title and subtitle
-        title_label = self.query_one("Label")
+        title_label = self.query_one("Label", Label)
         title_label.update(f"Development Tools - {self.sections[self.current_section]}")
 
         # Update subtitle showing section progress
         try:
-            subtitle_label = self.query_one("Label.subtitle")
+            subtitle_label = self.query_one("Label.subtitle", Label)
             subtitle_label.update(f"Section {self.current_section + 1} of {len(self.sections)}")
-        except Exception:
-            # Subtitle might not exist yet
-            pass
+        except Exception as e:
+            logger.debug("Subtitle label not found during section update: %s", e)
 
     def save_current_section(self) -> None:
         """Save selections for current section."""
@@ -1474,9 +1673,8 @@ class ToolSelectionScreen(Screen[None]):
             try:
                 checkbox = self.query_one(f"#tool_{tool}", Checkbox)
                 self.tool_selected[tool] = checkbox.value
-            except Exception:
-                # Checkbox might not exist
-                pass
+            except Exception as e:
+                logger.debug("Checkbox for tool '%s' not found during save: %s", tool, e)
 
         # Save any configuration values
         self.save_configuration_values()
@@ -1491,13 +1689,13 @@ class ToolSelectionScreen(Screen[None]):
                 self.config.python_repository_type = "Artifactory"
             elif self.query_one("#py_repo_custom", Checkbox).value:
                 self.config.python_repository_type = "Custom"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Python repository type widgets not found during save: %s", e)
 
         try:
             self.config.python_index_url = self.query_one("#py_index_url", Input).value
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Python index URL input not found during save: %s", e)
 
         # Save version configurations - only for configurable tools in the current section
         # since version inputs are only shown for the current section
@@ -1516,13 +1714,14 @@ class ToolSelectionScreen(Screen[None]):
                     version_id = f"version_{tool}_gen_{self._widget_generation}"
                     version_input = self.query_one(f"#{version_id}", Input)
                     self.tool_version_value[tool] = version_input.value or "latest"
-                except Exception:
+                except Exception as e:
+                    logger.debug("Generation-based version input for tool '%s' not found: %s", tool, e)
                     try:
                         # Fallback to simple ID format
                         version_input = self.query_one(f"#version_{tool}", Input)
                         self.tool_version_value[tool] = version_input.value or "latest"
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Version input for tool '%s' not found during save: %s", tool, e)
 
     def finalize_selection(self) -> None:
         """Finalize tool selection and continue."""
@@ -1548,7 +1747,7 @@ class ToolSelectionScreen(Screen[None]):
         self.config.include_shell_extensions = True
 
         # Go directly to tool version configuration or next step
-        self.app.call_later(self.app.after_tool_selection)
+        self.app.call_later(self.app.after_tool_selection)  # type: ignore[attr-defined]
         self.app.pop_screen()
 
     def action_next(self) -> None:
@@ -1562,6 +1761,12 @@ class ToolSelectionScreen(Screen[None]):
         """Go back to previous screen."""
         self.app.pop_screen()
 
+    def action_toggle_debug(self) -> None:
+        """Toggle debug output visibility."""
+        self.show_debug = not self.show_debug
+        # Refresh the screen to show/hide debug output
+        self.app.refresh(layout=True)
+
 
 class SummaryScreen(Screen[None]):
     """Summary screen showing final configuration."""
@@ -1572,6 +1777,14 @@ class SummaryScreen(Screen[None]):
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
+        """Initialize the Summary screen.
+
+        Parameters
+        ----------
+        config : ProjectConfig
+            Project configuration data
+
+        """
         super().__init__()
         self.config = config
 
@@ -1685,7 +1898,7 @@ class SummaryScreen(Screen[None]):
 
     def action_install(self) -> None:
         """Start the installation process."""
-        self.app.call_later(self.app.after_summary)
+        self.app.call_later(self.app.after_summary)  # type: ignore[attr-defined]
         self.app.pop_screen()
 
     def action_back(self) -> None:
@@ -1779,12 +1992,12 @@ class InstallationScreen(Screen[None]):
         progress_bar.update(progress=self.progress_step)
         status_label.update(status)
 
-    def create_project_directory(self):
+    def create_project_directory(self) -> None:
         """Create project directory if it doesn't exist."""
         project_path = Path(self.config.project_path)
         project_path.mkdir(parents=True, exist_ok=True)
 
-    def copy_files(self):
+    def copy_files(self) -> None:
         """Copy files and directories to target."""
         source_dir = self.source_dir
         target_dir = Path(self.config.project_path)
@@ -1795,7 +2008,7 @@ class InstallationScreen(Screen[None]):
             include_python=self.config.install_python_tools,
         )
 
-    def generate_mise_toml(self):
+    def generate_mise_toml(self) -> None:
         """Generate custom .mise.toml based on selected tools."""
         source_file = self.source_dir / ".mise.toml"
         target_file = Path(self.config.project_path) / ".mise.toml"
@@ -1869,7 +2082,7 @@ class InstallationScreen(Screen[None]):
         with open(target_file, "w") as f:
             f.write("\n".join(lines))
 
-    def generate_devcontainer_json(self):
+    def generate_devcontainer_json(self) -> None:
         """Generate custom devcontainer.json based on configuration."""
         source_file = self.source_dir / ".devcontainer" / "devcontainer.json"
         target_file = Path(self.config.project_path) / ".devcontainer" / "devcontainer.json"
@@ -1904,7 +2117,7 @@ class InstallationScreen(Screen[None]):
         with open(target_file, "w") as f:
             f.write(content)
 
-    def update_dev_sh(self):
+    def update_dev_sh(self) -> None:
         """Update dev.sh with project settings."""
         source_file = self.source_dir / "dev.sh"
         target_file = Path(self.config.project_path) / "dev.sh"
@@ -1938,7 +2151,7 @@ class InstallationScreen(Screen[None]):
         # Make executable
         os.chmod(target_file, 0o744)
 
-    def update_pyproject_toml(self):
+    def update_pyproject_toml(self) -> None:
         """Update pyproject.toml with Python project configuration."""
         target_file = Path(self.config.project_path) / "pyproject.toml"
 
@@ -2010,7 +2223,7 @@ class InstallationScreen(Screen[None]):
         with open(target_file, "w") as f:
             f.write(content)
 
-    def configure_psi_header(self):
+    def configure_psi_header(self) -> None:
         """Configure PSI Header extension settings."""
         if not self.config.install_psi_header:
             return
@@ -2021,7 +2234,7 @@ class InstallationScreen(Screen[None]):
         settings_dir.mkdir(exist_ok=True)
 
         # Basic PSI Header configuration
-        psi_config = {
+        psi_config: dict[str, Any] = {
             "psi-header.config": {
                 "forceToTop": True,
                 "blankLinesAfter": 1,
@@ -2036,7 +2249,7 @@ class InstallationScreen(Screen[None]):
 
         # Add language-specific templates
         for lang_id, _lang_name in self.config.psi_header_templates:
-            template_config = {
+            template_config: dict[str, Any] = {
                 "language": lang_id,
                 "template": [
                     f"Copyright (c) {self.config.psi_header_company or 'Company'} - All Rights Reserved",
@@ -2051,7 +2264,7 @@ class InstallationScreen(Screen[None]):
             psi_config["psi-header.templates"].append(template_config)
 
         # Read existing settings or create new
-        existing_settings = {}
+        existing_settings: dict[str, Any] = {}
         if settings_file.exists():
             try:
                 with open(settings_file) as f:
@@ -2067,7 +2280,7 @@ class InstallationScreen(Screen[None]):
         with open(settings_file, "w") as f:
             json.dump(existing_settings, f, indent=2)
 
-    def configure_python_repository_settings(self):
+    def configure_python_repository_settings(self) -> None:
         """Configure Python repository settings if needed."""
         if not self.config.install_python_tools:
             return
@@ -2090,7 +2303,7 @@ class InstallationScreen(Screen[None]):
             with open(pip_conf, "w") as f:
                 f.write("\n".join(config_content) + "\n")
 
-    def show_completion(self):
+    def show_completion(self) -> None:
         """Show completion message and exit."""
         console = Console()
         console.print("\n[bold green]Installation completed successfully![/bold green]")
@@ -2112,12 +2325,25 @@ class InstallationScreen(Screen[None]):
         self.app.call_later(self.app.exit)
 
 
-class DynamicDevContainerApp(App):
+class DynamicDevContainerApp(App[None]):
     """Main application class."""
 
     CSS_PATH = "install.tcss"
 
-    def __init__(self, project_path: str = ""):
+    def __init__(self, project_path: str = "") -> None:
+        """Initialize the Dynamic Dev Container application.
+
+        Parameters
+        ----------
+        project_path : str, optional
+            Path where the dev container will be created, by default ""
+
+        Raises
+        ------
+        FileNotFoundError
+            If required template files are not found in the current directory
+
+        """
         super().__init__()
         self.config = ProjectConfig()
         self.config.project_path = project_path
@@ -2138,7 +2364,7 @@ class DynamicDevContainerApp(App):
         """Called when app is mounted."""
         self.push_screen(WelcomeScreen(), self.after_welcome)
 
-    def after_welcome(self):
+    def after_welcome(self, _result: None = None) -> None:
         """Called after welcome screen."""
         try:
             # Set a default project path if none provided
@@ -2154,7 +2380,7 @@ class DynamicDevContainerApp(App):
             self.notify(f"Error: {e}", severity="error")
             self.exit()
 
-    def after_project_config(self):
+    def after_project_config(self, _result: None = None) -> None:
         """Called after project config screen."""
 
         # Always show tool selection screen, even if no tools available
@@ -2169,7 +2395,7 @@ class DynamicDevContainerApp(App):
             self.after_tool_selection,
         )
 
-    def show_tool_selection(self):
+    def show_tool_selection(self) -> None:
         """Show tool selection screen with current state."""
 
         # Show tool selection screen with current selections
@@ -2184,24 +2410,24 @@ class DynamicDevContainerApp(App):
             self.after_tool_selection,
         )
 
-    def after_tool_selection(self):
+    def after_tool_selection(self, _result: None = None) -> None:
         """Called after tool selection screen."""
 
         # Skip Python-specific screens since configuration is now inline
         # Go directly to tool version configuration or next step
         self.check_tool_versions()
 
-    def after_python_repository(self):
+    def after_python_repository(self, _result: None = None) -> None:
         """Called after Python repository configuration."""
         # Show Python project metadata screen
         self.push_screen(PythonProjectScreen(self.config), self.after_python_project)
 
-    def after_python_project(self):
+    def after_python_project(self, _result: None = None) -> None:
         """Called after Python project metadata configuration."""
         # Return to tool selection to allow selection of other tools
         self.show_tool_selection()
 
-    def check_tool_versions(self):
+    def check_tool_versions(self) -> None:
         """Check if we need to show tool version configuration screen."""
         configurable_tools = [
             tool
@@ -2215,27 +2441,29 @@ class DynamicDevContainerApp(App):
             # Show PSI Header configuration
             self.show_psi_header_config()
 
-    def after_tool_versions(self):
+    def after_tool_versions(self, _result: None = None) -> None:
         """Called after tool version configuration."""
         # Show PSI Header configuration
         self.show_psi_header_config()
 
-    def show_psi_header_config(self):
+    def show_psi_header_config(self) -> None:
         """Show PSI Header configuration screen."""
         self.push_screen(PSIHeaderScreen(self.config), self.after_psi_header)
 
-    def after_psi_header(self):
+    def after_psi_header(self, _result: None = None) -> None:
         """Called after PSI Header configuration."""
         # Now show summary
         self.push_screen(SummaryScreen(self.config), self.after_summary)
 
-    def after_summary(self):
+    def after_summary(self, _result: None = None) -> None:
         """Called after summary screen."""
         self.push_screen(InstallationScreen(self.config, self.source_dir))
 
 
 def main() -> None:
     """Main entry point."""
+    global DEBUG_MODE
+
     parser = argparse.ArgumentParser(
         description="Dynamic Dev Container TUI Setup - Python Version",
         epilog="This script creates a development container configuration with a Terminal User Interface.",
@@ -2250,8 +2478,19 @@ def main() -> None:
         action="store_true",
         help="Show extended help and examples",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode with verbose logging and debug panel",
+    )
 
     args = parser.parse_args()
+
+    # Update debug mode based on command line argument
+    if args.debug:
+        DEBUG_MODE = True
+        # Reconfigure logging for debug mode
+        setup_logging(DEBUG_MODE)
 
     if args.help_extended:
         print("""
@@ -2260,16 +2499,21 @@ Dynamic Dev Container TUI Setup - Python Version
 This is a Python implementation of the original install.sh script with enhanced
 TUI capabilities using the Textual library.
 
-Usage: python install.py [project_path]
+Usage: python install.py [project_path] [--debug]
 
 Arguments:
   project_path    Path where the dev container will be created
                   If not provided, you'll be prompted to enter it
 
+Options:
+  --debug         Enable debug mode with verbose logging and debug panel
+                  Press Ctrl+D in the tool selection screen to toggle debug output
+
 Examples:
   python install.py ~/my-project
-  python install.py /workspace/new-project
+  python install.py /workspace/new-project --debug
   python install.py  # Will prompt for path
+  DEBUG=true python install.py  # Enable debug via environment variable
 
 Requirements:
   - Python 3.9 or higher
