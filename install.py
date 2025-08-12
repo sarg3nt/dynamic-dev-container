@@ -21,7 +21,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 # Global debug flag - can be set via environment variable or command line
 DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
@@ -446,7 +446,7 @@ class ToolManager:
     @staticmethod
     def get_latest_major_versions(tool_name: str) -> str:
         """Get latest major versions for a tool (legacy method for compatibility)."""
-        versions = ToolManager.get_latest_major_versions(tool_name)
+        versions = ToolManager.get_version_list(tool_name)
         if len(versions) > 1:
             return f"(e.g., {', '.join(versions[1:])})"  # Skip 'latest' for display
         return "(latest version available)"
@@ -1220,7 +1220,7 @@ class ProjectConfigScreen(Screen[None]):
     def action_back(self) -> None:
         """Go to previous step."""
         """Go back to previous screen."""
-        self.app.pop_screen()
+        self.app.push_screen(WelcomeScreen())
 
     def save_config(self) -> None:
         """Save current configuration."""
@@ -1308,7 +1308,11 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         if not self.sections:
             yield Container(
                 Label("No tool sections found in .mise.toml", classes="title"),
-                Button("Next", id="next_btn", variant="primary"),
+                Horizontal(
+                    Button("Back", id="back_btn"),
+                    Button("Next", id="next_btn", variant="primary"),
+                    id="button-row",
+                ),
                 id="tools-container",
             )
         else:
@@ -1335,6 +1339,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     id="main-layout",
                 ),
                 Horizontal(
+                    Button("Back", id="back_btn"),
                     Button("Previous Section", id="prev_btn", disabled=self.current_section == 0),
                     Button(
                         "Next Section",
@@ -1634,7 +1639,9 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     logger.debug("Version input widget '%s' not found for tool '%s': %s", version_id, tool, e)
             return
 
-        if button_id == "prev_btn":
+        if button_id == "back_btn":
+            self.action_back()
+        elif button_id == "prev_btn":
             self.save_current_section()
             self.current_section = max(0, self.current_section - 1)
             self.refresh_controls()
@@ -1765,7 +1772,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
     def action_back(self) -> None:
         """Go to previous step."""
         """Go back to previous screen."""
-        self.app.pop_screen()
+        self.app.push_screen(ProjectConfigScreen(self.config))
 
     def action_toggle_debug(self) -> None:
         """Toggle debug output visibility."""
@@ -1910,7 +1917,18 @@ class SummaryScreen(Screen[None]):
     def action_back(self) -> None:
         """Go to previous step."""
         """Go back to previous screen."""
-        self.app.pop_screen()
+        # Access the main app's parsed data for ToolSelectionScreen
+
+        app = cast("DynamicDevContainerApp", self.app)
+        self.app.push_screen(
+            ToolSelectionScreen(
+                self.config,
+                app.sections,
+                app.tool_selected,
+                app.tool_version_configurable,
+                app.tool_version_value,
+            ),
+        )
 
 
 class InstallationScreen(Screen[None]):
@@ -2419,9 +2437,9 @@ class DynamicDevContainerApp(App[None]):
     def after_tool_selection(self, _result: None = None) -> None:
         """Called after tool selection screen."""
 
-        # Skip Python-specific screens since configuration is now inline
-        # Go directly to tool version configuration or next step
-        self.check_tool_versions()
+        # Version configuration is now handled inline in ToolSelectionScreen
+        # Skip the separate ToolVersionScreen and go directly to PSI Header configuration
+        self.show_psi_header_config()
 
     def after_python_repository(self, _result: None = None) -> None:
         """Called after Python repository configuration."""
