@@ -333,8 +333,9 @@ class ToolManager:
             result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
             if result.returncode == 0:
                 return result.stdout.strip()
-        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
-            pass
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError) as e:
+            if DEBUG_MODE:
+                logger.debug("Container command failed for %s: %s", container_cmd, e)
 
         return ""
 
@@ -367,8 +368,9 @@ class ToolManager:
                 )
                 if result.returncode == 0:
                     versions_output = result.stdout.strip()
-            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
-                pass
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError) as e:
+                if DEBUG_MODE:
+                    logger.debug("Local mise command failed for tool %s: %s", tool_name, e)
 
         # If mise not available or failed, try using container
         if not versions_output:
@@ -656,16 +658,19 @@ class DebugMixin:
     def update_debug_output(self) -> None:
         """Update the debug output with new messages."""
         try:
-            debug_log = self.query_one("#debug_log", RichLog)
-            messages = tui_log_handler.get_messages()
-            # Clear and repopulate with recent messages
-            debug_log.clear()
-            for msg in messages[-20:]:  # Show last 20 messages
-                debug_log.write(msg)
-        except Exception:
+            # Check if we have the query_one method (i.e., we're mixed into a Screen)
+            if hasattr(self, "query_one"):
+                debug_log = self.query_one("#debug_log", RichLog)
+                messages = tui_log_handler.get_messages()
+                # Clear and repopulate with recent messages
+                debug_log.clear()
+                for msg in messages[-20:]:  # Show last 20 messages
+                    debug_log.write(msg)
+        except Exception as e:
             # Debug log widget not found or error occurred - silently ignore
             # This is expected when debug widget is not present
-            pass
+            if DEBUG_MODE:
+                logger.debug("Failed to update debug output widget: %s", e)
 
 
 class WelcomeScreen(Screen[None]):
@@ -1563,9 +1568,10 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     version_widget.remove()
                     if DEBUG_MODE:
                         logger.debug("Removed version widget for tool: %s", tool)
-                except Exception:
+                except Exception as e:
                     # Don't log missing widgets - this is expected behavior
-                    pass
+                    if DEBUG_MODE:
+                        logger.debug("Version widget for tool %s not found during cleanup: %s", tool, e)
         except Exception as e:
             if DEBUG_MODE:
                 logger.debug("Error during version input cleanup: %s", e)
