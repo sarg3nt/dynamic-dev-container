@@ -20,7 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, cast
 
@@ -166,6 +166,7 @@ try:
     from textual.app import App, ComposeResult
     from textual.binding import Binding
     from textual.containers import Container, Horizontal, ScrollableContainer
+    from textual.css.query import NoMatches
     from textual.screen import Screen
     from textual.widgets import (
         Button,
@@ -670,8 +671,8 @@ class DevContainerParser:
     def create_section_tool_mapping(mise_file: Path, devcontainer_file: Path) -> dict[str, list[str]]:
         """Create a mapping of sections to tools based on .mise.toml sections."""
         mise_sections, _, _, _ = MiseParser.parse_mise_sections(mise_file)
-        extension_sections = DevContainerParser.parse_extension_sections(devcontainer_file)
-        settings_sections = DevContainerParser.parse_settings_sections(devcontainer_file)
+        _extension_sections = DevContainerParser.parse_extension_sections(devcontainer_file)
+        _settings_sections = DevContainerParser.parse_settings_sections(devcontainer_file)
 
         # Create mapping of section to tools
         section_tool_mapping = {}
@@ -710,8 +711,6 @@ class DevContainerParser:
             if in_psi_templates and '"language":' in stripped_line:
                 # Look for language entries
                 # Extract language ID (e.g., "python", "javascript")
-                import re
-
                 match = re.search(r'"language":\s*"([^"]+)"', stripped_line)
                 if match:
                     lang_id = match.group(1)
@@ -1206,7 +1205,9 @@ class PSIHeaderScreen(Screen[None]):
         return auto_selected
 
     def _create_language_checkboxes(
-        self, available_languages: list[tuple[str, str]], auto_selected: set[str]
+        self,
+        available_languages: list[tuple[str, str]],
+        auto_selected: set[str],
     ) -> list[Checkbox]:
         """Create checkboxes for available languages with auto-selection."""
         checkboxes = []
@@ -1252,7 +1253,7 @@ class PSIHeaderScreen(Screen[None]):
                     # Extract just the language name from display name (e.g., "Python" from "Python (.py)")
                     lang_name = display_name.split(" (")[0] if " (" in display_name else display_name
                     self.config.psi_header_templates.append((lang_id, lang_name))
-            except Exception:
+            except NoMatches:
                 # Skip if checkbox doesn't exist
                 continue
 
@@ -2376,7 +2377,6 @@ class InstallationScreen(Screen[None]):
 
     def _update_container_references_only(self, content: str) -> str:
         """Update ONLY container references, preserving everything else exactly."""
-        import re
 
         # Update display name
         content = re.sub(
@@ -2398,13 +2398,11 @@ class InstallationScreen(Screen[None]):
             f'"source": "{self.config.container_name}-shellhistory"',
             content,
         )
-        content = re.sub(
+        return re.sub(
             r'"source":\s*"[^"]*-plugins"',
             f'"source": "{self.config.container_name}-plugins"',
             content,
         )
-
-        return content
 
     def _remove_unselected_tool_sections(self, content: str) -> str:
         """Remove entire sections for tools that are NOT selected."""
@@ -2466,7 +2464,7 @@ class InstallationScreen(Screen[None]):
 
         return content
 
-    def _remove_section(self, content: str, section_name: str, section_type: str) -> str:
+    def _remove_section(self, content: str, section_name: str, _section_type: str) -> str:
         """Remove a section between begin/end markers and fix trailing commas."""
         begin_pattern = f"// #### Begin {section_name} ####"
         end_pattern = f"// #### End {section_name} ####"
@@ -2495,7 +2493,7 @@ class InstallationScreen(Screen[None]):
         lines = content.split("\n")
         result_lines = []
 
-        for i, line in enumerate(lines):
+        for _i, line in enumerate(lines):
             result_lines.append(line)
 
             # Check if this line ends with a comment like "// #### End Core VS Code Settings ####"
@@ -2614,9 +2612,9 @@ class InstallationScreen(Screen[None]):
         # Get all languages that should have templates based on selected tools
         languages_to_include = self._get_psi_languages_for_selected_tools()
 
-        for lang_id, lang_name in languages_to_include:
+        for lang_id, _lang_name in languages_to_include:
             # Create the default template content similar to bash script
-            current_year = datetime.now().year
+            current_year = datetime.now(tz=UTC).year
             company = self.config.psi_header_company or "My Company"
 
             # Generate template text based on language
@@ -2652,7 +2650,7 @@ class InstallationScreen(Screen[None]):
 
         # If no custom templates, add a default one
         if not template_entries:
-            current_year = datetime.now().year
+            current_year = datetime.now(tz=UTC).year
             company = self.config.psi_header_company or "My Company"
             default_template = {
                 "language": "*",
@@ -2664,7 +2662,6 @@ class InstallationScreen(Screen[None]):
         # Find the templates array and replace it with our generated content
         lines = content.split("\n")
         result_lines = []
-        in_templates_section = False
         templates_indent = ""
 
         i = 0
@@ -2673,7 +2670,6 @@ class InstallationScreen(Screen[None]):
 
             # Look for the start of psi-header.templates section
             if '"psi-header.templates": [' in line:
-                in_templates_section = True
                 templates_indent = line[: line.find('"psi-header.templates"')]
                 result_lines.append(line)  # Add the opening line
 
@@ -2707,7 +2703,6 @@ class InstallationScreen(Screen[None]):
                 # Add the closing bracket line
                 if i < len(lines):
                     result_lines.append(lines[i])
-                in_templates_section = False
             else:
                 result_lines.append(line)
 
@@ -2718,12 +2713,10 @@ class InstallationScreen(Screen[None]):
     def _remove_psi_header_section(self, content: str) -> str:
         """Remove PSI Header section if not selected."""
         content = self._remove_section(content, "PSI Header", "extensions")
-        content = self._remove_section(content, "PSI Header Settings", "settings")
-        return content
+        return self._remove_section(content, "PSI Header Settings", "settings")
 
     def _update_container_references_in_content(self, content: str) -> str:
         """Update container name references in the content using regex."""
-        import re
 
         # Update name
         content = re.sub(
@@ -2745,27 +2738,48 @@ class InstallationScreen(Screen[None]):
             f'"source": "{self.config.container_name}-shellhistory"',
             content,
         )
-        content = re.sub(
+        return re.sub(
             r'"source": "dynamic-dev-container-plugins"',
             f'"source": "{self.config.container_name}-plugins"',
             content,
         )
 
-        return content
-
     def _replace_extensions_array(self, content: str) -> str:
-        """Replace the extensions array while preserving comments and structure."""
-        import re
+        """Replace the extensions array while preserving comments and structure.
 
+        Parameters
+        ----------
+        content : str
+            The original devcontainer.json content as a string
+
+        Returns
+        -------
+        str
+            The updated content with the extensions array replaced
+
+        """
         # Generate the filtered extensions list
-        extensions = self._generate_extensions_list()
+        extensions: list[str] = self._generate_extensions_list()
 
         # Find the extensions array in the content
         extensions_pattern = r'(\s*"extensions": \[)(.*?)(\n\s*\])'
 
-        def replace_extensions(match):
+        def replace_extensions(match: re.Match[str]) -> str:
+            """Build the replacement text for the extensions array.
+
+            Parameters
+            ----------
+            match : re.Match[str]
+                Regex match object capturing the extensions array region
+
+            Returns
+            -------
+            str
+                Formatted multiline string containing the filtered extensions
+
+            """
             indent = "        "  # Match the original indentation
-            extensions_lines = []
+            extensions_lines: list[str] = []
 
             for i, ext in enumerate(extensions):
                 comma = "," if i < len(extensions) - 1 else ""
@@ -2774,23 +2788,20 @@ class InstallationScreen(Screen[None]):
             extensions_content = "\n".join(extensions_lines)
             return f"{match.group(1)}\n{extensions_content}{match.group(3)}"
 
-        content = re.sub(extensions_pattern, replace_extensions, content, flags=re.DOTALL)
-        return content
+        return re.sub(extensions_pattern, replace_extensions, content, flags=re.DOTALL)
 
     def _replace_settings_object(self, content: str) -> str:
         """Replace the settings object while preserving structure and adding only relevant settings."""
-        import re
 
         # Find the settings object in the content
         settings_pattern = r'(\s*"settings": \{)(.*?)(\n\s*\})'
 
-        def replace_settings(match):
+        def replace_settings(match: re.Match[str]) -> str:
             # Generate filtered settings content
             filtered_settings = self._generate_filtered_settings_object()
             return f"{match.group(1)}{filtered_settings}{match.group(3)}"
 
-        content = re.sub(settings_pattern, replace_settings, content, flags=re.DOTALL)
-        return content
+        return re.sub(settings_pattern, replace_settings, content, flags=re.DOTALL)
 
     def _generate_filtered_settings_object(self) -> str:
         """Generate a properly formatted settings object with only relevant settings."""
@@ -3373,7 +3384,7 @@ class InstallationScreen(Screen[None]):
         }
 
         # Project creation year
-        current_year = str(datetime.now().year)
+        current_year = str(datetime.now(tz=UTC).year)
         settings["psi-header.variables"] = [["projectCreationYear", current_year]]
 
         # Language configurations
@@ -3801,7 +3812,7 @@ class DynamicDevContainerApp(App[None]):
 
 def main() -> None:
     """Main entry point."""
-    global DEBUG_MODE
+    global DEBUG_MODE  # noqa: PLW0603  # Needed for CLI debug configuration
 
     parser = argparse.ArgumentParser(
         description="Dynamic Dev Container TUI Setup - Python Version",
