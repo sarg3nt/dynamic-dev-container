@@ -583,6 +583,107 @@ class MiseParser:
         return tools
 
 
+class DevContainerParser:
+    """Parser for devcontainer.json files to extract extension and settings sections."""
+
+    @staticmethod
+    def parse_extension_sections(devcontainer_file: Path) -> list[str]:
+        """Parse extension sections from devcontainer.json file."""
+        if not devcontainer_file.exists():
+            return []
+
+        with open(devcontainer_file, encoding="utf-8") as f:
+            content = f.read()
+
+        sections = []
+        in_extensions = False
+
+        for line in content.split("\n"):
+            stripped_line = line.strip()
+
+            # Look for the extensions array
+            if '"extensions":' in stripped_line:
+                in_extensions = True
+                continue
+
+            # Stop when we exit the extensions array
+            if in_extensions and stripped_line.startswith('"settings":'):
+                break
+
+            if in_extensions:
+                # Look for section markers
+                begin_match = re.match(r"^//\s*#### Begin (.+) ####", stripped_line)
+                if begin_match:
+                    section_name = begin_match.group(1)
+                    if section_name not in sections and section_name not in ["Github", "Core Extensions", "PSI Header"]:
+                        sections.append(section_name)
+
+        return sections
+
+    @staticmethod
+    def parse_settings_sections(devcontainer_file: Path) -> list[str]:
+        """Parse settings sections from devcontainer.json file."""
+        if not devcontainer_file.exists():
+            return []
+
+        with open(devcontainer_file, encoding="utf-8") as f:
+            content = f.read()
+
+        sections = []
+        in_settings = False
+
+        for line in content.split("\n"):
+            stripped_line = line.strip()
+
+            # Look for the settings object
+            if '"settings":' in stripped_line:
+                in_settings = True
+                continue
+
+            # Stop when we exit the settings object (look for closing brace at same level)
+            if (
+                in_settings
+                and stripped_line == "}"
+                and "customizations" in content[content.find('"settings"') : content.find(stripped_line)]
+            ):
+                break
+
+            if in_settings:
+                # Look for section markers that end with "Settings"
+                begin_match = re.match(r"^//\s*#### Begin (.+) Settings ####", stripped_line)
+                if begin_match:
+                    section_name = begin_match.group(1)
+                    # Remove "Settings" suffix to match with extension section names
+                    base_section_name = section_name
+                    if base_section_name not in sections and base_section_name not in [
+                        "Core VS Code",
+                        "Mise",
+                        "Spell Checker",
+                        "TODO Tree",
+                        "PSI Header",
+                    ]:
+                        sections.append(base_section_name)
+
+        return sections
+
+    @staticmethod
+    def create_section_tool_mapping(mise_file: Path, devcontainer_file: Path) -> dict[str, list[str]]:
+        """Create a mapping of sections to tools based on .mise.toml sections."""
+        mise_sections, _, _, _ = MiseParser.parse_mise_sections(mise_file)
+        extension_sections = DevContainerParser.parse_extension_sections(devcontainer_file)
+        settings_sections = DevContainerParser.parse_settings_sections(devcontainer_file)
+
+        # Create mapping of section to tools
+        section_tool_mapping = {}
+
+        for section in mise_sections:
+            tools = MiseParser.get_section_tools(mise_file, section)
+            if tools:
+                section_tool_mapping[section] = tools
+
+        return section_tool_mapping
+
+
 class FileManager:
     """Manages file operations for the installer."""
 
@@ -2192,60 +2293,61 @@ class InstallationScreen(Screen[None]):
 
     def _remove_unselected_tool_sections(self, content: str) -> str:
         """Remove entire sections for tools that are NOT selected."""
-        # Define section mappings: tool_name -> (extension_section, settings_section)
-        tool_sections = {
-            "go": ("Go", "Go Settings"),
-            "dotnet": (".NET", ".NET Settings"),
-            "node": ("JavaScript/Node.js", "JavaScript/Node.js Settings"),
-            "pnpm": ("JavaScript/Node.js", "JavaScript/Node.js Settings"),  # Same as node
-            "python": ("Python", "Python Settings"),
-        }
 
-        # Additional sections that depend on config flags or tool selections
-        conditional_sections = [
-            ("Markdown", "Markdown Settings", self.config.include_markdown_extensions),
-            ("Shell/Bash", "Shell/Bash Settings", self.config.include_shell_extensions),
-            (
-                "Kubernetes/Helm",
-                "Kubernetes/Helm Settings",
-                self.config.tool_selected.get("kubectl", False) or self.config.tool_selected.get("helm", False),
-            ),
-            (
-                "Terraform/OpenTofu",
-                None,
-                self.config.tool_selected.get("opentofu", False) or self.config.tool_selected.get("terraform", False),
-            ),
-            ("Packer", None, self.config.tool_selected.get("packer", False)),
-            ("PowerShell", "PowerShell Settings", False),  # Always remove unless explicitly needed
-            ("JavaScript/TypeScript Settings", None, False),  # Always remove (duplicate section)
-        ]
+        # Create dynamic section-tool mapping
+        devcontainer_file = self.source_dir / ".devcontainer" / "devcontainer.json"
+        mise_file = self.source_dir / ".mise.toml"
+        section_tool_mapping = DevContainerParser.create_section_tool_mapping(mise_file, devcontainer_file)
 
-        # Check JavaScript extensions flag
-        include_js = (
-            self.config.tool_selected.get("node", False) or self.config.tool_selected.get("pnpm", False)
-        ) and self.config.include_js_extensions
+        # Get extension and settings sections from devcontainer.json
+        extension_sections = DevContainerParser.parse_extension_sections(devcontainer_file)
+        settings_sections = DevContainerParser.parse_settings_sections(devcontainer_file)
 
-        # Remove extension sections for unselected tools
-        for tool_name, (ext_section, settings_section) in tool_sections.items():
-            tool_selected = self.config.tool_selected.get(tool_name, False)
+        # Check which sections should be included based on tool selections
+        for section_name in extension_sections:
+            tools_in_section = section_tool_mapping.get(section_name, [])
 
-            # Special handling for JavaScript
-            if tool_name in ["node", "pnpm"]:
-                if not include_js:
-                    content = self._remove_section(content, ext_section, "extensions")
-                    if settings_section:
-                        content = self._remove_section(content, settings_section, "settings")
-            elif not tool_selected:
-                content = self._remove_section(content, ext_section, "extensions")
-                if settings_section:
-                    content = self._remove_section(content, settings_section, "settings")
+            # Check if any tools in this section are selected
+            section_selected = False
+            for tool in tools_in_section:
+                if self.config.tool_selected.get(tool, False):
+                    section_selected = True
+                    break
 
-        # Remove conditional sections
-        for section_name, settings_name, include_condition in conditional_sections:
-            if not include_condition:
+            # Special handling for conditional sections
+            if section_name == "Node Development":
+                section_selected = section_selected and self.config.include_js_extensions
+            elif section_name == "Markdown":
+                section_selected = self.config.include_markdown_extensions
+            elif section_name == "Shell/Bash":
+                section_selected = self.config.include_shell_extensions
+
+            # Remove section if not selected
+            if not section_selected:
                 content = self._remove_section(content, section_name, "extensions")
-                if settings_name:
-                    content = self._remove_section(content, settings_name, "settings")
+
+        # Check settings sections
+        for section_name in settings_sections:
+            tools_in_section = section_tool_mapping.get(section_name, [])
+
+            # Check if any tools in this section are selected
+            section_selected = False
+            for tool in tools_in_section:
+                if self.config.tool_selected.get(tool, False):
+                    section_selected = True
+                    break
+
+            # Special handling for conditional sections
+            if section_name == "Node Development":
+                section_selected = section_selected and self.config.include_js_extensions
+            elif section_name == "Markdown":
+                section_selected = self.config.include_markdown_extensions
+            elif section_name == "Shell/Bash":
+                section_selected = self.config.include_shell_extensions
+
+            # Remove settings section if not selected
+            if not section_selected:
+                content = self._remove_section(content, f"{section_name} Settings", "settings")
 
         return content
 
@@ -2330,13 +2432,74 @@ class InstallationScreen(Screen[None]):
             content = self._update_psi_header_templates(content)
         return content
 
+    def _get_psi_languages_for_selected_tools(self) -> list[tuple[str, str]]:
+        """Get PSI header languages that should be included based on selected tools."""
+        # Base languages to include if PSI header is enabled
+        base_languages = [("*", "Default")]
+
+        # If user selected specific PSI header templates, include those
+        if self.config.psi_header_templates:
+            return self.config.psi_header_templates
+
+        # Otherwise, automatically include languages based on selected tools
+        languages_to_include = base_languages.copy()
+
+        # Map tools to their corresponding PSI header languages
+        tool_language_mapping = {
+            # Go Development
+            "golang": ("go", "Go"),
+            "golangci-lint": ("go", "Go"),
+            "goreleaser": ("go", "Go"),
+            # .NET Development
+            "dotnet": ("csharp", "C#"),
+            # Node Development
+            "node": ("javascript", "JavaScript"),
+            "pnpm": ("javascript", "JavaScript"),
+            "yarn": ("javascript", "JavaScript"),
+            "deno": ("typescript", "TypeScript"),
+            "bun": ("javascript", "JavaScript"),
+            # Python
+            "python": ("python", "Python"),
+            # PowerShell
+            "powershell": ("powershell", "PowerShell"),
+            # HashiCorp Tools (use terraform language)
+            "opentofu": ("terraform", "Terraform/OpenTofu"),
+            "openbao": ("terraform", "Terraform/OpenTofu"),
+            "packer": ("terraform", "Terraform/OpenTofu"),
+        }
+
+        # Check which tools are selected and add their languages
+        included_languages = set()
+        for tool_name, is_selected in self.config.tool_selected.items():
+            if is_selected and tool_name in tool_language_mapping:
+                lang_id, lang_name = tool_language_mapping[tool_name]
+                if lang_id not in included_languages:
+                    languages_to_include.append((lang_id, lang_name))
+                    included_languages.add(lang_id)
+
+        # Always include common languages if any development tools are selected
+        if any(self.config.tool_selected.values()):
+            common_languages = [
+                ("shellscript", "Shell Script"),
+                ("markdown", "Markdown"),
+            ]
+            for lang_id, lang_name in common_languages:
+                if lang_id not in included_languages:
+                    languages_to_include.append((lang_id, lang_name))
+                    included_languages.add(lang_id)
+
+        return languages_to_include
+
     def _update_psi_header_templates(self, content: str) -> str:
         """Update PSI header templates with actual template content from user configuration."""
 
         # Generate the template content for each configured language
         template_entries = []
 
-        for lang_id, lang_name in self.config.psi_header_templates:
+        # Get all languages that should have templates based on selected tools
+        languages_to_include = self._get_psi_languages_for_selected_tools()
+
+        for lang_id, lang_name in languages_to_include:
             # Create the default template content similar to bash script
             current_year = datetime.now().year
             company = self.config.psi_header_company or "My Company"

@@ -114,21 +114,21 @@
         "huizhou.githd", // Git history diff
         // #### End Github ####
 
-        // #### Begin Go ####
+        // #### Begin Go Development ####
         "golang.go", // Go language support
         "premparihar.gotestexplorer", // Go test explorer
         "msyrus.go-doc", // Go documentation
         "766b.go-outliner", // Go code outliner
-        // #### End Go ####
+        // #### End Go Development ####
 
-        // #### Begin .NET ####
+        // #### Begin .NET Development ####
         "ms-dotnettools.csharp", // C# language support
         "ms-dotnettools.csdevkit", // C# Dev Kit
         "ms-dotnettools.vscode-dotnet-runtime", // .NET Runtime installer
         "ms-dotnettools.dotnet-interactive-vscode", // .NET Interactive Notebooks
-        // #### End .NET ####
+        // #### End .NET Development ####
 
-        // #### Begin JavaScript/Node.js ####
+        // #### Begin Node Development ####
         "ms-vscode.vscode-typescript-next", // TypeScript and JavaScript support
         "bradlc.vscode-tailwindcss", // Tailwind CSS IntelliSense
         "esbenp.prettier-vscode", // Prettier code formatter
@@ -136,7 +136,7 @@
         "ms-vscode.vscode-json", // JSON language support
         "formulahendry.auto-rename-tag", // Auto rename paired HTML/XML tags
         "christian-kohler.path-intellisense", // Path autocompletion
-        // #### End JavaScript/Node.js ####
+        // #### End Node Development ####
 
         // #### Begin Python ####
         "ms-python.python", // Python language support
@@ -155,38 +155,32 @@
         "timonwong.shellcheck", // Shell script linter
         // #### End Shell/Bash ####
 
-        // #### Begin Kubernetes/Helm ####
+        // #### Begin Kubernetes ####
         "ms-kubernetes-tools.vscode-kubernetes-tools", // Kubernetes tools
         "tim-koehler.helm-intellisense", // Helm IntelliSense
         "redhat.vscode-yaml", // YAML language support
-        // #### End Kubernetes/Helm ####
+        // #### End Kubernetes ####
 
-        // #### Begin Terraform/OpenTofu ####
+        // #### Begin HashiCorp Tools ####
         "opentofu.vscode-opentofu", // OpenTofu/Terraform support
-        // #### End Terraform/OpenTofu ####
-
-        // #### Begin Packer ####
         "szTheory.vscode-packer-powertools", // Packer tools
-        // #### End Packer ####
+        // #### End HashiCorp Tools ####
 
         // #### Begin PSI Header ####
         "psioniq.psi-header", // File header management
         // #### End PSI Header ####
 
         // #### Begin Core Extensions ####
-        "albert.TabOut", // Tab out of brackets/quotes
         "ciiqr.encode", // Encode/decode utilities
         "EditorConfig.EditorConfig", // EditorConfig support
         "euskadi31.json-pretty-printer", // JSON pretty printer
         "Gruntfuggly.todo-tree", // TODO tree view
         "hediet.vscode-drawio", // Draw.io integration
         "IronGeek.vscode-env", // Environment variables support
-        "k--kato.docomment", // Documentation comment generator
         "hverlin.mise-vscode", // Mise VS Code integration
         "ms-azuretools.vscode-docker", // Docker support
         "naumovs.color-highlight", // Color highlighting
         "PKief.material-icon-theme", // Material icon theme
-        "RapidAPI.vscode-rapidapi-client", // RapidAPI client
         "streetsidesoftware.code-spell-checker", // Spell checker
         "tamasfe.even-better-toml", // TOML language support
         "tomoki1207.pdf" // PDF viewer
@@ -237,7 +231,7 @@
         "reformat": true,
         // #### End Core VS Code Settings ####
 
-        // #### Begin Go Settings ####
+        // #### Begin Go Development Settings ####
         "go.buildTags": "",
         "go.toolsEnvVars": {
           "CGO_ENABLED": "0"
@@ -263,9 +257,9 @@
           "staticcheck": true,
           "formatting.gofumpt": true
         },
-        // #### End Go Settings ####
+        // #### End Go Development Settings ####
 
-        // #### Begin .NET Settings ####
+        // #### Begin .NET Development Settings ####
         "dotnetAcquisitionExtension.allowInvalidPaths": true,
         "dotnetAcquisitionExtension.existingDotnetPath": [
           {
@@ -299,9 +293,9 @@
         "[json]": {
           "editor.defaultFormatter": "vscode.json-language-features"
         },
-        // #### End .NET Settings ####
+        // #### End .NET Development Settings ####
 
-        // #### Begin JavaScript/Node.js Settings ####
+        // #### Begin Node Development Settings ####
         "typescript.preferences.includePackageJsonAutoImports": "auto",
         "typescript.suggest.autoImports": true,
         "typescript.updateImportsOnFileMove.enabled": "always",
@@ -346,7 +340,7 @@
         "[jsonc]": {
           "editor.defaultFormatter": "esbenp.prettier-vscode"
         },
-        // #### End JavaScript/Node.js Settings ####
+        // #### End Node Development Settings ####
 
         // #### Begin Python Settings ####
         "python.pythonPath": "/home/vscode/.local/share/mise/installs/python/3.13.5/bin/python",
@@ -395,15 +389,18 @@
         ],
         // #### End Shell/Bash Settings ####
 
-        // #### Begin Kubernetes/Helm Settings ####
+        // #### Begin Kubernetes Settings ####
         "vs-kubernetes": {
           "vscode-kubernetes.kubectl-path": "/home/vscode/.local/share/mise/installs/kubectl/1.33.2/bin/kubectl"
         },
         "helm-intellisense.lintFileOnSave": true,
         "helm-intellisense.customValueFileNames": ["values.yaml"],
-        // #### End Kubernetes/Helm Settings ####
+        // #### End Kubernetes Settings ####
 
-        // #### Begin JavaScript/TypeScript Settings ####
+        // #### Begin PowerShell Settings ####
+        "powershell.powerShellAdditionalExePaths": {
+          "Powershell7": "/home/vscode/.local/share/mise/installs/powershell/7.5.2/pwsh"
+        },
         "[groovy]": {
           "editor.tabSize": 2,
           "editor.insertSpaces": true
@@ -411,12 +408,6 @@
         "[jenkinsfile]": {
           "editor.tabSize": 2,
           "insertSpaces": true
-        },
-        // #### End JavaScript/TypeScript Settings ####
-
-        // #### Begin PowerShell Settings ####
-        "powershell.powerShellAdditionalExePaths": {
-          "Powershell7": "/home/vscode/.local/share/mise/installs/powershell/7.5.2/pwsh"
         },
         "powershell.powerShellDefaultVersion": "Powershell7",
         "omnisharp.autoStart": false,
