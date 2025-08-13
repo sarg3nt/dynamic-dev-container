@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, cast
 
@@ -216,12 +217,12 @@ class ProjectConfig:
 
         # Python configuration
         self.install_python_tools: bool = False
-        self.python_publish_url: str = ""
-        self.python_index_url: str = ""
+        self.python_publish_url: str = "https://upload.pypi.org/legacy/"
+        self.python_index_url: str = "https://pypi.org/simple/"
         self.python_extra_index_url: str = ""
-        self.python_dev_suffix: str = ""
-        self.python_prod_suffix: str = ""
-        self.python_repository_type: str = ""
+        self.python_dev_suffix: str = "dev"
+        self.python_prod_suffix: str = "prod"
+        self.python_repository_type: str = "PyPI"
 
         # Python project metadata
         self.python_project_name: str = ""
@@ -752,9 +753,9 @@ class PythonRepositoryScreen(Screen[None]):
                 id="repo_types",
             ),
             Label("Publishing URL:"),
-            Input(placeholder="https://pypi.org/simple/", id="publish_url"),
+            Input(value="https://upload.pypi.org/legacy/", id="publish_url"),
             Label("Index URL:"),
-            Input(placeholder="https://pypi.org/simple/", id="index_url"),
+            Input(value="https://pypi.org/simple/", id="index_url"),
             Label("Extra Index URL (optional):"),
             Input(placeholder="Additional package index", id="extra_index_url"),
             Label("Development Suffix:"),
@@ -780,6 +781,23 @@ class PythonRepositoryScreen(Screen[None]):
                     checkbox = self.query_one(f"#{repo_id}", Checkbox)
                     checkbox.value = False
 
+            # Update URLs based on selected repository type
+            publish_input = self.query_one("#publish_url", Input)
+            index_input = self.query_one("#index_url", Input)
+
+            if event.checkbox.id == "repo_pypi":
+                publish_input.value = "https://upload.pypi.org/legacy/"
+                index_input.value = "https://pypi.org/simple/"
+            elif event.checkbox.id == "repo_artifactory":
+                publish_input.value = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-local"
+                index_input.value = "https://your-company.jfrog.io/artifactory/api/pypi/pypi/simple"
+            elif event.checkbox.id == "repo_nexus":
+                publish_input.value = "https://nexus.your-company.com/repository/pypi-hosted/"
+                index_input.value = "https://nexus.your-company.com/repository/pypi-group/simple"
+            elif event.checkbox.id == "repo_custom":
+                publish_input.value = "https://your-custom-repo.com/upload/"
+                index_input.value = "https://your-custom-repo.com/simple/"
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
         if event.button.id == "next_btn":
@@ -803,7 +821,9 @@ class PythonRepositoryScreen(Screen[None]):
             self.config.python_repository_type = "PyPI"  # Default
 
         # Save URLs and settings
-        self.config.python_publish_url = self.query_one("#publish_url", Input).value or "https://pypi.org/simple/"
+        self.config.python_publish_url = (
+            self.query_one("#publish_url", Input).value or "https://upload.pypi.org/legacy/"
+        )
         self.config.python_index_url = self.query_one("#index_url", Input).value or "https://pypi.org/simple/"
         self.config.python_extra_index_url = self.query_one("#extra_index_url", Input).value
         self.config.python_dev_suffix = self.query_one("#dev_suffix", Input).value or "dev"
@@ -1838,10 +1858,10 @@ class SummaryScreen(Screen[None]):
             summary += f"\n## Development Tools ({len(selected_tools)} selected)\n\n"
             for tool in selected_tools:
                 version = self.config.tool_version_value.get(tool, "latest")
-                if version != "latest":
+                if version and version != "latest":
                     summary += f"- **{tool}** ({version})\n"
                 else:
-                    summary += f"- **{tool}**\n"
+                    summary += f"- **{tool}** (latest)\n"
         else:
             summary += "\n## Development Tools\nNone selected\n"
 
@@ -2107,39 +2127,1105 @@ class InstallationScreen(Screen[None]):
             f.write("\n".join(lines))
 
     def generate_devcontainer_json(self) -> None:
-        """Generate custom devcontainer.json based on configuration."""
+        """Generate the devcontainer.json file using manual section-based approach."""
         source_file = self.source_dir / ".devcontainer" / "devcontainer.json"
         target_file = Path(self.config.project_path) / ".devcontainer" / "devcontainer.json"
 
         if not source_file.exists():
+            msg = f"Source devcontainer.json not found at {source_file}"
+            raise Exception(msg)
+
+        # Ensure target directory exists
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Read the source file as text (preserving all comments and formatting)
+        with open(source_file, encoding="utf-8") as f:
+            content = f.read()
+
+        # Step 1: Update container references (name, runArgs, mounts) ONLY
+        content = self._update_container_references_only(content)
+
+        # Step 2: Remove sections for tools that are NOT selected
+        content = self._remove_unselected_tool_sections(content)
+
+        # Step 3: Add PSI Header extension if selected
+        if self.config.install_psi_header:
+            content = self._ensure_psi_header_section(content)
+        else:
+            content = self._remove_psi_header_section(content)
+
+        # Write the result
+        with open(target_file, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    def _update_container_references_only(self, content: str) -> str:
+        """Update ONLY container references, preserving everything else exactly."""
+        import re
+
+        # Update display name
+        content = re.sub(
+            r'"name":\s*"[^"]*"',
+            f'"name": "{self.config.display_name}"',
+            content,
+        )
+
+        # Update runArgs container name
+        content = re.sub(
+            r'"runArgs":\s*\[\s*"--name=[^"]*"\s*\]',
+            f'"runArgs": ["--name={self.config.container_name}"]',
+            content,
+        )
+
+        # Update mount sources in mounts array
+        content = re.sub(
+            r'"source":\s*"[^"]*-shellhistory"',
+            f'"source": "{self.config.container_name}-shellhistory"',
+            content,
+        )
+        content = re.sub(
+            r'"source":\s*"[^"]*-plugins"',
+            f'"source": "{self.config.container_name}-plugins"',
+            content,
+        )
+
+        return content
+
+    def _remove_unselected_tool_sections(self, content: str) -> str:
+        """Remove entire sections for tools that are NOT selected."""
+        # Define section mappings: tool_name -> (extension_section, settings_section)
+        tool_sections = {
+            "go": ("Go", "Go Settings"),
+            "dotnet": (".NET", ".NET Settings"),
+            "node": ("JavaScript/Node.js", "JavaScript/Node.js Settings"),
+            "pnpm": ("JavaScript/Node.js", "JavaScript/Node.js Settings"),  # Same as node
+            "python": ("Python", "Python Settings"),
+        }
+
+        # Additional sections that depend on config flags or tool selections
+        conditional_sections = [
+            ("Markdown", "Markdown Settings", self.config.include_markdown_extensions),
+            ("Shell/Bash", "Shell/Bash Settings", self.config.include_shell_extensions),
+            (
+                "Kubernetes/Helm",
+                "Kubernetes/Helm Settings",
+                self.config.tool_selected.get("kubectl", False) or self.config.tool_selected.get("helm", False),
+            ),
+            (
+                "Terraform/OpenTofu",
+                None,
+                self.config.tool_selected.get("opentofu", False) or self.config.tool_selected.get("terraform", False),
+            ),
+            ("Packer", None, self.config.tool_selected.get("packer", False)),
+            ("PowerShell", "PowerShell Settings", False),  # Always remove unless explicitly needed
+            ("JavaScript/TypeScript Settings", None, False),  # Always remove (duplicate section)
+        ]
+
+        # Check JavaScript extensions flag
+        include_js = (
+            self.config.tool_selected.get("node", False) or self.config.tool_selected.get("pnpm", False)
+        ) and self.config.include_js_extensions
+
+        # Remove extension sections for unselected tools
+        for tool_name, (ext_section, settings_section) in tool_sections.items():
+            tool_selected = self.config.tool_selected.get(tool_name, False)
+
+            # Special handling for JavaScript
+            if tool_name in ["node", "pnpm"]:
+                if not include_js:
+                    content = self._remove_section(content, ext_section, "extensions")
+                    if settings_section:
+                        content = self._remove_section(content, settings_section, "settings")
+            elif not tool_selected:
+                content = self._remove_section(content, ext_section, "extensions")
+                if settings_section:
+                    content = self._remove_section(content, settings_section, "settings")
+
+        # Remove conditional sections
+        for section_name, settings_name, include_condition in conditional_sections:
+            if not include_condition:
+                content = self._remove_section(content, section_name, "extensions")
+                if settings_name:
+                    content = self._remove_section(content, settings_name, "settings")
+
+        return content
+
+    def _remove_section(self, content: str, section_name: str, section_type: str) -> str:
+        """Remove a section between begin/end markers and fix trailing commas."""
+        begin_pattern = f"// #### Begin {section_name} ####"
+        end_pattern = f"// #### End {section_name} ####"
+
+        # Find the section and remove it
+        lines = content.split("\n")
+        result_lines = []
+        in_section = False
+
+        for line in lines:
+            if begin_pattern in line:
+                in_section = True
+                continue
+            if end_pattern in line:
+                in_section = False
+                continue
+            if not in_section:
+                result_lines.append(line)
+
+        # Fix trailing commas after section removal
+        content = "\n".join(result_lines)
+        return self._fix_trailing_commas(content)
+
+    def _fix_trailing_commas(self, content: str) -> str:
+        """Fix trailing commas in JSON that would be invalid after section removal."""
+        lines = content.split("\n")
+        result_lines = []
+
+        for i, line in enumerate(lines):
+            result_lines.append(line)
+
+            # Check if this line ends with a comment like "// #### End Core VS Code Settings ####"
+            # and the next non-empty line starts a new section
+            if "// #### End Core VS Code Settings ####" in line:
+                # Look back to find the last property line and ensure it has a comma
+                for j in range(len(result_lines) - 2, -1, -1):  # Go backwards
+                    prev_line = result_lines[j].strip()
+                    if prev_line and not prev_line.startswith("//") and not prev_line.startswith("/*"):
+                        # This is a property line - ensure it ends with comma
+                        if not prev_line.endswith(",") and not prev_line.endswith("{") and not prev_line.endswith("["):
+                            result_lines[j] = result_lines[j] + ","
+                        break
+
+        # Handle trailing commas before closing braces and fix block comment issues
+        final_lines = []
+        for i, line in enumerate(result_lines):
+            # Check for situations where we need to add comma before block comment
+            if line.strip() == "}," and i < len(result_lines) - 1:
+                # Look ahead to see if next line is a block comment
+                next_line = result_lines[i + 1].strip() if i + 1 < len(result_lines) else ""
+                if next_line.startswith("/*"):
+                    # The comma is already there, this is good
+                    final_lines.append(line)
+                else:
+                    final_lines.append(line)
+            elif line.strip().endswith(","):
+                # Look ahead to see what comes next
+                next_significant_line = None
+                for j in range(i + 1, len(result_lines)):
+                    if result_lines[j].strip():  # Non-empty line
+                        next_significant_line = result_lines[j].strip()
+                        break
+
+                # If the next significant line closes an object/array, remove the comma
+                if next_significant_line and next_significant_line.startswith(("}", "]")):
+                    final_lines.append(line.rstrip(","))
+                else:
+                    final_lines.append(line)
+            else:
+                final_lines.append(line)
+
+        return "\n".join(final_lines)
+
+    def _ensure_psi_header_section(self, content: str) -> str:
+        """Ensure PSI Header section is present (it should already be in template)."""
+        # PSI Header section should already exist in template, so nothing to add
+        return content
+
+    def _remove_psi_header_section(self, content: str) -> str:
+        """Remove PSI Header section if not selected."""
+        content = self._remove_section(content, "PSI Header", "extensions")
+        content = self._remove_section(content, "PSI Header Settings", "settings")
+        return content
+
+    def _update_container_references_in_content(self, content: str) -> str:
+        """Update container name references in the content using regex."""
+        import re
+
+        # Update name
+        content = re.sub(
+            r'"name": "[^"]*"',
+            f'"name": "{self.config.display_name}"',
+            content,
+        )
+
+        # Update runArgs container name
+        content = re.sub(
+            r'"runArgs": \["--name=[^"]*"\]',
+            f'"runArgs": ["--name={self.config.container_name}"]',
+            content,
+        )
+
+        # Update mount sources
+        content = re.sub(
+            r'"source": "dynamic-dev-container-shellhistory"',
+            f'"source": "{self.config.container_name}-shellhistory"',
+            content,
+        )
+        content = re.sub(
+            r'"source": "dynamic-dev-container-plugins"',
+            f'"source": "{self.config.container_name}-plugins"',
+            content,
+        )
+
+        return content
+
+    def _replace_extensions_array(self, content: str) -> str:
+        """Replace the extensions array while preserving comments and structure."""
+        import re
+
+        # Generate the filtered extensions list
+        extensions = self._generate_extensions_list()
+
+        # Find the extensions array in the content
+        extensions_pattern = r'(\s*"extensions": \[)(.*?)(\n\s*\])'
+
+        def replace_extensions(match):
+            indent = "        "  # Match the original indentation
+            extensions_lines = []
+
+            for i, ext in enumerate(extensions):
+                comma = "," if i < len(extensions) - 1 else ""
+                extensions_lines.append(f'{indent}"{ext}"{comma}')
+
+            extensions_content = "\n".join(extensions_lines)
+            return f"{match.group(1)}\n{extensions_content}{match.group(3)}"
+
+        content = re.sub(extensions_pattern, replace_extensions, content, flags=re.DOTALL)
+        return content
+
+    def _replace_settings_object(self, content: str) -> str:
+        """Replace the settings object while preserving structure and adding only relevant settings."""
+        import re
+
+        # Find the settings object in the content
+        settings_pattern = r'(\s*"settings": \{)(.*?)(\n\s*\})'
+
+        def replace_settings(match):
+            # Generate filtered settings content
+            filtered_settings = self._generate_filtered_settings_object()
+            return f"{match.group(1)}{filtered_settings}{match.group(3)}"
+
+        content = re.sub(settings_pattern, replace_settings, content, flags=re.DOTALL)
+        return content
+
+    def _generate_filtered_settings_object(self) -> str:
+        """Generate a properly formatted settings object with only relevant settings."""
+        settings = {}
+
+        # Always include core settings
+        core_settings = {
+            "code-runner.enableAppInsights": False,
+            "code-runner.showExecutionMessage": False,
+            "code-runner.runInTerminal": True,
+            "dev.containers.dockerCredentialHelper": "docker-credential-helper",
+            "editor.detectIndentation": False,
+            "editor.insertSpaces": True,
+            "editor.tabSize": 2,
+            "editor.formatOnSave": True,
+            "editor.renderWhitespace": "all",
+            "editor.rulers": [80, 120],
+            "files.eol": "\\n",
+            "files.watcherExclude": {
+                "**/node_modules/*/**": True,
+                "**/.git/objects/**": True,
+                "**/.git/subtree-cache/**": True,
+                "**/.hg/**": True,
+            },
+            "files.associations": {
+                "*.toml": "toml",
+                "*.yaml": "yaml",
+                "*.yml": "yaml",
+            },
+        }
+        settings.update(core_settings)
+
+        # Add tool-specific settings based on selections
+        for tool, selected in self.config.tool_selected.items():
+            if not selected:
+                continue
+
+            if tool == "python":
+                python_settings = {
+                    "python.defaultInterpreterPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
+                    "python.terminal.activateEnvironment": False,
+                    "python.analysis.autoImportCompletions": True,
+                    "python.analysis.typeCheckingMode": "strict",
+                }
+                settings.update(python_settings)
+            elif tool in ["go", "goreleaser"]:
+                go_settings = {
+                    "go.toolsManagement.checkForUpdates": "off",
+                    "go.useLanguageServer": True,
+                    "go.formatTool": "gofumpt",
+                }
+                settings.update(go_settings)
+            elif tool == "dotnet":
+                dotnet_settings = {
+                    "dotnet.server.useOmnisharp": False,
+                    "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": True,
+                }
+                settings.update(dotnet_settings)
+            elif tool in ["node", "pnpm", "yarn", "deno", "bun"]:
+                js_settings = {
+                    "typescript.preferences.includePackageJsonAutoImports": "auto",
+                    "typescript.updateImportsOnFileMove.enabled": "always",
+                    "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+                }
+                settings.update(js_settings)
+
+        # Add settings based on flags
+        if self.config.include_python_extensions and "python" not in self.config.tool_selected:
+            python_settings = {
+                "python.defaultInterpreterPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",
+                "python.terminal.activateEnvironment": False,
+                "python.analysis.autoImportCompletions": True,
+                "python.analysis.typeCheckingMode": "strict",
+            }
+            settings.update(python_settings)
+
+        if self.config.include_markdown_extensions:
+            markdown_settings = {
+                "markdown.extension.toc.levels": "2..6",
+                "markdown.extension.orderedList.marker": "one",
+                "markdown.extension.orderedList.autoRenumber": True,
+            }
+            settings.update(markdown_settings)
+
+        if self.config.include_shell_extensions:
+            shell_settings = {
+                "shellcheck.customArgs": ["-x"],
+                "shellcheck.exclude": ["SC1091"],
+            }
+            settings.update(shell_settings)
+
+        if self.config.include_js_extensions:
+            js_settings = {
+                "typescript.preferences.includePackageJsonAutoImports": "auto",
+                "typescript.updateImportsOnFileMove.enabled": "always",
+                "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+            }
+            settings.update(js_settings)
+
+        # Always include these common settings
+        common_settings = {
+            "mise.checkForUpdates": False,
+            "mise.showUpdateNotifications": False,
+            "cSpell.enabledLanguageIds": [
+                "asciidoc",
+                "c",
+                "cpp",
+                "csharp",
+                "css",
+                "git-commit",
+                "go",
+                "handlebars",
+                "haskell",
+                "html",
+                "jade",
+                "java",
+                "javascript",
+                "javascriptreact",
+                "json",
+                "jsonc",
+                "latex",
+                "less",
+                "markdown",
+                "php",
+                "plaintext",
+                "pug",
+                "python",
+                "restructuredtext",
+                "rust",
+                "scala",
+                "scss",
+                "text",
+                "typescript",
+                "typescriptreact",
+                "yaml",
+                "yml",
+            ],
+            "todo-tree.general.tags": ["BUG", "HACK", "FIXME", "TODO", "XXX", "NOTE", "WARNING"],
+            "todo-tree.highlights.customHighlight": {
+                "TODO": {"icon": "check", "type": "line"},
+                "NOTE": {"icon": "note", "foreground": "#00ff00"},
+                "WARNING": {"icon": "alert", "foreground": "#ffaa00"},
+                "FIXME": {"icon": "bug", "foreground": "#ff0000"},
+            },
+        }
+        settings.update(common_settings)
+
+        # Convert to properly formatted JSON string with proper indentation
+        import json
+
+        # Convert the settings dict to a JSON string with proper indentation
+        settings_json = json.dumps(settings, indent=2, ensure_ascii=False)
+
+        # Add proper indentation for the devcontainer context (8 spaces for each line)
+        lines = settings_json.split("\n")
+        indented_lines = []
+        for i, line in enumerate(lines):
+            if i == 0:  # First line (opening brace)
+                indented_lines.append("\n        " + line[1:])  # Remove opening brace, add indentation
+            elif i == len(lines) - 1:  # Last line (closing brace)
+                indented_lines.append("        " + line[:-1])  # Remove closing brace, add indentation
+            else:
+                indented_lines.append("        " + line)
+
+        return "\n".join(indented_lines)
+
+    def _update_container_references(self, file_path: Path) -> None:
+        """Update container name references in the file using sed-like replacements."""
+        with open(file_path) as f:
+            content = f.read()
+
+        # Update name
+        content = re.sub(
+            r'"name": "[^"]*"',
+            f'"name": "{self.config.display_name}"',
+            content,
+        )
+
+        # Update runArgs container name
+        content = re.sub(
+            r"--name=dynamic-dev-container",
+            f"--name={self.config.container_name}",
+            content,
+        )
+
+        # Update mount sources
+        content = re.sub(
+            r"dynamic-dev-container-shellhistory",
+            f"{self.config.container_name}-shellhistory",
+            content,
+        )
+        content = re.sub(
+            r"dynamic-dev-container-plugins",
+            f"{self.config.container_name}-plugins",
+            content,
+        )
+
+        with open(file_path, "w") as f:
+            f.write(content)
+
+    def _append_remaining_devcontainer_content(self, temp_file: Path, source_file: Path) -> None:
+        """Append the remaining content after extensions array from source file."""
+        with open(source_file) as f:
+            lines = f.readlines()
+
+        # Find where extensions array ends and get the rest
+        extensions_end_found = False
+        remaining_lines = []
+        in_extensions = False
+
+        for line in lines:
+            if '"extensions": [' in line:
+                in_extensions = True
+                continue
+            if in_extensions and line.strip() == "],":
+                # Found end of extensions array, start collecting remaining content
+                extensions_end_found = True
+                remaining_lines.append("      ],\n")
+                continue
+            if extensions_end_found:
+                remaining_lines.append(line)
+
+        # Append remaining content to temp file
+        with open(temp_file, "a") as f:
+            f.writelines(remaining_lines)
+
+    def _update_settings_in_file(self, file_path: Path) -> None:
+        """Update VS Code settings in the devcontainer.json file using text manipulation."""
+        # Read the current content
+        with open(file_path) as f:
+            content = f.read()
+
+        # Find the settings section
+        settings_start = content.find('"settings": {')
+        if settings_start == -1:
             return
 
-        # This is a simplified version - in practice, you'd want to parse and modify JSON
-        # For now, copy and do basic replacements
+        # Find the end of settings section (look for closing brace at the same indentation level)
+        settings_end = self._find_settings_end(content, settings_start)
+        if settings_end == -1:
+            return
+
+        # Extract the parts before and after settings
+        before_settings = content[:settings_start]
+        after_settings = content[settings_end:]
+
+        # Generate filtered settings content
+        filtered_settings = self._generate_filtered_settings()
+
+        # Reconstruct the file with filtered settings
+        new_content = before_settings + filtered_settings + after_settings
+
+        # Write back to file
+        with open(file_path, "w") as f:
+            f.write(new_content)
+
+    def _find_settings_end(self, content: str, settings_start: int) -> int:
+        """Find the end of the settings section by matching braces."""
+        # Start after the opening brace of "settings": {
+        brace_pos = content.find("{", settings_start)
+        if brace_pos == -1:
+            return -1
+
+        # Count braces to find the matching closing brace
+        brace_count = 1
+        pos = brace_pos + 1
+
+        while pos < len(content) and brace_count > 0:
+            char = content[pos]
+            if char == "{":
+                brace_count += 1
+            elif char == "}":
+                brace_count -= 1
+            pos += 1
+
+        return pos if brace_count == 0 else -1
+
+    def _generate_filtered_settings(self) -> str:
+        """Generate filtered settings content based on selected tools."""
+        settings_lines = []
+        settings_lines.append('      "settings": {')
+
+        # Define settings mappings for different tools/categories
+        settings_mappings = {
+            "core": [
+                '        "code-runner.enableAppInsights": false,',
+                '        "code-runner.showExecutionMessage": false,',
+                '        "code-runner.runInTerminal": true,',
+                '        "dev.containers.dockerCredentialHelper": "docker-credential-helper",',
+                '        "editor.detectIndentation": false,',
+                '        "editor.insertSpaces": true,',
+                '        "editor.tabSize": 2,',
+                '        "editor.formatOnSave": true,',
+                '        "editor.renderWhitespace": "all",',
+                '        "editor.rulers": [80, 120],',
+                '        "files.eol": "\\n",',
+                '        "files.watcherExclude": {',
+                '          "**/node_modules/*/**": true,',
+                '          "**/.git/objects/**": true,',
+                '          "**/.git/subtree-cache/**": true,',
+                '          "**/.hg/**": true',
+                "        },",
+            ],
+            "python": [
+                '        "python.defaultInterpreterPath": "/home/vscode/.local/share/mise/installs/python/latest/bin/python",',
+                '        "python.terminal.activateEnvironment": false,',
+                '        "python.analysis.autoImportCompletions": true,',
+                '        "python.analysis.typeCheckingMode": "strict",',
+            ],
+            "go": [
+                '        "go.toolsManagement.checkForUpdates": "off",',
+                '        "go.useLanguageServer": true,',
+                '        "go.formatTool": "gofumpt",',
+            ],
+            "dotnet": [
+                '        "dotnet.server.useOmnisharp": false,',
+                '        "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,',
+            ],
+            "javascript": [
+                '        "typescript.preferences.includePackageJsonAutoImports": "auto",',
+                '        "typescript.updateImportsOnFileMove.enabled": "always",',
+                '        "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],',
+            ],
+            "markdown": [
+                '        "markdown.extension.toc.levels": "2..6",',
+                '        "markdown.extension.orderedList.marker": "one",',
+                '        "markdown.extension.orderedList.autoRenumber": true,',
+            ],
+            "shell": [
+                '        "shellcheck.customArgs": ["-x"],',
+                '        "shellcheck.exclude": ["SC1091"],',
+            ],
+            "mise": [
+                '        "mise.checkForUpdates": false,',
+                '        "mise.showUpdateNotifications": false,',
+            ],
+            "spell": [
+                '        "cSpell.enabledLanguageIds": [',
+                '          "asciidoc", "c", "cpp", "csharp", "css", "git-commit", "go", "handlebars",',
+                '          "haskell", "html", "jade", "java", "javascript", "javascriptreact", "json",',
+                '          "jsonc", "latex", "less", "markdown", "php", "plaintext", "pug", "python",',
+                '          "restructuredtext", "rust", "scala", "scss", "text", "typescript",',
+                '          "typescriptreact", "yaml", "yml"',
+                "        ],",
+            ],
+            "todo": [
+                '        "todo-tree.general.tags": ["BUG", "HACK", "FIXME", "TODO", "XXX", "NOTE", "WARNING"],',
+                '        "todo-tree.highlights.customHighlight": {',
+                '          "TODO": { "icon": "check", "type": "line" },',
+                '          "NOTE": { "icon": "note", "foreground": "#00ff00" },',
+                '          "WARNING": { "icon": "alert", "foreground": "#ffaa00" },',
+                '          "FIXME": { "icon": "bug", "foreground": "#ff0000" }',
+                "        },",
+            ],
+        }
+
+        # Always include core settings
+        settings_lines.extend(settings_mappings["core"])
+
+        # Add tool-specific settings based on selections
+        for tool, selected in self.config.tool_selected.items():
+            if not selected:
+                continue
+
+            if tool in ["go", "goreleaser"]:
+                settings_lines.extend(settings_mappings["go"])
+            elif tool == "dotnet":
+                settings_lines.extend(settings_mappings["dotnet"])
+            elif tool in ["node", "pnpm", "yarn", "deno", "bun"]:
+                settings_lines.extend(settings_mappings["javascript"])
+            elif tool == "python":
+                settings_lines.extend(settings_mappings["python"])
+
+        # Add settings based on flags
+        if self.config.include_python_extensions and "python" not in self.config.tool_selected:
+            settings_lines.extend(settings_mappings["python"])
+
+        if self.config.include_markdown_extensions:
+            settings_lines.extend(settings_mappings["markdown"])
+
+        if self.config.include_shell_extensions:
+            settings_lines.extend(settings_mappings["shell"])
+
+        if self.config.include_js_extensions:
+            settings_lines.extend(settings_mappings["javascript"])
+
+        # Always include these settings
+        settings_lines.extend(settings_mappings["mise"])
+        settings_lines.extend(settings_mappings["spell"])
+        settings_lines.extend(settings_mappings["todo"])
+
+        # Remove trailing comma from last line and close settings
+        if settings_lines and settings_lines[-1].endswith(","):
+            settings_lines[-1] = settings_lines[-1][:-1]
+
+        settings_lines.append("      }")
+        return "\n".join(settings_lines)
+
+    def _extract_settings_section(self, start_marker: str, end_marker: str) -> list[str]:
+        """Extract settings lines from a section in the devcontainer.json file."""
+        source_file = self.source_dir / ".devcontainer" / "devcontainer.json"
+
+        if not source_file.exists():
+            return []
+
+        with open(source_file) as f:
+            lines = f.readlines()
+
+        result = []
+        in_section = False
+
+        for line in lines:
+            if start_marker in line:
+                in_section = True
+                continue
+            if end_marker in line:
+                break
+            if in_section:
+                # Include all lines in the settings section (preserving comments and formatting)
+                result.append(line.rstrip())
+
+        return result
+
+    def _extract_devcontainer_section(self, start_marker: str, end_marker: str) -> list[str]:
+        """Extract a section from the devcontainer.json file."""
+        source_file = self.source_dir / ".devcontainer" / "devcontainer.json"
+
+        if not source_file.exists():
+            return []
+
+        with open(source_file) as f:
+            lines = f.readlines()
+
+        result = []
+        in_section = False
+
+        for line in lines:
+            if start_marker in line:
+                in_section = True
+                continue
+            if end_marker in line:
+                break
+            if in_section:
+                # Extract extension lines - look for quoted strings that may have comments
+                stripped = line.strip()
+                if stripped.startswith('"') and ("," in stripped or stripped.endswith('"')):
+                    # Extract the extension ID from the quoted string
+                    # Handle format: "extension.id", // comment
+                    extension_part = stripped.split(",")[0] if "," in stripped else stripped
+
+                    # Remove quotes to get extension ID
+                    extension_id = extension_part.strip('"')
+                    if extension_id:  # Only add non-empty extension IDs
+                        result.append(extension_id)
+
+        return result
+
+    def _generate_extensions_list(self) -> list[str]:
+        """Generate the list of VS Code extensions based on selected tools."""
+        extensions = []
+
+        # Define extension mappings for different tools/categories
+        extension_mappings = {
+            "github": [
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "GitHub.vscode-pull-request-github",
+                "GitHub.github-vscode-theme",
+                "GitHub.remotehub",
+                "GitHub.vscode-github-actions",
+                "cschleiden.vscode-github-actions",
+                "mhutchie.git-graph",
+                "huizhou.githd",
+            ],
+            "python": [
+                "ms-python.python",
+                "ms-python.mypy-type-checker",
+                "charliermarsh.ruff",
+                "Textualize.textual-syntax-highlighter",
+            ],
+            "go": [
+                "golang.go",
+                "ms-vscode.vscode-go",
+            ],
+            "dotnet": [
+                "ms-dotnettools.csharp",
+                "ms-dotnettools.csdevkit",
+            ],
+            "javascript": [
+                "ms-vscode.vscode-typescript-next",
+                "ms-vscode.vscode-eslint",
+                "esbenp.prettier-vscode",
+            ],
+            "markdown": [
+                "yzhang.markdown-all-in-one",
+                "darkriszty.markdown-table-prettify",
+            ],
+            "shell": [
+                "foxundermoon.shell-format",
+                "timonwong.shellcheck",
+            ],
+            "core": [
+                "albert.TabOut",
+                "ciiqr.encode",
+                "EditorConfig.EditorConfig",
+                "euskadi31.json-pretty-printer",
+                "Gruntfuggly.todo-tree",
+                "hediet.vscode-drawio",
+                "IronGeek.vscode-env",
+                "k--kato.docomment",
+                "hverlin.mise-vscode",
+                "ms-azuretools.vscode-docker",
+                "naumovs.color-highlight",
+                "PKief.material-icon-theme",
+                "RapidAPI.vscode-rapidapi-client",
+                "streetsidesoftware.code-spell-checker",
+                "tamasfe.even-better-toml",
+            ],
+        }
+
+        # Always include GitHub + Core extensions
+        extensions.extend(extension_mappings["github"])
+        extensions.extend(extension_mappings["core"])
+
+        # Add tool-specific extensions based on selections
+        for tool, selected in self.config.tool_selected.items():
+            if not selected:
+                continue
+
+            if tool in ["go", "goreleaser"]:
+                extensions.extend(extension_mappings["go"])
+            elif tool == "dotnet":
+                extensions.extend(extension_mappings["dotnet"])
+            elif tool in ["node", "pnpm", "yarn", "deno", "bun"]:
+                extensions.extend(extension_mappings["javascript"])
+            elif tool == "python":
+                extensions.extend(extension_mappings["python"])
+
+        # Add extensions based on flags
+        if self.config.include_python_extensions and "python" not in self.config.tool_selected:
+            extensions.extend(extension_mappings["python"])
+
+        if self.config.include_markdown_extensions:
+            extensions.extend(extension_mappings["markdown"])
+
+        if self.config.include_shell_extensions:
+            extensions.extend(extension_mappings["shell"])
+
+        if self.config.include_js_extensions:
+            extensions.extend(extension_mappings["javascript"])
+
+        if self.config.install_psi_header:
+            extensions.append("psioniq.psi-header")
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_extensions = []
+        for ext in extensions:
+            if ext not in seen:
+                seen.add(ext)
+                unique_extensions.append(ext)
+
+        return unique_extensions
+
+    def _extract_settings_section(self, start_marker: str, end_marker: str) -> dict[str, Any]:
+        """Extract settings from a section in the devcontainer.json file."""
+        source_file = self.source_dir / ".devcontainer" / "devcontainer.json"
+
+        if not source_file.exists():
+            return {}
+
         with open(source_file) as f:
             content = f.read()
 
-        # Replace basic values
-        content = content.replace(
-            '"name": "Dynamic Dev Container"',
-            f'"name": "{self.config.display_name}"',
+        # Find the section between markers
+        start_idx = content.find(start_marker)
+        end_idx = content.find(end_marker)
+
+        if start_idx == -1 or end_idx == -1:
+            return {}
+
+        # Extract the section content
+        section_content = content[start_idx + len(start_marker) : end_idx]
+
+        # Parse as JSON-like content (this is a simplified approach)
+        # In a real implementation, you might want to use a proper JSON parser
+        # that can handle comments and partial JSON
+        settings: dict[str, Any] = {}
+
+        # Simple regex-based parsing for key-value pairs
+        # Match patterns like "key": "value" or "key": { ... }
+        pattern = r'"([^"]+)":\s*([^,\n]+(?:\{[^}]*\})?[^,\n]*)'
+
+        for match in re.finditer(pattern, section_content):
+            key = match.group(1)
+            value_str = match.group(2).strip().rstrip(",")
+
+            # Try to parse the value
+            try:
+                value: Any
+                # Handle boolean values
+                if value_str == "true":
+                    value = True
+                elif value_str == "false":
+                    value = False
+                # Handle string values
+                elif value_str.startswith('"') and value_str.endswith('"'):
+                    value = value_str[1:-1]  # Remove quotes
+                # Handle numeric values
+                elif value_str.isdigit():
+                    value = int(value_str)
+                # Handle arrays and objects (simplified)
+                elif value_str.startswith(("[", "{")):
+                    value = json.loads(value_str)
+                else:
+                    value = value_str
+
+                settings[key] = value
+            except Exception:
+                # If parsing fails, store as string
+                settings[key] = value_str
+
+        return settings
+
+    def _generate_settings(self) -> dict[str, Any]:
+        """Generate VS Code settings based on selected tools and configuration."""
+        settings = {}
+
+        # Always include core settings
+        core_settings = self._extract_settings_section(
+            "// #### Begin Core VS Code Settings ####",
+            "// #### End Core VS Code Settings ####",
         )
-        content = content.replace(
-            "--name=dynamic-dev-container",
-            f"--name={self.config.container_name}",
+        settings.update(core_settings)
+
+        # Add tool-specific settings
+        for tool, selected in self.config.tool_selected.items():
+            if not selected:
+                continue
+
+            if tool in ["go", "goreleaser"]:
+                go_settings = self._extract_settings_section(
+                    "// #### Begin Go Settings ####",
+                    "// #### End Go Settings ####",
+                )
+                settings.update(go_settings)
+            elif tool == "dotnet":
+                dotnet_settings = self._extract_settings_section(
+                    "// #### Begin .NET Settings ####",
+                    "// #### End .NET Settings ####",
+                )
+                settings.update(dotnet_settings)
+            elif tool in ["node", "pnpm", "yarn", "deno", "bun"]:
+                js_settings = self._extract_settings_section(
+                    "// #### Begin JavaScript/Node.js Settings ####",
+                    "// #### End JavaScript/Node.js Settings ####",
+                )
+                settings.update(js_settings)
+            elif tool == "python":
+                python_settings = self._extract_settings_section(
+                    "// #### Begin Python Settings ####",
+                    "// #### End Python Settings ####",
+                )
+                settings.update(python_settings)
+            elif tool in [
+                "kubectl",
+                "helm",
+                "k9s",
+                "kubectx",
+                "kubens",
+                "krew",
+                "dive",
+                "kubebench",
+                "popeye",
+                "trivy",
+                "cmctl",
+                "k3d",
+            ]:
+                k8s_settings = self._extract_settings_section(
+                    "// #### Begin Kubernetes/Helm Settings ####",
+                    "// #### End Kubernetes/Helm Settings ####",
+                )
+                settings.update(k8s_settings)
+            elif tool == "powershell":
+                ps_settings = self._extract_settings_section(
+                    "// #### Begin PowerShell Settings ####",
+                    "// #### End PowerShell Settings ####",
+                )
+                settings.update(ps_settings)
+
+        # Add extension-specific settings
+        if self.config.include_markdown_extensions:
+            md_settings = self._extract_settings_section(
+                "// #### Begin Markdown Settings ####",
+                "// #### End Markdown Settings ####",
+            )
+            settings.update(md_settings)
+
+        if self.config.include_shell_extensions:
+            shell_settings = self._extract_settings_section(
+                "// #### Begin Shell/Bash Settings ####",
+                "// #### End Shell/Bash Settings ####",
+            )
+            settings.update(shell_settings)
+
+        # Add PSI Header settings if configured
+        if self.config.install_psi_header:
+            psi_settings = self._generate_psi_header_settings()
+            settings.update(psi_settings)
+
+        # Add Mise settings
+        mise_settings = self._extract_settings_section(
+            "// #### Begin Mise Settings ####",
+            "// #### End Mise Settings ####",
         )
-        content = content.replace(
-            "dynamic-dev-container-shellhistory",
-            f"{self.config.container_name}-shellhistory",
-        )
-        content = content.replace(
-            "dynamic-dev-container-plugins",
-            f"{self.config.container_name}-plugins",
+        settings.update(mise_settings)
+
+        return settings
+
+    def _generate_psi_header_settings(self) -> dict[str, Any]:
+        """Generate PSI Header specific settings."""
+        if not self.config.install_psi_header:
+            return {}
+
+        settings: dict[str, Any] = {}
+
+        # Company configuration
+        if self.config.psi_header_company:
+            settings["psi-header.config"] = {
+                "company": self.config.psi_header_company,
+            }
+
+        # Changes tracking configuration
+        settings["psi-header.changes-tracking"] = {
+            "autoHeader": "autoSave",
+            "exclude": ["json"],
+            "excludeGlob": ["**/.git/**"],
+        }
+
+        # Project creation year
+        current_year = str(datetime.now().year)
+        settings["psi-header.variables"] = [["projectCreationYear", current_year]]
+
+        # Language configurations
+        lang_configs: list[dict[str, Any]] = []
+
+        # Default configuration for all languages
+        lang_configs.append(
+            {
+                "language": "*",
+                "begin": "",
+                "end": "",
+                "prefix": "// ",
+            },
         )
 
-        # Write modified content
-        with open(target_file, "w") as f:
-            f.write(content)
+        # Add language-specific configurations based on selected tools and templates
+        if self.config.psi_header_templates:
+            for lang_id, _lang_name in self.config.psi_header_templates:
+                template_lines = [
+                    f"Copyright (c) {self.config.psi_header_company or 'Company'} - All Rights Reserved",
+                    f"Project: {self.config.project_name}",
+                    "Author: <<author>>",
+                    "Date: <<date>>",
+                    "",
+                    "This source code is licensed under the license found in the",
+                    "LICENSE file in the root directory of this source tree.",
+                ]
+
+                lang_config: dict[str, Any] = {
+                    "language": lang_id,
+                    "template": template_lines,
+                }
+
+                # Language-specific configurations
+                if lang_id == "python":
+                    lang_config.update(
+                        {
+                            "begin": '"""',
+                            "end": '"""',
+                            "prefix": "",
+                        },
+                    )
+                elif lang_id in ["shellscript", "bash"]:
+                    lang_config.update(
+                        {
+                            "begin": "",
+                            "end": "",
+                            "prefix": "# ",
+                        },
+                    )
+                elif lang_id in ["html", "xml"]:
+                    lang_config.update(
+                        {
+                            "begin": "<!--",
+                            "end": "-->",
+                            "prefix": "",
+                        },
+                    )
+                elif lang_id == "css":
+                    lang_config.update(
+                        {
+                            "begin": "/*",
+                            "end": "*/",
+                            "prefix": "",
+                        },
+                    )
+                else:
+                    # Default for most languages (JavaScript, TypeScript, Go, etc.)
+                    lang_config.update(
+                        {
+                            "begin": "",
+                            "end": "",
+                            "prefix": "// ",
+                        },
+                    )
+
+                lang_configs.append(lang_config)
+
+        settings["psi-header.lang-config"] = lang_configs
+
+        return settings
 
     def update_dev_sh(self) -> None:
         """Update dev.sh with project settings."""
