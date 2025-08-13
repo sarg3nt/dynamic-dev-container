@@ -683,6 +683,61 @@ class DevContainerParser:
 
         return section_tool_mapping
 
+    @staticmethod
+    def parse_psi_header_languages(devcontainer_file: Path) -> list[tuple[str, str]]:
+        """Parse available PSI header languages from devcontainer.json template."""
+        if not devcontainer_file.exists():
+            return []
+
+        with open(devcontainer_file, encoding="utf-8") as f:
+            content = f.read()
+
+        languages = []
+        in_psi_templates = False
+
+        for line in content.split("\n"):
+            stripped_line = line.strip()
+
+            # Look for PSI header templates array
+            if '"psi-header.templates":' in stripped_line:
+                in_psi_templates = True
+                continue
+
+            # Stop when we exit the templates array
+            if in_psi_templates and stripped_line == "]":
+                break
+
+            if in_psi_templates and '"language":' in stripped_line:
+                # Look for language entries
+                # Extract language ID (e.g., "python", "javascript")
+                import re
+
+                match = re.search(r'"language":\s*"([^"]+)"', stripped_line)
+                if match:
+                    lang_id = match.group(1)
+                    # Convert to display name
+                    display_names = {
+                        "python": "Python (.py)",
+                        "javascript": "JavaScript (.js)",
+                        "typescript": "TypeScript (.ts)",
+                        "go": "Go (.go)",
+                        "shellscript": "Shell (.sh)",
+                        "powershell": "PowerShell (.ps1)",
+                        "csharp": "C# (.cs)",
+                        "terraform": "Terraform (.tf)",
+                        "yaml": "YAML (.yml)",
+                        "json": "JSON (.json)",
+                        "markdown": "Markdown (.md)",
+                        "dockerfile": "Dockerfile",
+                        "env": "Environment (.env)",
+                        "*": "Default (all languages)",
+                    }
+                    display_name = display_names.get(lang_id, f"{lang_id.title()} (.{lang_id})")
+                    if lang_id != "*":  # Skip wildcard for selection list
+                        languages.append((lang_id, display_name))
+
+        return languages
+
 
 class FileManager:
     """Manages file operations for the installer."""
@@ -1070,37 +1125,41 @@ class PSIHeaderScreen(Screen[None]):
         Binding("escape", "back", "Back"),
     ]
 
-    def __init__(self, config: ProjectConfig) -> None:
+    def __init__(self, config: ProjectConfig, source_dir: Path) -> None:
         """Initialize the PSI Header screen.
 
         Parameters
         ----------
         config : ProjectConfig
             Project configuration data
+        source_dir : Path
+            Source directory for template files
 
         """
         super().__init__()
         self.config = config
+        self.source_dir = source_dir
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
+        # Get available languages from devcontainer.json template
+        devcontainer_file = self.source_dir / ".devcontainer" / "devcontainer.json"
+        available_languages = DevContainerParser.parse_psi_header_languages(devcontainer_file)
+
+        # Determine which languages should be auto-selected based on selected tools
+        auto_selected_languages = self._get_auto_selected_languages()
+
         yield Header()
         yield Container(
             Label("PSI Header Configuration", classes="title"),
             Label("Configure PSI Header extension for file templates:"),
             Checkbox("Install PSI Header Extension", id="install_psi", value=self.config.install_psi_header),
             Label("Company Name:"),
-            Input(placeholder="Your Company Name", id="company_name"),
+            Input(placeholder="Your Company Name", id="company_name", value=self.config.psi_header_company),
             Label("Language Templates:"),
+            Label("Select languages for custom headers (auto-selected based on your tools):"),
             ScrollableContainer(
-                Label("Select languages for custom headers:"),
-                Checkbox("Python (.py)", id="lang_python"),
-                Checkbox("JavaScript (.js)", id="lang_javascript"),
-                Checkbox("TypeScript (.ts)", id="lang_typescript"),
-                Checkbox("Go (.go)", id="lang_go"),
-                Checkbox("Shell (.sh)", id="lang_shell"),
-                Checkbox("YAML (.yml)", id="lang_yaml"),
-                Checkbox("JSON (.json)", id="lang_json"),
+                *self._create_language_checkboxes(available_languages, auto_selected_languages),
                 id="language-scroll",
             ),
             Horizontal(
@@ -1112,6 +1171,59 @@ class PSIHeaderScreen(Screen[None]):
         )
         yield Footer()
 
+    def _get_auto_selected_languages(self) -> set[str]:
+        """Get languages that should be auto-selected based on selected tools."""
+        auto_selected = set()
+
+        # Mapping of tools to their primary languages
+        tool_language_mapping = {
+            "python": "python",
+            "golang": "go",
+            "golangci-lint": "go",
+            "goreleaser": "go",
+            "node": "javascript",
+            "pnpm": "javascript",
+            "yarn": "javascript",
+            "bun": "javascript",
+            "deno": "typescript",
+            "dotnet": "csharp",
+            "powershell": "powershell",
+            "opentofu": "terraform",
+            "openbao": "terraform",
+            "packer": "terraform",
+            "shellcheck": "shellscript",
+        }
+
+        # Add languages for selected tools
+        for tool, selected in self.config.tool_selected.items():
+            if selected and tool in tool_language_mapping:
+                auto_selected.add(tool_language_mapping[tool])
+
+        # Always include common languages if any development tools are selected
+        if any(self.config.tool_selected.values()):
+            auto_selected.update(["shellscript", "markdown"])
+
+        return auto_selected
+
+    def _create_language_checkboxes(
+        self, available_languages: list[tuple[str, str]], auto_selected: set[str]
+    ) -> list[Checkbox]:
+        """Create checkboxes for available languages with auto-selection."""
+        checkboxes = []
+
+        for lang_id, display_name in available_languages:
+            # Check if this language should be auto-selected
+            is_selected = lang_id in auto_selected
+
+            # Create a checkbox ID
+            checkbox_id = f"lang_{lang_id}"
+
+            # Create the checkbox
+            checkbox = Checkbox(display_name, id=checkbox_id, value=is_selected)
+            checkboxes.append(checkbox)
+
+        return checkboxes
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
         if event.button.id == "next_btn":
@@ -1120,26 +1232,29 @@ class PSIHeaderScreen(Screen[None]):
             self.action_back()
 
     def save_config(self) -> None:
-        """Save current configuration."""
         """Save PSI Header configuration."""
         self.config.install_psi_header = self.query_one("#install_psi", Checkbox).value
         self.config.psi_header_company = self.query_one("#company_name", Input).value
 
-        # Collect selected language templates
+        # Collect selected language templates from dynamic checkboxes
         self.config.psi_header_templates = []
-        language_mappings = {
-            "lang_python": ("python", "Python"),
-            "lang_javascript": ("javascript", "JavaScript"),
-            "lang_typescript": ("typescript", "TypeScript"),
-            "lang_go": ("go", "Go"),
-            "lang_shell": ("shellscript", "Shell"),
-            "lang_yaml": ("yaml", "YAML"),
-            "lang_json": ("json", "JSON"),
-        }
 
-        for checkbox_id, (lang_id, lang_name) in language_mappings.items():
-            if self.query_one(f"#{checkbox_id}", Checkbox).value:
-                self.config.psi_header_templates.append((lang_id, lang_name))
+        # Get available languages from devcontainer.json template
+        devcontainer_file = self.source_dir / ".devcontainer" / "devcontainer.json"
+        available_languages = DevContainerParser.parse_psi_header_languages(devcontainer_file)
+
+        # Check each available language checkbox
+        for lang_id, display_name in available_languages:
+            checkbox_id = f"lang_{lang_id}"
+            try:
+                checkbox = self.query_one(f"#{checkbox_id}", Checkbox)
+                if checkbox.value:
+                    # Extract just the language name from display name (e.g., "Python" from "Python (.py)")
+                    lang_name = display_name.split(" (")[0] if " (" in display_name else display_name
+                    self.config.psi_header_templates.append((lang_id, lang_name))
+            except Exception:
+                # Skip if checkbox doesn't exist
+                continue
 
         self.app.call_later(self.app.after_psi_header)  # type: ignore[attr-defined]
         self.app.pop_screen()
@@ -3672,7 +3787,7 @@ class DynamicDevContainerApp(App[None]):
 
     def show_psi_header_config(self) -> None:
         """Show PSI Header configuration screen."""
-        self.push_screen(PSIHeaderScreen(self.config), self.after_psi_header)
+        self.push_screen(PSIHeaderScreen(self.config, self.source_dir), self.after_psi_header)
 
     def after_psi_header(self, _result: None = None) -> None:
         """Called after PSI Header configuration."""

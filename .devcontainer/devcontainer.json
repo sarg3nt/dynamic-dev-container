@@ -595,7 +595,7 @@
             "prefix": "# "
           }
         ],
-        "psi-header.templates": [
+         "psi-header.templates":[
           {
             "language": "go",
             "template": ["Add your template text here"]
