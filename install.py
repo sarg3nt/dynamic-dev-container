@@ -2324,9 +2324,118 @@ class InstallationScreen(Screen[None]):
         return "\n".join(final_lines)
 
     def _ensure_psi_header_section(self, content: str) -> str:
-        """Ensure PSI Header section is present (it should already be in template)."""
-        # PSI Header section should already exist in template, so nothing to add
+        """Ensure PSI Header section is present and update templates with actual content."""
+        # If PSI Header is configured, replace template placeholders with actual content
+        if self.config.psi_header_templates:
+            content = self._update_psi_header_templates(content)
         return content
+
+    def _update_psi_header_templates(self, content: str) -> str:
+        """Update PSI header templates with actual template content from user configuration."""
+
+        # Generate the template content for each configured language
+        template_entries = []
+
+        for lang_id, lang_name in self.config.psi_header_templates:
+            # Create the default template content similar to bash script
+            current_year = datetime.now().year
+            company = self.config.psi_header_company or "My Company"
+
+            # Generate template text based on language
+            if lang_id == "powershell":
+                # PowerShell has special .DESCRIPTION format
+                template_lines = [
+                    ".DESCRIPTION",
+                    f"Copyright © {current_year} {company}. All rights reserved.",
+                    f"Project: {self.config.project_name}",
+                    "Author: <<author>>",
+                    "Date: <<date>>",
+                    "",
+                    "This source code is licensed under the license found in the",
+                    "LICENSE file in the root directory of this source tree.",
+                ]
+            else:
+                # Standard template for other languages
+                template_lines = [
+                    f"Copyright © {current_year} {company}. All rights reserved.",
+                    f"Project: {self.config.project_name}",
+                    "Author: <<author>>",
+                    "Date: <<date>>",
+                    "",
+                    "This source code is licensed under the license found in the",
+                    "LICENSE file in the root directory of this source tree.",
+                ]
+
+            template_entry = {
+                "language": lang_id,
+                "template": template_lines,
+            }
+            template_entries.append(template_entry)
+
+        # If no custom templates, add a default one
+        if not template_entries:
+            current_year = datetime.now().year
+            company = self.config.psi_header_company or "My Company"
+            default_template = {
+                "language": "*",
+                "template": [f"Copyright © {current_year} {company}. All rights reserved."],
+            }
+            template_entries.append(default_template)
+
+        # Now replace the "psi-header.templates" section in the content
+        # Find the templates array and replace it with our generated content
+        lines = content.split("\n")
+        result_lines = []
+        in_templates_section = False
+        templates_indent = ""
+
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+
+            # Look for the start of psi-header.templates section
+            if '"psi-header.templates": [' in line:
+                in_templates_section = True
+                templates_indent = line[: line.find('"psi-header.templates"')]
+                result_lines.append(line)  # Add the opening line
+
+                # Skip until we find the closing bracket for this array
+                i += 1
+                bracket_count = 1
+                while i < len(lines) and bracket_count > 0:
+                    line = lines[i]
+                    # Count brackets to find the end of the array
+                    bracket_count += line.count("[") - line.count("]")
+                    if bracket_count == 0:
+                        # This is the closing line, we'll replace everything before it
+                        break
+                    i += 1
+
+                # Now insert our custom templates
+                for j, template_entry in enumerate(template_entries):
+                    result_lines.append(f"{templates_indent}          {{")
+                    result_lines.append(f'{templates_indent}            "language": "{template_entry["language"]}",')
+
+                    # Format the template array
+                    template_json = json.dumps(template_entry["template"], ensure_ascii=False)
+                    result_lines.append(f'{templates_indent}            "template": {template_json}')
+
+                    # Add closing brace with comma if not the last entry
+                    if j < len(template_entries) - 1:
+                        result_lines.append(f"{templates_indent}          }},")
+                    else:
+                        result_lines.append(f"{templates_indent}          }}")
+
+                # Add the closing bracket line
+                if i < len(lines):
+                    result_lines.append(lines[i])
+                in_templates_section = False
+            else:
+                result_lines.append(line)
+
+            i += 1
+
+        return "\n".join(result_lines)
 
     def _remove_psi_header_section(self, content: str) -> str:
         """Remove PSI Header section if not selected."""
@@ -2550,9 +2659,6 @@ class InstallationScreen(Screen[None]):
             },
         }
         settings.update(common_settings)
-
-        # Convert to properly formatted JSON string with proper indentation
-        import json
 
         # Convert the settings dict to a JSON string with proper indentation
         settings_json = json.dumps(settings, indent=2, ensure_ascii=False)
@@ -2967,161 +3073,6 @@ class InstallationScreen(Screen[None]):
                 unique_extensions.append(ext)
 
         return unique_extensions
-
-    def _extract_settings_section(self, start_marker: str, end_marker: str) -> dict[str, Any]:
-        """Extract settings from a section in the devcontainer.json file."""
-        source_file = self.source_dir / ".devcontainer" / "devcontainer.json"
-
-        if not source_file.exists():
-            return {}
-
-        with open(source_file) as f:
-            content = f.read()
-
-        # Find the section between markers
-        start_idx = content.find(start_marker)
-        end_idx = content.find(end_marker)
-
-        if start_idx == -1 or end_idx == -1:
-            return {}
-
-        # Extract the section content
-        section_content = content[start_idx + len(start_marker) : end_idx]
-
-        # Parse as JSON-like content (this is a simplified approach)
-        # In a real implementation, you might want to use a proper JSON parser
-        # that can handle comments and partial JSON
-        settings: dict[str, Any] = {}
-
-        # Simple regex-based parsing for key-value pairs
-        # Match patterns like "key": "value" or "key": { ... }
-        pattern = r'"([^"]+)":\s*([^,\n]+(?:\{[^}]*\})?[^,\n]*)'
-
-        for match in re.finditer(pattern, section_content):
-            key = match.group(1)
-            value_str = match.group(2).strip().rstrip(",")
-
-            # Try to parse the value
-            try:
-                value: Any
-                # Handle boolean values
-                if value_str == "true":
-                    value = True
-                elif value_str == "false":
-                    value = False
-                # Handle string values
-                elif value_str.startswith('"') and value_str.endswith('"'):
-                    value = value_str[1:-1]  # Remove quotes
-                # Handle numeric values
-                elif value_str.isdigit():
-                    value = int(value_str)
-                # Handle arrays and objects (simplified)
-                elif value_str.startswith(("[", "{")):
-                    value = json.loads(value_str)
-                else:
-                    value = value_str
-
-                settings[key] = value
-            except Exception:
-                # If parsing fails, store as string
-                settings[key] = value_str
-
-        return settings
-
-    def _generate_settings(self) -> dict[str, Any]:
-        """Generate VS Code settings based on selected tools and configuration."""
-        settings = {}
-
-        # Always include core settings
-        core_settings = self._extract_settings_section(
-            "// #### Begin Core VS Code Settings ####",
-            "// #### End Core VS Code Settings ####",
-        )
-        settings.update(core_settings)
-
-        # Add tool-specific settings
-        for tool, selected in self.config.tool_selected.items():
-            if not selected:
-                continue
-
-            if tool in ["go", "goreleaser"]:
-                go_settings = self._extract_settings_section(
-                    "// #### Begin Go Settings ####",
-                    "// #### End Go Settings ####",
-                )
-                settings.update(go_settings)
-            elif tool == "dotnet":
-                dotnet_settings = self._extract_settings_section(
-                    "// #### Begin .NET Settings ####",
-                    "// #### End .NET Settings ####",
-                )
-                settings.update(dotnet_settings)
-            elif tool in ["node", "pnpm", "yarn", "deno", "bun"]:
-                js_settings = self._extract_settings_section(
-                    "// #### Begin JavaScript/Node.js Settings ####",
-                    "// #### End JavaScript/Node.js Settings ####",
-                )
-                settings.update(js_settings)
-            elif tool == "python":
-                python_settings = self._extract_settings_section(
-                    "// #### Begin Python Settings ####",
-                    "// #### End Python Settings ####",
-                )
-                settings.update(python_settings)
-            elif tool in [
-                "kubectl",
-                "helm",
-                "k9s",
-                "kubectx",
-                "kubens",
-                "krew",
-                "dive",
-                "kubebench",
-                "popeye",
-                "trivy",
-                "cmctl",
-                "k3d",
-            ]:
-                k8s_settings = self._extract_settings_section(
-                    "// #### Begin Kubernetes/Helm Settings ####",
-                    "// #### End Kubernetes/Helm Settings ####",
-                )
-                settings.update(k8s_settings)
-            elif tool == "powershell":
-                ps_settings = self._extract_settings_section(
-                    "// #### Begin PowerShell Settings ####",
-                    "// #### End PowerShell Settings ####",
-                )
-                settings.update(ps_settings)
-
-        # Add extension-specific settings
-        if self.config.include_markdown_extensions:
-            md_settings = self._extract_settings_section(
-                "// #### Begin Markdown Settings ####",
-                "// #### End Markdown Settings ####",
-            )
-            settings.update(md_settings)
-
-        if self.config.include_shell_extensions:
-            shell_settings = self._extract_settings_section(
-                "// #### Begin Shell/Bash Settings ####",
-                "// #### End Shell/Bash Settings ####",
-            )
-            settings.update(shell_settings)
-
-        # Add PSI Header settings if configured
-        if self.config.install_psi_header:
-            psi_settings = self._generate_psi_header_settings()
-            settings.update(psi_settings)
-
-        # Add Mise settings
-        mise_settings = self._extract_settings_section(
-            "// #### Begin Mise Settings ####",
-            "// #### End Mise Settings ####",
-        )
-        settings.update(mise_settings)
-
-        return settings
 
     def _generate_psi_header_settings(self) -> dict[str, Any]:
         """Generate PSI Header specific settings."""
