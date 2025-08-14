@@ -94,6 +94,11 @@
     margin: 1 0;
 }
 
+#config-columns {
+    height: auto;
+    margin: 1 0;
+}
+
 /* Column layout */
 .left-column {
     width: 1fr;
@@ -104,6 +109,17 @@
 .right-column {
     width: 1fr;
     height: 1fr;
+    margin: 0;
+}
+
+.config-column {
+    width: 1fr;
+    height: auto;
+    margin: 0 1 0 0;
+    padding: 0;
+}
+
+.config-column:last-child {
     margin: 0;
 }
 
