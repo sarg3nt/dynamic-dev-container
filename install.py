@@ -23,7 +23,10 @@ import tempfile
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
+
+if TYPE_CHECKING:
+    from textual.events import Focus, Key
 
 # Global debug flag - can be set via environment variable or command line
 DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
@@ -135,6 +138,7 @@ def check_and_install_dependencies() -> None:
         ("rich", "rich>=13.0.0"),
         ("toml", "toml>=0.10.0"),
         ("pyperclip", "pyperclip>=1.9.0"),
+        ("types-pyperclip", "types-pyperclip>=1.9.0"),
     ]
 
     missing_packages = []
@@ -196,6 +200,7 @@ except ImportError as e:
 # Constants
 MIN_VERSION_PARTS = 2
 VERSION_BUTTON_PARTS = 4
+MAX_DEBUG_MESSAGES = 50  # Maximum number of debug messages to display at once
 
 
 class ProjectConfig:
@@ -801,7 +806,10 @@ class FileManager:
 
 
 class DebugMixin:
-    """Mixin class to add debug functionality to screens."""
+    """Mixin class to add debug functionality to screens.
+
+    This mixin should be used with classes that inherit from Screen.
+    """
 
     def get_debug_widget(self) -> Container:
         """Create a debug output widget for the screen."""
@@ -830,8 +838,8 @@ class DebugMixin:
         if not messages:
             debug_log.write("[dim]No debug messages available yet. Perform some operations to see debug output.[/dim]")
         else:
-            # Show recent messages (last 50 or all if fewer)
-            recent_messages = messages[-50:] if len(messages) > 50 else messages
+            # Show recent messages (last MAX_DEBUG_MESSAGES or all if fewer)
+            recent_messages = messages[-MAX_DEBUG_MESSAGES:] if len(messages) > MAX_DEBUG_MESSAGES else messages
             for msg in recent_messages:
                 # Ensure message is properly formatted for display
                 try:
@@ -843,15 +851,15 @@ class DebugMixin:
     def update_debug_output(self) -> None:
         """Update the debug output with new messages."""
         try:
-            if hasattr(self, "query_one"):
-                debug_log = self.query_one("#debug_log", RichLog)
+            # Use cast to tell mypy this mixin is used with Screen classes
+            debug_log = cast("Screen[None]", self).query_one("#debug_log", RichLog)
 
-                # Clear and repopulate to ensure fresh content
-                debug_log.clear()
-                self._populate_debug_log(debug_log)
+            # Clear and repopulate to ensure fresh content
+            debug_log.clear()
+            self._populate_debug_log(debug_log)
 
-                # Force a refresh to ensure content is displayed
-                debug_log.refresh()
+            # Force a refresh to ensure content is displayed
+            debug_log.refresh()
 
         except NoMatches:
             # Debug widget not found - this is normal when debug panel isn't shown
@@ -877,7 +885,7 @@ class DebugMixin:
 
             for container_id in container_ids:
                 try:
-                    main_container = self.query_one(container_id)
+                    main_container = cast("Screen[None]", self).query_one(container_id)
                     break
                 except NoMatches:
                     continue
@@ -888,7 +896,7 @@ class DebugMixin:
 
             # Remove any existing debug container first
             try:
-                existing_debug = self.query_one("#debug_container")
+                existing_debug = cast("Screen[None]", self).query_one("#debug_container")
                 existing_debug.remove()
                 logger.debug("DebugMixin: Removed existing debug container")
             except NoMatches:
@@ -930,9 +938,9 @@ class DebugMixin:
             messages = tui_log_handler.get_messages()
             debug_text = "\n".join(messages)
             pyperclip.copy(debug_text)
-            self.notify("Debug output copied to clipboard!", timeout=2, severity="information")
+            cast("Screen[None]", self).notify("Debug output copied to clipboard!", timeout=2, severity="information")
         except Exception as e:
-            self.notify(f"Failed to copy debug output: {e}", timeout=3, severity="error")
+            cast("Screen[None]", self).notify(f"Failed to copy debug output: {e}", timeout=3, severity="error")
 
 
 class DebugModal(ModalScreen[None]):
@@ -997,9 +1005,9 @@ class DebugModal(ModalScreen[None]):
         except Exception as e:
             self.notify(f"Failed to copy debug output: {e}", timeout=3, severity="error")
 
-    def action_dismiss(self) -> None:
+    async def action_dismiss(self, result: None = None) -> None:
         """Close the debug modal."""
-        self.dismiss()
+        self.dismiss(result)
 
 
 class WelcomeScreen(Screen[None], DebugMixin):
@@ -1357,6 +1365,7 @@ class PythonProjectScreen(Screen[None]):
         self.config.python_keywords = self.query_one("#keywords", Input).value
 
         # Determine license
+        # Determine license
         if self.query_one("#license_mit", Checkbox).value:
             self.config.python_license = "MIT"
         elif self.query_one("#license_apache", Checkbox).value:
@@ -1553,7 +1562,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             self._rebuild_with_debug_panel()
 
 
-class ToolVersionScreen(Screen[None]):
+class ToolVersionScreen(Screen[None], DebugMixin):
     """Screen for configuring specific tool versions."""
 
     BINDINGS = [
@@ -1941,7 +1950,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 # Update existing checkbox states
                 for tool in tools:
                     checkbox = existing_checkboxes[tool]
-                    checkbox.value = self.tool_selected.get(tool, False)
+                    cast("Checkbox", checkbox).value = self.tool_selected.get(tool, False)
         except Exception:
             # If anything goes wrong with the check, fall back to rebuild
             needs_rebuild = True
@@ -2471,19 +2480,19 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             logger.debug("Homepage URL input changed to: %s", event.value)
             # The actual username propagation will happen on focus loss via _process_input_on_focus_loss()
 
-    def on_focus(self, event) -> None:
+    def on_focus(self, event: Focus) -> None:
         """Handle focus events to track input focus changes."""
         # Track the currently focused input
-        if hasattr(event.widget, "id") and event.widget.id:
-            self._last_focused_input = event.widget.id
-            logger.debug("Input gained focus: %s", event.widget.id)
+        if event.control and hasattr(event.control, "id") and event.control.id:
+            self._last_focused_input = event.control.id
+            logger.debug("Input gained focus: %s", event.control.id)
 
-    def on_descendant_focus(self, event) -> None:
+    def on_descendant_focus(self, event: Focus) -> None:
         """Handle when focus moves to track focus loss from inputs."""
         # When focus moves from one input to another, process the previous input
-        if hasattr(self, "_last_focused_input") and hasattr(event.widget, "id"):
+        if hasattr(self, "_last_focused_input") and event.control and hasattr(event.control, "id"):
             previous_input_id = self._last_focused_input
-            current_input_id = event.widget.id if event.widget.id else None
+            current_input_id = event.control.id if event.control.id else None
 
             # If focus moved from a tracked input to something else, process the previous input
             if previous_input_id and previous_input_id != current_input_id:
@@ -2527,7 +2536,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         except Exception as e:
             logger.debug("Error processing input on focus loss (%s): %s", input_id, e)
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: Key) -> None:
         """Handle key events for immediate processing."""
         # Check if Enter was pressed in Homepage URL field
         if (
