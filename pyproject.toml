@@ -98,54 +98,25 @@ exclude = [
 [tool.hatch.publish.index]
 disable = false  # Set to true to disable publishing entirely
 
-# Default repository (PyPI)
-# Remove the # to enable a specific repository configuration
-# [tool.hatch.publish.index.repos.main]
-# url = "https://upload.pypi.org/legacy/"  # PyPI upload URL
-
-# Test PyPI repository (recommended for testing before publishing to main PyPI)
-# [tool.hatch.publish.index.repos.test]
-# url = "https://test.pypi.org/legacy/"
-
-# Example: JFrog Artifactory configuration
-# Replace with your actual Artifactory URL and repository names
-# [tool.hatch.publish.index.repos.artifactory-dev]
-# url = "https://your-company.jfrog.io/artifactory/api/pypi/your-repo-dev/simple/"
-# 
-# [tool.hatch.publish.index.repos.artifactory-prod]
-# url = "https://your-company.jfrog.io/artifactory/api/pypi/your-repo-prod/simple/"
-
-# Example: Sonatype Nexus configuration
-# Replace with your actual Nexus URL and repository names
-# [tool.hatch.publish.index.repos.nexus-dev]
-# url = "https://your-nexus-server.com/repository/your-repo-dev/simple/"
-# 
-# [tool.hatch.publish.index.repos.nexus-prod]
-# url = "https://your-nexus-server.com/repository/your-repo-prod/simple/"
-
-# Example: Azure DevOps Artifacts configuration
-# [tool.hatch.publish.index.repos.azure-artifacts]
-# url = "https://pkgs.dev.azure.com/your-org/_packaging/your-feed/pypi/upload/"
-
-# Example: GitHub Packages configuration
-# [tool.hatch.publish.index.repos.github]
-# url = "https://upload.pypi.org/legacy/"  # GitHub uses PyPI protocol
-# username = "your-github-username"
-
-# Authentication methods:
-# 1. Environment variables (recommended):
-#    export HATCH_INDEX_USER=your_username
-#    export HATCH_INDEX_AUTH=your_password_or_token
-# 
-# 2. For repository-specific auth:
-#    export HATCH_INDEX_REPOS_YOUR_REPO_USER=your_username
-#    export HATCH_INDEX_REPOS_YOUR_REPO_AUTH=your_password_or_token
+# Repository configuration is done via Hatch's config file (~/.config/hatch/config.toml)
+# or environment variables. Examples:
 #
-# 3. Interactive prompt (Hatch will ask for credentials when needed)
-
-# To publish to a specific repository:
-# hatch publish -r repository-name
-# Example: hatch publish -r test
+# For PyPI (default repository "main"):
+#   hatch publish
+#
+# For TestPyPI (repository "test"):
+#   hatch publish -r test
+#
+# For custom repositories, add to ~/.config/hatch/config.toml:
+#   [publish.index.repos.my-repo]
+#   url = "https://my-company.com/simple/"
+#
+# Authentication via environment variables:
+#   export HATCH_INDEX_USER=your_username
+#   export HATCH_INDEX_AUTH=your_password_or_token
+#
+# To publish: hatch publish
+# To publish to specific repo: hatch publish -r my-repo
 
 # Development environment configuration for Hatch
 [tool.hatch.envs.default]

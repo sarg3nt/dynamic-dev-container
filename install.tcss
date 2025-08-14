@@ -236,3 +236,89 @@ ProgressBar {
     height: 1;
     margin: 1 0;
 }
+
+/* Debug panel styling */
+.debug-panel {
+    height: 25%;
+    max-height: 25%;
+    border: solid $accent;
+    background: $surface;
+    margin: 1 0 0 0;
+    dock: bottom;
+}
+
+.debug-title {
+    text-style: bold;
+    color: $background;
+    margin: 0;
+    height: 1;
+    padding: 0 1;
+    background: $accent;
+}
+
+#debug_log {
+    height: 1fr;
+    scrollbar-size: 1 1;
+    scrollbar-background: $surface;
+    scrollbar-color: $accent;
+    padding: 0 1;
+    color: $text;
+    background: $surface;
+}
+
+#debug_container {
+    height: 25%;
+    max-height: 25%;
+    dock: bottom;
+}
+
+.debug-copy-btn {
+    height: 1;
+    min-width: 10;
+    margin: 0 0 0 1;
+    padding: 0 1;
+    background: $accent;
+    color: $background;
+    border: none;
+}
+
+.debug-copy-btn:hover {
+    background: $primary;
+}
+
+#debug-header {
+    height: 1;
+    margin: 0;
+    padding: 0;
+}
+
+/* Main content should take up the remaining space when debug is shown */
+#main-content {
+    height: 1fr;
+}
+
+/* Main containers should use full space by default */
+#welcome-container, #project-container, #summary-container, #install-container, #tools-container {
+    height: auto;
+}
+
+/* Debug Modal Styles */
+.debug-modal {
+    align: center middle;
+    width: 90%;
+    height: 80%;
+    max-width: 120;
+    max-height: 40;
+}
+
+.debug-modal-content {
+    height: 100%;
+    background: $surface;
+    border: thick $primary;
+    padding: 1;
+}
+
+#debug_modal {
+    background: $surface;
+    border: thick $primary;
+}

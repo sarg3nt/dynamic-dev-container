@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -93,29 +94,32 @@ tui_log_handler = TUILogHandler()
 # Configure logging for debugging
 def setup_logging(debug_mode: bool = False) -> None:
     """Set up logging configuration based on debug mode."""
-    # Always add the TUI handler for capturing debug messages
+    # Clear any existing handlers to prevent duplicates
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+
+    # Always set root logger to DEBUG level so TUI handler can capture all messages
+    root_logger.setLevel(logging.DEBUG)
+
+    # Always add the TUI handler for capturing debug messages (even if not displayed)
     tui_log_handler.setLevel(logging.DEBUG)
+    root_logger.addHandler(tui_log_handler)
 
     if debug_mode:
-        # In debug mode, log to both file and TUI handler
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            handlers=[
-                logging.FileHandler(tempfile.gettempdir() + "/install_debug.log"),
-                tui_log_handler,
-            ],
-        )
+        # In debug mode, also log to file
+        file_handler = logging.FileHandler(tempfile.gettempdir() + "/install_debug.log")
+        file_handler.setLevel(logging.DEBUG)
+        root_logger.addHandler(file_handler)
     else:
-        # In normal mode, only log warnings/errors to file, debug to TUI handler only
-        logging.basicConfig(
-            level=logging.WARNING,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            handlers=[
-                logging.FileHandler(tempfile.gettempdir() + "/install_debug.log"),
-                tui_log_handler,
-            ],
-        )
+        # In normal mode, only log warnings/errors to file
+        file_handler = logging.FileHandler(tempfile.gettempdir() + "/install_debug.log")
+        file_handler.setLevel(logging.WARNING)
+        root_logger.addHandler(file_handler)
+
+    # Set format for all handlers
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    for handler in root_logger.handlers:
+        handler.setFormatter(formatter)
 
 
 # Initialize logging based on debug mode
@@ -130,6 +134,7 @@ def check_and_install_dependencies() -> None:
         ("textual", "textual[dev]>=0.41.0"),
         ("rich", "rich>=13.0.0"),
         ("toml", "toml>=0.10.0"),
+        ("pyperclip", "pyperclip>=1.9.0"),
     ]
 
     missing_packages = []
@@ -162,12 +167,13 @@ check_and_install_dependencies()
 
 # Now import the required packages
 try:
+    import pyperclip
     from rich.console import Console
     from textual.app import App, ComposeResult
     from textual.binding import Binding
     from textual.containers import Container, Horizontal, ScrollableContainer
     from textual.css.query import NoMatches
-    from textual.screen import Screen
+    from textual.screen import ModalScreen, Screen
     from textual.widgets import (
         Button,
         Checkbox,
@@ -218,6 +224,7 @@ class ProjectConfig:
 
         # Python configuration
         self.install_python_tools: bool = False
+        self.install_python_repository: bool = False
         self.python_publish_url: str = "https://upload.pypi.org/legacy/"
         self.python_index_url: str = "https://pypi.org/simple/"
         self.python_extra_index_url: str = ""
@@ -234,6 +241,13 @@ class ProjectConfig:
         self.python_github_project: str = ""
         self.python_license: str = ""
         self.python_keywords: str = ""
+
+        # Additional pyproject.toml configuration
+        self.python_requires_python: str = ">=3.12"
+        self.python_homepage_url: str = ""
+        self.python_source_url: str = ""
+        self.python_documentation_url: str = ""
+        self.python_packages_path: str = ""
 
         # PSI Header configuration
         self.install_psi_header: bool = False
@@ -799,10 +813,8 @@ class DebugMixin:
             id="debug_log",
         )
 
-        # Populate with existing debug messages
-        messages = tui_log_handler.get_messages()
-        for msg in messages[-20:]:  # Show last 20 messages
-            debug_log.write(msg)
+        # Populate with existing debug messages immediately
+        self._populate_debug_log(debug_log)
 
         return Container(
             Label("Debug Output:", classes="debug-title"),
@@ -811,30 +823,192 @@ class DebugMixin:
             classes="debug-panel",
         )
 
+    def _populate_debug_log(self, debug_log: RichLog) -> None:
+        """Populate debug log with current messages."""
+        messages = tui_log_handler.get_messages()
+
+        if not messages:
+            debug_log.write("[dim]No debug messages available yet. Perform some operations to see debug output.[/dim]")
+        else:
+            # Show recent messages (last 50 or all if fewer)
+            recent_messages = messages[-50:] if len(messages) > 50 else messages
+            for msg in recent_messages:
+                # Ensure message is properly formatted for display
+                try:
+                    debug_log.write(msg)
+                except Exception as e:
+                    # If there's an issue with the message, show a safe version
+                    debug_log.write(f"[red]Error displaying message: {e}[/red]")
+
     def update_debug_output(self) -> None:
         """Update the debug output with new messages."""
         try:
-            # Check if we have the query_one method (i.e., we're mixed into a Screen)
             if hasattr(self, "query_one"):
                 debug_log = self.query_one("#debug_log", RichLog)
-                messages = tui_log_handler.get_messages()
-                # Clear and repopulate with recent messages
+
+                # Clear and repopulate to ensure fresh content
                 debug_log.clear()
-                for msg in messages[-20:]:  # Show last 20 messages
-                    debug_log.write(msg)
+                self._populate_debug_log(debug_log)
+
+                # Force a refresh to ensure content is displayed
+                debug_log.refresh()
+
+        except NoMatches:
+            # Debug widget not found - this is normal when debug panel isn't shown
+            pass
         except Exception as e:
-            # Debug log widget not found or error occurred - silently ignore
-            # This is expected when debug widget is not present
-            if DEBUG_MODE:
-                logger.debug("Failed to update debug output widget: %s", e)
+            # Log any other errors for debugging
+            logger.debug("Failed to update debug output: %s", e)
+
+    def _rebuild_with_debug_panel(self) -> None:
+        """Standard debug panel creation for all screens."""
+        try:
+            # Try to find a main container with common IDs
+            main_container = None
+            container_ids = [
+                "#welcome-container",
+                "#project-container",
+                "#summary-container",
+                "#install-container",
+                "#tools-container",
+                "#main-content",
+                "#psi-header-container",
+            ]
+
+            for container_id in container_ids:
+                try:
+                    main_container = self.query_one(container_id)
+                    break
+                except NoMatches:
+                    continue
+
+            if not main_container:
+                logger.debug("DebugMixin: Could not find any main container for debug panel")
+                return
+
+            # Remove any existing debug container first
+            try:
+                existing_debug = self.query_one("#debug_container")
+                existing_debug.remove()
+                logger.debug("DebugMixin: Removed existing debug container")
+            except NoMatches:
+                pass  # No existing debug container, which is fine
+
+            # Create the standardized debug panel
+            debug_log = RichLog(
+                max_lines=50,
+                wrap=True,
+                highlight=True,
+                markup=True,
+                id="debug_log",
+            )
+
+            # Populate immediately with current messages
+            self._populate_debug_log(debug_log)
+
+            debug_container = Container(
+                Horizontal(
+                    Label("Debug Output (Ctrl+D to toggle):", classes="debug-title"),
+                    Button("Copy Debug", id="copy_debug_btn", classes="debug-copy-btn"),
+                    id="debug-header",
+                ),
+                debug_log,
+                id="debug_container",
+                classes="debug-panel",
+            )
+
+            # Mount the debug container
+            main_container.mount(debug_container)
+            logger.debug("DebugMixin: Debug panel created and mounted successfully")
+
+        except Exception as e:
+            logger.debug("DebugMixin: Error creating debug panel: %s", e)
+
+    def _copy_debug_output(self) -> None:
+        """Standard debug copy functionality for all screens."""
+        try:
+            messages = tui_log_handler.get_messages()
+            debug_text = "\n".join(messages)
+            pyperclip.copy(debug_text)
+            self.notify("Debug output copied to clipboard!", timeout=2, severity="information")
+        except Exception as e:
+            self.notify(f"Failed to copy debug output: {e}", timeout=3, severity="error")
 
 
-class WelcomeScreen(Screen[None]):
+class DebugModal(ModalScreen[None]):
+    """Modal screen for showing debug output."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss", "Close"),
+        Binding("ctrl+d", "dismiss", "Close"),
+        Binding("ctrl+c", "copy_debug", "Copy"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        """Create the debug modal layout."""
+        debug_log = RichLog(
+            max_lines=100,
+            wrap=True,
+            highlight=True,
+            markup=True,
+            id="modal_debug_log",  # Different ID to avoid conflicts
+        )
+
+        # Populate with existing debug messages
+        messages = tui_log_handler.get_messages()
+        for msg in messages[-50:]:  # Show last 50 messages
+            debug_log.write(msg)
+
+        yield Container(
+            Container(
+                Horizontal(
+                    Label("Debug Output (Ctrl+D to close, Ctrl+C to copy)", classes="debug-title"),
+                    Button("Copy", id="copy_debug_btn", classes="debug-copy-btn"),
+                    Button("Close", id="close_debug_btn", variant="primary"),
+                    id="debug-header",
+                ),
+                debug_log,
+                id="debug_content",
+                classes="debug-modal-content",
+            ),
+            id="debug_modal",
+            classes="debug-modal",
+        )
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button presses in the debug modal."""
+        if event.button.id == "copy_debug_btn":
+            self.action_copy_debug()
+        elif event.button.id == "close_debug_btn":
+            self.dismiss()
+
+    def action_copy_debug(self) -> None:
+        """Copy debug output to clipboard."""
+        try:
+            # Get all debug messages
+            messages = tui_log_handler.get_messages()
+            debug_text = "\n".join(messages)
+
+            # Try to copy to clipboard
+            pyperclip.copy(debug_text)
+            self.notify("Debug output copied to clipboard!", timeout=2, severity="information")
+        except ImportError:
+            self.notify("pyperclip not available - cannot copy to clipboard", timeout=3, severity="warning")
+        except Exception as e:
+            self.notify(f"Failed to copy debug output: {e}", timeout=3, severity="error")
+
+    def action_dismiss(self) -> None:
+        """Close the debug modal."""
+        self.dismiss()
+
+
+class WelcomeScreen(Screen[None], DebugMixin):
     """Welcome screen for the installer."""
 
     BINDINGS = [
         Binding("enter", "continue", "Continue"),
         Binding("q", "quit", "Quit"),
+        Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -853,12 +1027,19 @@ This wizard will guide you through configuring your development container with t
 - Use **SPACE** to select/deselect checkboxes
 - Use **ENTER** to confirm selections
 - Use **Q** to quit at any time
+- Press **Ctrl+D** to view debug output
 
 Press **ENTER** to continue...
             """),
             id="welcome-container",
         )
         yield Footer()
+
+    def on_mount(self) -> None:
+        """Called when the screen is mounted."""
+        logger.debug("WelcomeScreen mounted - Debug functionality available (Ctrl+D)")
+        # Set up a timer to periodically update debug output
+        self.set_interval(1.0, self.update_debug_output)
 
     def action_continue(self) -> None:
         """Continue to the next screen."""
@@ -871,6 +1052,27 @@ Press **ENTER** to continue...
         """Quit the application."""
         """Quit the application."""
         self.app.exit()
+
+    def action_toggle_debug(self) -> None:
+        """Toggle debug mode."""
+        # Check if debug panel already exists
+        try:
+            debug_container = self.query_one("#debug_container")
+            # Remove existing debug panel
+            debug_container.remove()
+            logger.debug("WelcomeScreen: Removed existing debug panel")
+        except NoMatches:
+            # Debug panel doesn't exist, create it
+            logger.debug("WelcomeScreen: Creating new debug panel")
+            self._rebuild_with_debug_panel()
+        except Exception as e:
+            logger.debug("WelcomeScreen: Error toggling debug panel: %s", e)
+            self._rebuild_with_debug_panel()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button press events."""
+        if event.button.id == "copy_debug_btn":
+            self._copy_debug_output()
 
 
 class PythonRepositoryScreen(Screen[None]):
@@ -897,8 +1099,64 @@ class PythonRepositoryScreen(Screen[None]):
         """Create the layout for this screen."""
         yield Header()
         yield Container(
-            Label("Python Repository Configuration", classes="title"),
-            Label("Configure Python package repository settings:"),
+            Label("Python Project Configuration", classes="title"),
+            Label("Configure your Python project settings and repository:"),
+            # Project Metadata Section
+            Label("Project Metadata:", classes="section-header"),
+            Label("Package Name:"),
+            Input(
+                value=self.config.python_project_name or "my-awesome-project",
+                placeholder="Enter package name (lowercase, no spaces)",
+                id="project_name",
+            ),
+            Label("Description:"),
+            Input(
+                value=self.config.python_project_description or "A brief description of your project",
+                placeholder="Enter project description",
+                id="project_description",
+            ),
+            Label("Required Python Version:"),
+            Input(
+                value=self.config.python_requires_python or ">=3.12",
+                placeholder="e.g., >=3.12",
+                id="requires_python",
+            ),
+            Label("Author Name:"),
+            Input(
+                value=self.config.python_author_name or "Your Name",
+                placeholder="Enter author name",
+                id="author_name",
+            ),
+            Label("Author Email:"),
+            Input(
+                value=self.config.python_author_email or "your.email@example.com",
+                placeholder="Enter author email",
+                id="author_email",
+            ),
+            # Project URLs Section
+            Label("Project URLs:", classes="section-header"),
+            Label("Homepage URL:"),
+            Input(
+                value=self.config.python_homepage_url or "https://github.com/yourusername/my-awesome-project",
+                placeholder="Enter homepage URL",
+                id="homepage_url",
+            ),
+            Label("Source URL:"),
+            Input(
+                value=self.config.python_source_url or "https://github.com/yourusername/my-awesome-project",
+                placeholder="Enter source repository URL",
+                id="source_url",
+            ),
+            # Build Configuration Section
+            Label("Build Configuration:", classes="section-header"),
+            Label("Package Path:"),
+            Input(
+                value=self.config.python_packages_path or "src/my_awesome_project",
+                placeholder="Enter package path (e.g., src/package_name)",
+                id="packages_path",
+            ),
+            # Repository Configuration Section
+            Label("Repository Publishing:", classes="section-header"),
             Label("Repository Type:"),
             Container(
                 Checkbox("PyPI (default)", id="repo_pypi", value=True),
@@ -907,16 +1165,12 @@ class PythonRepositoryScreen(Screen[None]):
                 Checkbox("Custom", id="repo_custom"),
                 id="repo_types",
             ),
+            Label("Package Index URL:"),
+            Input(value="https://pypi.org/simple/", id="index_url"),
             Label("Publishing URL:"),
             Input(value="https://upload.pypi.org/legacy/", id="publish_url"),
-            Label("Index URL:"),
-            Input(value="https://pypi.org/simple/", id="index_url"),
             Label("Extra Index URL (optional):"),
             Input(placeholder="Additional package index", id="extra_index_url"),
-            Label("Development Suffix:"),
-            Input(value="dev", id="dev_suffix"),
-            Label("Production Suffix:"),
-            Input(value="prod", id="prod_suffix"),
             Horizontal(
                 Button("Back", id="back_btn"),
                 Button("Next", id="next_btn", variant="primary"),
@@ -963,6 +1217,22 @@ class PythonRepositoryScreen(Screen[None]):
     def save_config(self) -> None:
         """Save current configuration."""
         """Save Python repository configuration."""
+        # Save project metadata
+        self.config.python_project_name = self.query_one("#project_name", Input).value or "my-awesome-project"
+        self.config.python_project_description = (
+            self.query_one("#project_description", Input).value or "A brief description of your project"
+        )
+        self.config.python_requires_python = self.query_one("#requires_python", Input).value or ">=3.12"
+        self.config.python_author_name = self.query_one("#author_name", Input).value or "Your Name"
+        self.config.python_author_email = self.query_one("#author_email", Input).value or "your.email@example.com"
+        self.config.python_homepage_url = (
+            self.query_one("#homepage_url", Input).value or "https://github.com/yourusername/my-awesome-project"
+        )
+        self.config.python_source_url = (
+            self.query_one("#source_url", Input).value or "https://github.com/yourusername/my-awesome-project"
+        )
+        self.config.python_packages_path = self.query_one("#packages_path", Input).value or "src/my_awesome_project"
+
         # Determine repository type
         if self.query_one("#repo_pypi", Checkbox).value:
             self.config.python_repository_type = "PyPI"
@@ -981,8 +1251,6 @@ class PythonRepositoryScreen(Screen[None]):
         )
         self.config.python_index_url = self.query_one("#index_url", Input).value or "https://pypi.org/simple/"
         self.config.python_extra_index_url = self.query_one("#extra_index_url", Input).value
-        self.config.python_dev_suffix = self.query_one("#dev_suffix", Input).value or "dev"
-        self.config.python_prod_suffix = self.query_one("#prod_suffix", Input).value or "prod"
 
         self.app.call_later(self.app.after_python_repository)  # type: ignore[attr-defined]
         self.app.pop_screen()
@@ -1116,12 +1384,13 @@ class PythonProjectScreen(Screen[None]):
         self.app.pop_screen()
 
 
-class PSIHeaderScreen(Screen[None]):
+class PSIHeaderScreen(Screen[None], DebugMixin):
     """Screen for PSI Header configuration."""
 
     BINDINGS = [
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
 
     def __init__(self, config: ProjectConfig, source_dir: Path) -> None:
@@ -1231,6 +1500,8 @@ class PSIHeaderScreen(Screen[None]):
             self.save_config()
         elif event.button.id == "back_btn":
             self.action_back()
+        elif event.button.id == "copy_debug_btn":
+            self._copy_debug_output()
 
     def save_config(self) -> None:
         """Save PSI Header configuration."""
@@ -1269,6 +1540,17 @@ class PSIHeaderScreen(Screen[None]):
         """Go to previous step."""
         """Go back to previous screen."""
         self.app.pop_screen()
+
+    def action_toggle_debug(self) -> None:
+        """Toggle debug mode."""
+        # Check if debug panel already exists
+        try:
+            debug_container = self.query_one("#debug_container")
+            # Remove existing debug panel
+            debug_container.remove()
+        except Exception:
+            # Debug panel doesn't exist, create it
+            self._rebuild_with_debug_panel()
 
 
 class ToolVersionScreen(Screen[None]):
@@ -1326,6 +1608,10 @@ class ToolVersionScreen(Screen[None]):
     def on_mount(self) -> None:
         """Initialize the screen when mounted."""
         """Populate version inputs when screen mounts."""
+        logger.debug("PSIHeaderScreen mounted - Debug functionality available (Ctrl+D)")
+        # Set up a timer to periodically update debug output
+        self.set_interval(1.0, self.update_debug_output)
+
         if not self.configurable_tools:
             return
 
@@ -1377,12 +1663,13 @@ class ToolVersionScreen(Screen[None]):
         self.app.pop_screen()
 
 
-class ProjectConfigScreen(Screen[None]):
+class ProjectConfigScreen(Screen[None], DebugMixin):
     """Screen for project configuration."""
 
     BINDINGS = [
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
@@ -1420,7 +1707,7 @@ class ProjectConfigScreen(Screen[None]):
         default_exec = "".join(word[0].lower() for word in words if word) if words else "mp"  # fallback
 
         yield Header()
-        yield Container(
+        yield ScrollableContainer(
             Label("Project Configuration", classes="title"),
             Label("Enter your project configuration details:"),
             Label("Project Path:"),
@@ -1442,12 +1729,20 @@ class ProjectConfigScreen(Screen[None]):
         )
         yield Footer()
 
+    def on_mount(self) -> None:
+        """Called when the screen is mounted."""
+        logger.debug("ProjectConfigScreen mounted - Debug functionality available (Ctrl+D)")
+        # Set up a timer to periodically update debug output
+        self.set_interval(1.0, self.update_debug_output)
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
         if event.button.id == "next_btn":
             self.save_config()
         elif event.button.id == "back_btn":
             self.action_back()
+        elif event.button.id == "copy_debug_btn":
+            self._copy_debug_output()
 
     def action_next(self) -> None:
         """Go to next step."""
@@ -1458,6 +1753,17 @@ class ProjectConfigScreen(Screen[None]):
         """Go to previous step."""
         """Go back to previous screen."""
         self.app.push_screen(WelcomeScreen())
+
+    def action_toggle_debug(self) -> None:
+        """Toggle debug mode."""
+        # Check if debug panel already exists
+        try:
+            debug_container = self.query_one("#debug_container")
+            # Remove existing debug panel
+            debug_container.remove()
+        except Exception:
+            # Debug panel doesn't exist, create it
+            self._rebuild_with_debug_panel()
 
     def save_config(self) -> None:
         """Save current configuration."""
@@ -1536,7 +1842,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self._refreshing_config = False  # Flag to prevent concurrent refresh calls
         self._widget_generation = 0  # Track widget generation to prevent ID conflicts
         self._active_version_inputs: set[str] = set()  # Track currently active version input IDs
-        self.show_debug = DEBUG_MODE  # Show debug by default if debug mode is enabled
+        self._username_propagated = False  # Track if username has been propagated already
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
@@ -1553,7 +1859,11 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 id="tools-container",
             )
         else:
-            main_container = Container(
+            # Create main layout container with debug panel at bottom if enabled
+            layout_components = []
+
+            # Main content area
+            main_content = Container(
                 Label(
                     f"Development Tools - {self.sections[self.current_section]} - Section {self.current_section + 1} of {len(self.sections)}",
                     classes="title",
@@ -1586,23 +1896,23 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     Button("Finish Tool Selection", id="next_btn", variant="primary"),
                     id="button-row",
                 ),
-                id="tools-container",
+                id="main-content",
             )
-            yield main_container
+            layout_components.append(main_content)
 
-            # Add debug output if enabled
-            if self.show_debug:
-                yield self.get_debug_widget()
+            # Create vertical container with all components
+            main_container = Container(*layout_components, id="tools-container")
+            yield main_container
 
         yield Footer()
 
     def on_mount(self) -> None:
         """Initialize the screen when mounted."""
         """Called when the screen is mounted."""
+        logger.debug("ToolSelectionScreen mounted - Debug functionality available (Ctrl+D)")
         self.refresh_tools()
         # Set up a timer to periodically update debug output
-        if self.show_debug:
-            self.set_interval(1.0, self.update_debug_output)
+        self.set_interval(1.0, self.update_debug_output)
 
     def refresh_tools(self) -> None:
         """Refresh the tools display for current section."""
@@ -1610,25 +1920,76 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             return
 
         tools_container = self.query_one("#tools-scroll", ScrollableContainer)
-        tools_container.remove_children()
 
+        # Only remove children if we need to rebuild (avoid duplicate IDs)
+        needs_rebuild = True
         current_section = self.sections[self.current_section]
         tools = MiseParser.get_section_tools(Path(".mise.toml"), current_section)
 
+        # Check if we can just update existing widgets instead of rebuilding
+        try:
+            existing_checkboxes = {}
+            for widget in tools_container.children:
+                if hasattr(widget, "id") and widget.id and widget.id.startswith("tool_"):
+                    tool_name = widget.id[5:]  # Remove "tool_" prefix
+                    existing_checkboxes[tool_name] = widget
+
+            # If the tools match exactly, we can just update states
+            if set(existing_checkboxes.keys()) == set(tools):
+                needs_rebuild = False
+                # Update existing checkbox states
+                for tool in tools:
+                    checkbox = existing_checkboxes[tool]
+                    checkbox.value = self.tool_selected.get(tool, False)
+        except Exception:
+            # If anything goes wrong with the check, fall back to rebuild
+            needs_rebuild = True
+
+        if needs_rebuild:
+            tools_container.remove_children()
+
         if not tools:
-            no_tools_label = Label("No tools found in this section", classes="compact")
-            tools_container.mount(no_tools_label)
+            if needs_rebuild:
+                no_tools_label = Label("No tools found in this section", classes="compact")
+                tools_container.mount(no_tools_label)
             return
 
-        for tool in tools:
-            description = ToolManager.get_tool_description(tool)
+        if needs_rebuild:
+            for tool in tools:
+                description = ToolManager.get_tool_description(tool)
 
-            # Add checkbox for the tool (no version buttons in left panel anymore)
-            checkbox = Checkbox(description, id=f"tool_{tool}", classes="compact")
-            checkbox.value = self.tool_selected.get(tool, False)
+                # Add checkbox for the tool (no version buttons in left panel anymore)
+                checkbox = Checkbox(description, id=f"tool_{tool}", classes="compact")
+                checkbox.value = self.tool_selected.get(tool, False)
 
-            tools_container.mount(checkbox)  # Update configuration panel
+                tools_container.mount(checkbox)
+
+        # Always handle Python repository configuration if Python is selected
+        if "python" in tools and self.tool_selected.get("python", False):
+            # Check if repository checkbox already exists
+            try:
+                tools_container.query_one("#py_repo_enabled")
+                repo_checkbox_exists = True
+            except Exception:
+                repo_checkbox_exists = False
+
+            if not repo_checkbox_exists:
+                # Add pyproject.toml configuration checkbox
+                repo_checkbox = Checkbox(
+                    "Configure pyproject.toml",
+                    id="py_repo_enabled",
+                    value=self.config.install_python_repository,
+                    classes="compact repo-checkbox",
+                )
+                tools_container.mount(repo_checkbox)
+
+        # Update configuration panel
         self.refresh_configuration()
+
+    def _refresh_python_repository_settings(self) -> None:
+        """Refresh just the Python repository settings in the left column."""
+        # Simply refresh the entire tools display, but with better duplicate prevention
+        self.refresh_tools()
 
     def refresh_configuration(self) -> None:
         """Refresh the configuration panel based on selected tools."""
@@ -1682,36 +2043,223 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
             # Show current section configuration first
             if selected_tools_in_section and "python" in selected_tools_in_section:
-                # Repository type
-                config_container.mount(Label("Repository Type:", classes="compact section-header"))
-                python_repo_container = Container(
-                    RadioSet(
-                        RadioButton("PyPI", id="py_repo_pypi", value=True, classes="compact"),
-                        RadioButton("Artifactory", id="py_repo_artifactory", classes="compact"),
-                        RadioButton("Custom", id="py_repo_custom", classes="compact"),
-                        id="py_repo_radioset",
-                    ),
-                    classes="compact-group",
-                )
-                config_container.mount(python_repo_container)
+                # Python version configuration (moved to top)
+                config_container.mount(Label("Python Version:", classes="compact section-header"))
+                python_version = self.tool_version_value.get("python", "latest")
 
-                # URLs (compact inputs)
-                config_container.mount(Label("Index URL:", classes="compact"))
+                # Create a horizontal container for Python version
+                python_version_container = Horizontal(classes="tool-version-row")
+                config_container.mount(python_version_container)
+
+                # Tool name label
+                python_version_container.mount(Label("python:", classes="compact tool-label"))
+
+                # Version buttons for Python
+                versions = ToolManager.get_version_list("python")
+                for version in versions[:4]:  # Show first 4 versions
+                    # Replace dots with underscores for valid CSS identifiers
+                    safe_version = version.replace(".", "_")
+                    version_btn = Button(
+                        version,
+                        id=f"version_btn_python_{safe_version}",
+                        classes="version-btn-small",
+                    )
+                    python_version_container.mount(version_btn)
+
+                # Version input field
+                version_id = f"version_python_gen_{self._widget_generation}"
+                self._active_version_inputs.add(version_id)
                 config_container.mount(
                     Input(
-                        placeholder="https://pypi.org/simple/",
-                        id="py_index_url",
-                        classes="compact-input",
+                        value=python_version,
+                        placeholder="version or 'latest'",
+                        id=version_id,
+                        classes="version-input",
                     ),
                 )
+
+                # Add pyproject.toml configuration if enabled
+                if self.config.install_python_repository:
+                    config_container.mount(Label("PyProject.toml Configuration:", classes="compact section-header"))
+
+                    # Project metadata section
+                    config_container.mount(Label("Project Metadata:", classes="compact subsection-header"))
+
+                    # Project name
+                    config_container.mount(Label("Package Name:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_project_name or "my-awesome-project",
+                            placeholder="Enter package name (lowercase, no spaces)",
+                            id="pyproject_name",
+                            classes="compact-input",
+                        ),
+                    )
+
+                    # Project description
+                    config_container.mount(Label("Description:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_project_description or "A brief description of your project",
+                            placeholder="Enter project description",
+                            id="pyproject_description",
+                            classes="compact-input",
+                        ),
+                    )
+
+                    # Required Python version
+                    config_container.mount(Label("Required Python Version:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_requires_python or ">=3.12",
+                            placeholder="e.g., >=3.12",
+                            id="pyproject_requires_python",
+                            classes="compact-input",
+                        ),
+                    )
+
+                    # Author name
+                    config_container.mount(Label("Author Name:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_author_name or "Your Name",
+                            placeholder="Enter author name",
+                            id="pyproject_author_name",
+                            classes="compact-input",
+                        ),
+                    )
+
+                    # Author email
+                    config_container.mount(Label("Author Email:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_author_email or "your.email@example.com",
+                            placeholder="Enter author email",
+                            id="pyproject_author_email",
+                            classes="compact-input",
+                        ),
+                    )
+
+                    # Project URLs section
+                    config_container.mount(Label("Project URLs:", classes="compact subsection-header"))
+
+                    # Homepage URL
+                    config_container.mount(Label("Homepage URL:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_homepage_url or self._get_default_homepage_url(),
+                            placeholder="Enter homepage URL",
+                            id="pyproject_homepage",
+                            classes="compact-input",
+                        ),
+                    )
+
+                    # Source URL
+                    config_container.mount(Label("Source URL:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_source_url or self._get_default_source_url(),
+                            placeholder="Enter source repository URL",
+                            id="pyproject_source",
+                            classes="compact-input",
+                        ),
+                    )
+
+                    # Documentation URL
+                    config_container.mount(Label("Documentation URL:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_documentation_url or self._get_default_documentation_url(),
+                            placeholder="Enter documentation URL",
+                            id="pyproject_documentation",
+                            classes="compact-input",
+                        ),
+                    )
+
+                    # Build configuration section
+                    config_container.mount(Label("Build Configuration:", classes="compact subsection-header"))
+
+                    # Package path
+                    config_container.mount(Label("Package Path:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_packages_path or self._get_default_package_path(),
+                            placeholder="Enter package path (e.g., src/package_name)",
+                            id="pyproject_packages",
+                            classes="compact-input",
+                        ),
+                    )
+
+                    # Repository publishing section
+                    config_container.mount(Label("Repository Publishing:", classes="compact subsection-header"))
+
+                    # Repository type selection (improved order: Type -> Index URL -> Publish URL)
+                    config_container.mount(Label("Repository Type:", classes="compact"))
+                    current_repo_type = self.config.python_repository_type or "PyPI"
+                    python_repo_container = Container(
+                        RadioSet(
+                            RadioButton(
+                                "PyPI",
+                                id="py_repo_pypi",
+                                value=(current_repo_type == "PyPI"),
+                                classes="compact",
+                            ),
+                            RadioButton(
+                                "Artifactory",
+                                id="py_repo_artifactory",
+                                value=(current_repo_type == "Artifactory"),
+                                classes="compact",
+                            ),
+                            RadioButton(
+                                "Nexus",
+                                id="py_repo_nexus",
+                                value=(current_repo_type == "Nexus"),
+                                classes="compact",
+                            ),
+                            RadioButton(
+                                "Custom",
+                                id="py_repo_custom",
+                                value=(current_repo_type == "Custom"),
+                                classes="compact",
+                            ),
+                            id="py_repo_radioset",
+                        ),
+                        classes="compact-group",
+                    )
+                    config_container.mount(python_repo_container)
+
+                    # Package index URL (moved up to be right after Repository Type)
+                    config_container.mount(Label("Package Index URL:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_index_url or "https://pypi.org/simple/",
+                            placeholder="Enter package index URL",
+                            id="pyproject_index_url",
+                            classes="compact-input",
+                        ),
+                    )
+
+                    # Publish URL (moved down to be after Index URL)
+                    config_container.mount(Label("Publish URL:", classes="compact"))
+                    config_container.mount(
+                        Input(
+                            value=self.config.python_publish_url or "https://upload.pypi.org/legacy/",
+                            placeholder="Enter publish URL",
+                            id="py_publish_url",
+                            classes="compact-input",
+                        ),
+                    )
 
             # Clean up any existing version inputs before creating new ones
             self._cleanup_version_inputs()
 
             # Show version configuration ONLY for configurable tools selected in the CURRENT section
             # (not all sections) to keep the interface section-specific
+            # Exclude Python since it's handled separately above
             configurable_tools_in_current_section = [
-                tool for tool in selected_tools_in_section if self.tool_version_configurable.get(tool, False)
+                tool
+                for tool in selected_tools_in_section
+                if self.tool_version_configurable.get(tool, False) and tool != "python"
             ]
 
             if configurable_tools_in_current_section:
@@ -1776,8 +2324,17 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             tool = event.checkbox.id[5:]  # Remove "tool_" prefix
             self.tool_selected[tool] = event.value
 
-            # Update configuration panel when selections change
-            self.refresh_configuration()
+            # If Python tool was toggled, refresh tools display to show/hide repository config
+            if tool == "python":
+                self.refresh_tools()
+            else:
+                # Update configuration panel when selections change
+                self.refresh_configuration()
+        elif event.checkbox.id == "py_repo_enabled":
+            # Handle Python repository configuration enable/disable
+            self.config.install_python_repository = event.value
+            # Refresh repository settings without recreating all tools
+            self._refresh_python_repository_settings()
         elif event.checkbox.id.startswith("py_repo_"):
             # Handle Python repository type selection
             if event.value:
@@ -1789,12 +2346,67 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                             checkbox.value = False
                         except Exception as e:
                             # Only log checkbox errors in debug mode
-                            if DEBUG_MODE:
-                                logger.debug(
-                                    "Checkbox '%s' not found during repository type selection: %s",
-                                    repo_type,
-                                    e,
-                                )
+                            logger.debug(
+                                "Checkbox '%s' not found during repository type selection: %s",
+                                repo_type,
+                                e,
+                            )
+
+                # Update URL fields based on repository type
+                try:
+                    publish_input = self.query_one("#py_publish_url", Input)
+                    index_input = self.query_one("#py_index_url", Input)
+
+                    if event.checkbox.id == "py_repo_pypi":
+                        publish_input.value = "https://upload.pypi.org/legacy/"
+                        index_input.value = "https://pypi.org/simple/"
+                    elif event.checkbox.id == "py_repo_artifactory":
+                        publish_input.value = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-local"
+                        index_input.value = "https://your-company.jfrog.io/artifactory/api/pypi/pypi/simple"
+                    elif event.checkbox.id == "py_repo_custom":
+                        publish_input.value = "https://your-custom-repo.com/upload/"
+                        index_input.value = "https://your-custom-repo.com/simple/"
+
+                    # Update the config immediately
+                    self.config.python_publish_url = publish_input.value
+                    self.config.python_index_url = index_input.value
+
+                except Exception as e:
+                    logger.debug("Could not update Python URL fields: %s", e)
+
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        """Handle radio set changes for Python repository type.
+
+        Parameters
+        ----------
+        event : RadioSet.Changed
+            The radio set change event
+
+        """
+        if event.radio_set.id == "py_repo_radioset":
+            try:
+                publish_input = self.query_one("#py_publish_url", Input)
+                index_input = self.query_one("#pyproject_index_url", Input)
+
+                if event.pressed.id == "py_repo_pypi":
+                    publish_input.value = "https://upload.pypi.org/legacy/"
+                    index_input.value = "https://pypi.org/simple/"
+                elif event.pressed.id == "py_repo_artifactory":
+                    publish_input.value = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-local"
+                    index_input.value = "https://your-company.jfrog.io/artifactory/api/pypi/pypi/simple"
+                elif event.pressed.id == "py_repo_nexus":
+                    publish_input.value = "https://nexus.your-company.com/repository/pypi-hosted/"
+                    index_input.value = "https://nexus.your-company.com/repository/pypi-group/simple"
+                elif event.pressed.id == "py_repo_custom":
+                    publish_input.value = "https://your-custom-repo.com/upload/"
+                    index_input.value = "https://your-custom-repo.com/simple/"
+
+                # Update the config immediately
+                self.config.python_publish_url = publish_input.value
+                self.config.python_index_url = index_input.value
+
+            except Exception as e:
+                logger.debug("Could not update Python URL fields: %s", e)
 
     def _cleanup_version_inputs(self) -> None:
         """Remove any existing version input widgets to prevent duplicates."""
@@ -1838,6 +2450,232 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             self.tool_version_value[tool] = event.value
         elif event.input.id == "py_index_url":
             self.config.python_index_url = event.value
+        elif event.input.id == "py_publish_url":
+            self.config.python_publish_url = event.value
+        elif event.input.id == "pyproject_name":
+            # Update package name and related fields when package name changes
+            logger.debug("Package name input changed to: %s", event.value)
+            self.config.python_project_name = event.value
+            # Use call_later to ensure all widgets are mounted before updating
+            self.call_later(self._update_package_related_fields, event.value)
+        elif event.input.id == "pyproject_homepage":
+            # Handle Homepage URL changes for username propagation (only once)
+            # Use a timer to debounce and only propagate after user stops typing
+            if not self._username_propagated:
+                # Cancel any existing timer
+                if hasattr(self, "_username_timer"):
+                    self._username_timer.stop()
+                # Set a new timer that will fire after 1 second of no typing
+                self._username_timer = self.set_timer(1.0, lambda: self._check_and_propagate_username(event.value))
+
+    def _check_and_propagate_username(self, homepage_url: str) -> None:
+        """Check if homepage URL contains a valid username and propagate it."""
+        logger.debug("Checking homepage URL for username propagation: %s", homepage_url)
+
+        # Only propagate if the URL looks complete (contains github.com and has a slash after username)
+        if not homepage_url or "github.com/" not in homepage_url:
+            logger.debug("URL not complete enough for propagation")
+            return
+
+        try:
+            # Extract username from the homepage URL
+            username = self._extract_username_from_url(homepage_url)
+            if not username or username == "yourusername":
+                # No valid username found or still using template
+                logger.debug("No valid username found or still using template: %s", username)
+                return
+
+            # Check if the URL has a repo name too (should have at least two parts after github.com)
+            url_match = re.search(r"github\.com/([^/]+)/(.+)", homepage_url)
+            if not url_match:
+                logger.debug("URL doesn't have repo name yet, waiting for complete URL")
+                return
+
+            logger.debug("Valid username found: %s, propagating to other fields", username)
+
+            # Get other URL fields
+            source_input = self.query_one("#pyproject_source", Input)
+            documentation_input = self.query_one("#pyproject_documentation", Input)
+
+            # Update source URL if it still uses template username
+            if "yourusername" in source_input.value:
+                repo_name = url_match.group(2)
+                new_source = f"https://github.com/{username}/{repo_name}"
+                source_input.value = new_source
+                logger.debug("Updated source URL to: %s", new_source)
+
+            # Update documentation URL
+            if (
+                not documentation_input.value.strip()
+                or "yourusername" in documentation_input.value
+                or documentation_input.value == self._get_default_documentation_url()
+            ):
+                repo_name = url_match.group(2)
+                new_documentation = f"https://github.com/{username}/{repo_name}/README.md"
+                documentation_input.value = new_documentation
+                logger.debug("Updated documentation URL to: %s", new_documentation)
+
+            # Mark that username propagation has happened
+            self._username_propagated = True
+            logger.debug("Username propagation completed, future changes will not propagate")
+
+        except Exception as e:
+            logger.debug("Could not check/propagate username: %s", e)
+            logger.debug("Traceback: %s", traceback.format_exc())
+
+    def _update_package_related_fields(self, package_name: str) -> None:
+        """Update fields that depend on the package name.
+
+        Parameters
+        ----------
+        package_name : str
+            The new package name
+
+        """
+        # Always try to update, even for empty package names (to show defaults)
+        logger.debug("Updating package-related fields for package name: %s", package_name)
+
+        try:
+            # Convert package name to valid formats
+            if package_name and package_name.strip():
+                package_name_clean = package_name.lower().replace("-", "_").replace(" ", "_")
+                package_name_url = package_name.lower().replace("_", "-").replace(" ", "-")
+            else:
+                # Use defaults for empty package name
+                package_name_clean = "my_awesome_project"
+                package_name_url = "my-awesome-project"
+
+            # Update Homepage URL if it still has the default value
+            homepage_input = self.query_one("#pyproject_homepage", Input)
+            logger.debug("Current homepage URL: %s", homepage_input.value)
+
+            # Update if it's empty, has the exact default, or looks like a generated URL
+            should_update_homepage = (
+                not homepage_input.value
+                or homepage_input.value == "https://github.com/yourusername/my-awesome-project"
+                or "my-awesome-project" in homepage_input.value
+                or "yourusername" in homepage_input.value  # Also update if it has the template username
+                or homepage_input.value.startswith("https://github.com/yourusername/")  # Any generated URL
+            )
+
+            if should_update_homepage:
+                new_url = f"https://github.com/yourusername/{package_name_url}"
+                homepage_input.value = new_url
+                logger.debug("Updated homepage URL to: %s", new_url)
+
+            # Update Source URL if it still has the default value
+            source_input = self.query_one("#pyproject_source", Input)
+            logger.debug("Current source URL: %s", source_input.value)
+
+            # Update if it's empty, has the exact default, or looks like a generated URL
+            should_update_source = (
+                not source_input.value
+                or source_input.value == "https://github.com/yourusername/my-awesome-project"
+                or "my-awesome-project" in source_input.value
+                or "yourusername" in source_input.value  # Also update if it has the template username
+                or source_input.value.startswith("https://github.com/yourusername/")  # Any generated URL
+            )
+
+            if should_update_source:
+                new_url = f"https://github.com/yourusername/{package_name_url}"
+                source_input.value = new_url
+                logger.debug("Updated source URL to: %s", new_url)
+
+            # Update Documentation URL if it still has the default value
+            documentation_input = self.query_one("#pyproject_documentation", Input)
+            logger.debug("Current documentation URL: %s", documentation_input.value)
+
+            # Update if it's empty, has the exact default, or looks like a generated URL
+            should_update_documentation = (
+                not documentation_input.value
+                or documentation_input.value == "https://github.com/yourusername/my-awesome-project/README.md"
+                or "my-awesome-project" in documentation_input.value
+                or "yourusername" in documentation_input.value  # Also update if it has the template username
+                or documentation_input.value.startswith("https://github.com/yourusername/")  # Any generated URL
+            )
+
+            if should_update_documentation:
+                new_url = f"https://github.com/yourusername/{package_name_url}/README.md"
+                documentation_input.value = new_url
+                logger.debug("Updated documentation URL to: %s", new_url)
+
+            # Update Package Path if it still has the default value
+            packages_input = self.query_one("#pyproject_packages", Input)
+            logger.debug("Current package path: %s", packages_input.value)
+
+            # Update if it's empty, has the exact default, or looks like a generated path
+            should_update_path = (
+                not packages_input.value
+                or packages_input.value == "src/my_awesome_project"
+                or "my_awesome_project" in packages_input.value
+                or packages_input.value.startswith("src/")  # Any src/ path
+            )
+
+            if should_update_path:
+                new_path = f"src/{package_name_clean}"
+                packages_input.value = new_path
+                logger.debug("Updated package path to: %s", new_path)
+
+        except Exception as e:
+            # Log errors for debugging
+            logger.debug("Could not update package-related fields: %s", e)
+            logger.debug("Traceback: %s", traceback.format_exc())
+
+    def _get_default_homepage_url(self) -> str:
+        """Get default homepage URL based on current package name."""
+        package_name = self.config.python_project_name
+        if package_name and package_name != "my-awesome-project":
+            package_name_url = package_name.lower().replace("_", "-").replace(" ", "-")
+            return f"https://github.com/yourusername/{package_name_url}"
+        return "https://github.com/yourusername/my-awesome-project"
+
+    def _get_default_source_url(self) -> str:
+        """Get default source URL based on current package name."""
+        package_name = self.config.python_project_name
+        if package_name and package_name != "my-awesome-project":
+            package_name_url = package_name.lower().replace("_", "-").replace(" ", "-")
+            return f"https://github.com/yourusername/{package_name_url}"
+        return "https://github.com/yourusername/my-awesome-project"
+
+    def _get_default_documentation_url(self) -> str:
+        """Get default documentation URL based on current package name."""
+        package_name = self.config.python_project_name
+        if package_name and package_name != "my-awesome-project":
+            package_name_url = package_name.lower().replace("_", "-").replace(" ", "-")
+            return f"https://github.com/yourusername/{package_name_url}/README.md"
+        return "https://github.com/yourusername/my-awesome-project/README.md"
+
+    def _extract_username_from_url(self, url: str) -> str:
+        """Extract username from a GitHub URL.
+
+        Parameters
+        ----------
+        url : str
+            The URL to extract username from
+
+        Returns
+        -------
+        str
+            The extracted username, or empty string if not found
+
+        """
+        if not url:
+            return ""
+
+        # Match GitHub URLs: https://github.com/username/repo
+        github_match = re.search(r"github\.com/([^/]+)", url)
+        if github_match:
+            return github_match.group(1)
+
+        return ""
+
+    def _get_default_package_path(self) -> str:
+        """Get default package path based on current package name."""
+        package_name = self.config.python_project_name
+        if package_name and package_name != "my-awesome-project":
+            package_name_clean = package_name.lower().replace("-", "_").replace(" ", "_")
+            return f"src/{package_name_clean}"
+        return "src/my_awesome_project"
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events.
@@ -1891,6 +2729,8 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         elif button_id == "next_btn":
             self.save_current_section()
             self.finalize_selection()
+        elif button_id == "copy_debug_btn":
+            self._copy_debug_output()
 
     def refresh_controls(self) -> None:
         """Refresh button states."""
@@ -1931,21 +2771,83 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
     def save_configuration_values(self) -> None:
         """Save current configuration values from input fields."""
+        # Save Python repository configuration enable/disable
+        try:
+            py_repo_checkbox = self.query_one("#py_repo_enabled", Checkbox)
+            self.config.install_python_repository = py_repo_checkbox.value
+        except Exception as e:
+            logger.debug("Python repository enabled checkbox not found during save: %s", e)
+
         # Save Python configuration
         try:
-            if self.query_one("#py_repo_pypi", Checkbox).value:
-                self.config.python_repository_type = "PyPI"
-            elif self.query_one("#py_repo_artifactory", Checkbox).value:
-                self.config.python_repository_type = "Artifactory"
-            elif self.query_one("#py_repo_custom", Checkbox).value:
-                self.config.python_repository_type = "Custom"
+            radio_set = self.query_one("#py_repo_radioset", RadioSet)
+            if radio_set.pressed_button:
+                if radio_set.pressed_button.id == "py_repo_pypi":
+                    self.config.python_repository_type = "PyPI"
+                elif radio_set.pressed_button.id == "py_repo_artifactory":
+                    self.config.python_repository_type = "Artifactory"
+                elif radio_set.pressed_button.id == "py_repo_nexus":
+                    self.config.python_repository_type = "Nexus"
+                elif radio_set.pressed_button.id == "py_repo_custom":
+                    self.config.python_repository_type = "Custom"
         except Exception as e:
-            logger.debug("Python repository type widgets not found during save: %s", e)
+            logger.debug("Python repository type radioset not found during save: %s", e)
 
         try:
-            self.config.python_index_url = self.query_one("#py_index_url", Input).value
+            self.config.python_index_url = self.query_one("#pyproject_index_url", Input).value
         except Exception as e:
             logger.debug("Python index URL input not found during save: %s", e)
+
+        try:
+            self.config.python_publish_url = self.query_one("#py_publish_url", Input).value
+        except Exception as e:
+            logger.debug("Python publish URL input not found during save: %s", e)
+
+        # Save additional pyproject.toml configuration
+        try:
+            self.config.python_project_name = self.query_one("#pyproject_name", Input).value
+        except Exception as e:
+            logger.debug("Project name input not found during save: %s", e)
+
+        try:
+            self.config.python_project_description = self.query_one("#pyproject_description", Input).value
+        except Exception as e:
+            logger.debug("Project description input not found during save: %s", e)
+
+        try:
+            self.config.python_requires_python = self.query_one("#pyproject_requires_python", Input).value
+        except Exception as e:
+            logger.debug("Required Python version input not found during save: %s", e)
+
+        try:
+            self.config.python_author_name = self.query_one("#pyproject_author_name", Input).value
+        except Exception as e:
+            logger.debug("Author name input not found during save: %s", e)
+
+        try:
+            self.config.python_author_email = self.query_one("#pyproject_author_email", Input).value
+        except Exception as e:
+            logger.debug("Author email input not found during save: %s", e)
+
+        try:
+            self.config.python_homepage_url = self.query_one("#pyproject_homepage", Input).value
+        except Exception as e:
+            logger.debug("Homepage URL input not found during save: %s", e)
+
+        try:
+            self.config.python_source_url = self.query_one("#pyproject_source", Input).value
+        except Exception as e:
+            logger.debug("Source URL input not found during save: %s", e)
+
+        try:
+            self.config.python_documentation_url = self.query_one("#pyproject_documentation", Input).value
+        except Exception as e:
+            logger.debug("Documentation URL input not found during save: %s", e)
+
+        try:
+            self.config.python_packages_path = self.query_one("#pyproject_packages", Input).value
+        except Exception as e:
+            logger.debug("Packages path input not found during save: %s", e)
 
         # Save version configurations - only for configurable tools in the current section
         # since version inputs are only shown for the current section
@@ -2000,6 +2902,17 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self.app.call_later(self.app.after_tool_selection)  # type: ignore[attr-defined]
         self.app.pop_screen()
 
+    def action_toggle_debug(self) -> None:
+        """Toggle debug mode."""
+        # Check if debug panel already exists
+        try:
+            debug_container = self.query_one("#debug_container")
+            # Remove existing debug panel
+            debug_container.remove()
+        except Exception:
+            # Debug panel doesn't exist, create it
+            self._rebuild_with_debug_panel()
+
     def action_next(self) -> None:
         """Go to next step."""
         """Continue to next screen."""
@@ -2011,19 +2924,14 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         """Go back to previous screen."""
         self.app.push_screen(ProjectConfigScreen(self.config))
 
-    def action_toggle_debug(self) -> None:
-        """Toggle debug output visibility."""
-        self.show_debug = not self.show_debug
-        # Refresh the screen to show/hide debug output
-        self.app.refresh(layout=True)
 
-
-class SummaryScreen(Screen[None]):
+class SummaryScreen(Screen[None], DebugMixin):
     """Summary screen showing final configuration."""
 
     BINDINGS = [
         Binding("enter", "install", "Install"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
@@ -2037,6 +2945,12 @@ class SummaryScreen(Screen[None]):
         """
         super().__init__()
         self.config = config
+
+    def on_mount(self) -> None:
+        """Called when the screen is mounted."""
+        logger.debug("SummaryScreen mounted - Debug functionality available (Ctrl+D)")
+        # Set up a timer to periodically update debug output
+        self.set_interval(1.0, self.update_debug_output)
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
@@ -2145,6 +3059,8 @@ class SummaryScreen(Screen[None]):
             self.action_install()
         elif event.button.id == "back_btn":
             self.action_back()
+        elif event.button.id == "copy_debug_btn":
+            self._copy_debug_output()
 
     def action_install(self) -> None:
         """Start the installation process."""
@@ -2166,6 +3082,17 @@ class SummaryScreen(Screen[None]):
                 app.tool_version_value,
             ),
         )
+
+    def action_toggle_debug(self) -> None:
+        """Toggle debug mode."""
+        # Check if debug panel already exists
+        try:
+            debug_container = self.query_one("#debug_container")
+            # Remove existing debug panel
+            debug_container.remove()
+        except Exception:
+            # Debug panel doesn't exist, create it
+            self._rebuild_with_debug_panel()
 
 
 class InstallationScreen(Screen[None]):
@@ -2370,6 +3297,10 @@ class InstallationScreen(Screen[None]):
             content = self._ensure_psi_header_section(content)
         else:
             content = self._remove_psi_header_section(content)
+
+        # Step 4: Update containerEnv with Hatch environment variables if Python repository is configured
+        if self.config.install_python_repository:
+            content = self._update_container_env_hatch_vars(content)
 
         # Write the result
         with open(target_file, "w", encoding="utf-8") as f:
@@ -2714,6 +3645,82 @@ class InstallationScreen(Screen[None]):
         """Remove PSI Header section if not selected."""
         content = self._remove_section(content, "PSI Header", "extensions")
         return self._remove_section(content, "PSI Header Settings", "settings")
+
+    def _update_container_env_hatch_vars(self, content: str) -> str:
+        """Update containerEnv section to include Hatch environment variables."""
+        if not self.config.install_python_repository:
+            return content
+
+        # Find the containerEnv section
+        lines = content.split("\n")
+        result_lines = []
+        in_container_env = False
+        container_env_indent = ""
+        added_hatch_vars = False
+
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+
+            # Look for containerEnv section start
+            if '"containerEnv":' in line and "{" in line:
+                in_container_env = True
+                container_env_indent = line[: line.find('"containerEnv"')]
+                result_lines.append(line)
+                i += 1
+                continue
+
+            # If we're in containerEnv section, look for the closing brace
+            if in_container_env:
+                # Check if this is the end of containerEnv (closing brace with same indentation)
+                if line.strip() == "}," or (
+                    line.strip() == "}" and i + 1 < len(lines) and lines[i + 1].strip().startswith(",")
+                ):
+                    # Add Hatch environment variables before the closing brace
+                    if not added_hatch_vars:
+                        # Add comma to previous line if it doesn't have one and it's not a comment
+                        if (
+                            result_lines
+                            and not result_lines[-1].rstrip().endswith(",")
+                            and not result_lines[-1].strip().startswith("//")
+                        ):
+                            result_lines[-1] = result_lines[-1].rstrip() + ","
+
+                        # Add comment and variables with proper indentation
+                        result_lines.append(
+                            f"{container_env_indent}    // Python Package Publishing Environment Variables",
+                        )
+                        result_lines.append(
+                            f'{container_env_indent}    "HATCH_INDEX_USER": "${{localEnv:HATCH_INDEX_USER}}",',
+                        )
+                        result_lines.append(
+                            f'{container_env_indent}    "HATCH_INDEX_AUTH": "${{localEnv:HATCH_INDEX_AUTH}}",',
+                        )
+
+                        # Add HATCH_INDEX_REPO with the user's configured URL (no trailing comma on last item)
+                        if self.config.python_publish_url:
+                            result_lines.append(
+                                f'{container_env_indent}    "HATCH_INDEX_REPO": "{self.config.python_publish_url}"',
+                            )
+
+                        added_hatch_vars = True
+
+                    # Add the closing brace
+                    result_lines.append(line)
+                    in_container_env = False
+                    i += 1
+                    continue
+
+                # Check if Hatch variables already exist (to avoid duplicates)
+                if "HATCH_INDEX_USER" in line or "HATCH_INDEX_AUTH" in line or "HATCH_INDEX_REPO" in line:
+                    # Skip existing Hatch variables to replace them
+                    i += 1
+                    continue
+
+            result_lines.append(line)
+            i += 1
+
+        return "\n".join(result_lines)
 
     def _update_container_references_in_content(self, content: str) -> str:
         """Update container name references in the content using regex."""
@@ -3505,7 +4512,7 @@ class InstallationScreen(Screen[None]):
         """Update pyproject.toml with Python project configuration."""
         target_file = Path(self.config.project_path) / "pyproject.toml"
 
-        if not target_file.exists() or not self.config.python_project_name:
+        if not target_file.exists():
             return
 
         # Read and update pyproject.toml
@@ -3520,7 +4527,7 @@ class InstallationScreen(Screen[None]):
                 content,
             )
 
-        # Replace description if provided
+        # Replace description
         if self.config.python_project_description:
             content = re.sub(
                 r'description = "A brief description of your project"',
@@ -3528,30 +4535,115 @@ class InstallationScreen(Screen[None]):
                 content,
             )
 
+        # Replace required Python version
+        if self.config.python_requires_python:
+            content = re.sub(
+                r'requires-python = ">=3\.12"',
+                f'requires-python = "{self.config.python_requires_python}"',
+                content,
+            )
+
         # Replace author information
         if self.config.python_author_name and self.config.python_author_email:
-            author_line = f'"{self.config.python_author_name} <{self.config.python_author_email}>"'
             content = re.sub(
-                r'authors = \["Your Name <your\.email@example\.com>"\]',
-                f"authors = [{author_line}]",
+                r'\{ name = "Your Name", email = "your\.email@example\.com" \}',
+                f'{{ name = "{self.config.python_author_name}", email = "{self.config.python_author_email}" }}',
                 content,
             )
         elif self.config.python_author_name:
             content = re.sub(
-                r'authors = \["Your Name <your\.email@example\.com>"\]',
-                f'authors = ["{self.config.python_author_name}"]',
+                r'\{ name = "Your Name", email = "your\.email@example\.com" \}',
+                f'{{ name = "{self.config.python_author_name}" }}',
                 content,
             )
+
+        # Replace project URLs
+        if self.config.python_homepage_url:
+            content = re.sub(
+                r'Homepage = "https://github\.com/yourusername/my-awesome-project"',
+                f'Homepage = "{self.config.python_homepage_url}"',
+                content,
+            )
+
+        if self.config.python_source_url:
+            content = re.sub(
+                r'Source = "https://github\.com/yourusername/my-awesome-project"',
+                f'Source = "{self.config.python_source_url}"',
+                content,
+            )
+
+        # Replace package index URL
+        if self.config.python_index_url:
+            content = re.sub(
+                r'index-url = "https://pypi\.org/simple/"',
+                f'index-url = "{self.config.python_index_url}"',
+                content,
+            )
+
+        # Replace package path in build targets
+        if self.config.python_packages_path:
+            content = re.sub(
+                r'packages = \["src/my_awesome_project"\]',
+                f'packages = ["{self.config.python_packages_path}"]',
+                content,
+            )
+
+            # Also update version path if it follows the same pattern
+            if "src/" in self.config.python_packages_path:
+                package_name = self.config.python_packages_path.replace("src/", "").replace("/", "_")
+                content = re.sub(
+                    r'path = "src/my_awesome_project/__about__\.py"',
+                    f'path = "src/{package_name}/__about__.py"',
+                    content,
+                )
+
+            # Update coverage source packages
+            if self.config.python_project_name:
+                safe_project_name = self.config.python_project_name.replace("-", "_")
+                content = re.sub(
+                    r'source_pkgs = \["my_awesome_project", "tests"\]',
+                    f'source_pkgs = ["{safe_project_name}", "tests"]',
+                    content,
+                )
+                content = re.sub(
+                    r'project = \["src", "\*/my_awesome_project/src"\]',
+                    f'project = ["src", "*/{safe_project_name}/src"]',
+                    content,
+                )
+                content = re.sub(
+                    r'tests = \["tests", "\*/my_awesome_project/tests"\]',
+                    f'tests = ["tests", "*/{safe_project_name}/tests"]',
+                    content,
+                )
+                content = re.sub(
+                    r'omit = \[\s*"src/my_awesome_project/__about__\.py",\s*\]',
+                    f'omit = [\n  "src/{safe_project_name}/__about__.py",\n]',
+                    content,
+                )
 
         # Replace license
         if self.config.python_license:
             content = re.sub(
-                r'license = "MIT"',
-                f'license = "{self.config.python_license}"',
+                r'license = \{text = "MIT"\}',
+                f'license = {{text = "{self.config.python_license}"}}',
                 content,
             )
 
         # Replace keywords
+        if self.config.python_keywords:
+            keywords_list = [f'"{kw.strip()}"' for kw in self.config.python_keywords.split(",") if kw.strip()]
+            keywords_str = ", ".join(keywords_list)
+            content = re.sub(
+                r'keywords = \["python", "cli", "automation"\]',
+                f"keywords = [{keywords_str}]",
+                content,
+            )
+
+        # Configure Hatch publishing based on repository settings
+        content = self._update_hatch_publish_config(content)
+
+        with open(target_file, "w") as f:
+            f.write(content)
         if self.config.python_keywords:
             keywords_list = [f'"{kw.strip()}"' for kw in self.config.python_keywords.split(",") if kw.strip()]
             keywords_str = ", ".join(keywords_list)
@@ -3570,8 +4662,206 @@ class InstallationScreen(Screen[None]):
                 content,
             )
 
+        # Configure Hatch publishing based on repository settings
+        content = self._update_hatch_publish_config(content)
+
         with open(target_file, "w") as f:
             f.write(content)
+
+        # Create environment variables example file if repository is configured
+        if self.config.install_python_repository:
+            self._create_environment_variables_example()
+
+    def _create_environment_variables_example(self) -> None:
+        """Create an example .env file with the required environment variables for publishing."""
+        env_file = Path(self.config.project_path) / ".env.example"
+
+        repo_type = self.config.python_repository_type or "pypi"
+        publish_url = self.config.python_publish_url or "https://upload.pypi.org/legacy/"
+
+        env_content = f"""# Environment Variables for Python Package Publishing
+# Copy this file to .env and fill in your actual credentials
+# Note: Never commit .env files with real credentials to version control
+
+# Repository Type: {repo_type.title()}
+# Repository URL: {publish_url}
+
+"""
+
+        if repo_type == "pypi":
+            env_content += """# PyPI Credentials (get token from https://pypi.org/manage/account/)
+HATCH_INDEX_USER=__token__
+HATCH_INDEX_AUTH=your_pypi_api_token_here
+
+# For TestPyPI (testing), uncomment these instead:
+# HATCH_INDEX_USER=__token__
+# HATCH_INDEX_AUTH=your_testpypi_api_token_here
+# HATCH_INDEX_REPO=https://test.pypi.org/legacy/
+"""
+        elif repo_type == "artifactory":
+            env_content += f"""# Artifactory Credentials
+HATCH_INDEX_USER=your_artifactory_username
+HATCH_INDEX_AUTH=your_artifactory_password_or_token
+HATCH_INDEX_REPO={publish_url}
+
+# For development repository, you might use:
+# HATCH_INDEX_REPO={publish_url.replace("-prod", "-dev") if "-prod" in publish_url else publish_url + "-dev"}
+"""
+        elif repo_type == "nexus":
+            env_content += f"""# Nexus Credentials
+HATCH_INDEX_USER=your_nexus_username
+HATCH_INDEX_AUTH=your_nexus_password_or_token
+HATCH_INDEX_REPO={publish_url}
+
+# For development repository, you might use:
+# HATCH_INDEX_REPO={publish_url.replace("-prod", "-dev") if "-prod" in publish_url else publish_url + "-dev"}
+"""
+        else:
+            env_content += f"""# Custom Repository Credentials
+HATCH_INDEX_USER=your_username
+HATCH_INDEX_AUTH=your_password_or_token
+HATCH_INDEX_REPO={publish_url}
+"""
+
+        env_content += """
+# Usage Instructions:
+# 1. Copy this file: cp .env.example .env
+# 2. Edit .env with your actual credentials
+# 3. Load environment: source .env
+# 4. Publish package: hatch publish
+#
+# For dev containers:
+# - HATCH_INDEX_REPO has been automatically configured in .devcontainer/devcontainer.json
+# - Set HATCH_INDEX_USER and HATCH_INDEX_AUTH in your local environment:
+#   export HATCH_INDEX_USER=your_username
+#   export HATCH_INDEX_AUTH=your_password_or_token
+# - These will be automatically passed to the dev container on startup
+"""
+
+        with open(env_file, "w") as f:
+            f.write(env_content)
+
+    def _update_hatch_publish_config(self, content: str) -> str:
+        """Update the [tool.hatch.publish.index] section based on repository configuration."""
+        if not self.config.install_python_repository:
+            # If repository publishing is disabled, set disable = true
+            hatch_config = """
+[tool.hatch.publish.index]
+disable = true"""
+        else:
+            # Generate environment variable configuration based on repository type
+            repo_type = self.config.python_repository_type or "pypi"
+            publish_url = self.config.python_publish_url or "https://upload.pypi.org/legacy/"
+
+            # Create specific instructions based on repository type
+            if repo_type == "pypi":
+                auth_instructions = """# For PyPI (python.org):
+#   export HATCH_INDEX_USER=__token__
+#   export HATCH_INDEX_AUTH=your_pypi_api_token
+#   hatch publish"""
+                env_example = """# Environment variables for PyPI publishing:
+export HATCH_INDEX_USER=__token__
+export HATCH_INDEX_AUTH=your_pypi_api_token"""
+            elif repo_type == "artifactory":
+                auth_instructions = f"""# For Artifactory repository:
+#   export HATCH_INDEX_USER=your_artifactory_username
+#   export HATCH_INDEX_AUTH=your_artifactory_password_or_token
+#   export HATCH_INDEX_REPO={publish_url}
+#   hatch publish"""
+                env_example = f"""# Environment variables for Artifactory publishing:
+export HATCH_INDEX_USER=your_artifactory_username
+export HATCH_INDEX_AUTH=your_artifactory_password_or_token
+export HATCH_INDEX_REPO={publish_url}"""
+            elif repo_type == "nexus":
+                auth_instructions = f"""# For Nexus repository:
+#   export HATCH_INDEX_USER=your_nexus_username
+#   export HATCH_INDEX_AUTH=your_nexus_password_or_token
+#   export HATCH_INDEX_REPO={publish_url}
+#   hatch publish"""
+                env_example = f"""# Environment variables for Nexus publishing:
+export HATCH_INDEX_USER=your_nexus_username
+export HATCH_INDEX_AUTH=your_nexus_password_or_token
+export HATCH_INDEX_REPO={publish_url}"""
+            else:
+                auth_instructions = f"""# For custom repository:
+#   export HATCH_INDEX_USER=your_username
+#   export HATCH_INDEX_AUTH=your_password_or_token
+#   export HATCH_INDEX_REPO={publish_url}
+#   hatch publish"""
+                env_example = f"""# Environment variables for custom repository publishing:
+export HATCH_INDEX_USER=your_username
+export HATCH_INDEX_AUTH=your_password_or_token
+export HATCH_INDEX_REPO={publish_url}"""
+
+            hatch_config = f"""
+[tool.hatch.publish.index]
+disable = false  # Set to true to disable publishing entirely
+
+# Repository Configuration for {repo_type.title()}
+# Repository URL: {publish_url}
+#
+# IMPORTANT: Set these environment variables for authentication and repository:
+{auth_instructions}
+#
+# Copy and customize these environment variables:
+{env_example}
+#
+# For development containers, add these to your .devcontainer/devcontainer.json:
+# "containerEnv": {{
+#   "HATCH_INDEX_USER": "${{localEnv:HATCH_INDEX_USER}}",
+#   "HATCH_INDEX_AUTH": "${{localEnv:HATCH_INDEX_AUTH}}",
+#   "HATCH_INDEX_REPO": "{publish_url}"
+# }}
+#
+# NOTE: If using install.py, these containerEnv variables are automatically configured!
+#
+# Repository configuration via environment variables (recommended for containers):
+# - HATCH_INDEX_USER: Username for authentication
+# - HATCH_INDEX_AUTH: Password/token for authentication
+# - HATCH_INDEX_REPO: Repository URL (overrides default PyPI)"""
+
+        # Replace the entire [tool.hatch.publish.index] section
+        # First, find and remove any existing hatch publish configuration
+        pattern = r"\[tool\.hatch\.publish\.index\].*?(?=\n\[|\nTODO|\n$|\Z)"
+        content = re.sub(pattern, "", content, flags=re.DOTALL | re.MULTILINE)
+
+        # Also remove any old repos configurations that might exist
+        pattern = r"\[tool\.hatch\.publish\.index\.repos\.[^\]]+\].*?(?=\n\[|\n$|\Z)"
+        content = re.sub(pattern, "", content, flags=re.DOTALL | re.MULTILINE)
+
+        # Remove multiple consecutive blank lines
+        content = re.sub(r"\n\n\n+", "\n\n", content)
+
+        # Find the end of the hatch publish comment section and add our config
+        insertion_point = content.find("# To publish to a specific repository:")
+        if insertion_point != -1:
+            # Find the end of the comment block
+            lines = content[insertion_point:].split("\n")
+            comment_end = insertion_point
+            for i, line in enumerate(lines):
+                if line.startswith("#") or line.strip() == "":
+                    comment_end = insertion_point + len("\n".join(lines[: i + 1]))
+                else:
+                    break
+
+            # Insert our configuration after the comments
+            content = content[:comment_end] + "\n" + hatch_config + "\n" + content[comment_end:]
+        else:
+            # Fallback: add at the end
+            content += "\n" + hatch_config + "\n"
+
+        # Check if hatch publish config already exists and replace it
+        if "[tool.hatch.publish.index]" in content:
+            # Replace existing configuration
+            # Find the start and end of the hatch publish section
+            pattern = r"\[tool\.hatch\.publish\.index\].*?(?=\n\[|$)"
+            content = re.sub(pattern, hatch_config.strip(), content, flags=re.DOTALL)
+        else:
+            # Append new configuration
+            content += "\n" + hatch_config
+
+        # Return the updated content
+        return content
 
     def configure_psi_header(self) -> None:
         """Configure PSI Header extension settings."""
@@ -3667,8 +4957,27 @@ class InstallationScreen(Screen[None]):
 
         console.print("\n[cyan]Next steps:[/cyan]")
         console.print("1. [yellow]Recommended:[/yellow] Set GITHUB_TOKEN environment variable")
-        console.print(f"2. Review settings in {self.config.project_path}/.devcontainer/devcontainer.json")
-        console.print(f"3. Review tool versions in {self.config.project_path}/.mise.toml")
+
+        # Add Python repository configuration instructions if enabled
+        if self.config.install_python_repository:
+            env_file = Path(self.config.project_path) / ".env.example"
+            if env_file.exists():
+                console.print(
+                    "2. [yellow]Python Publishing:[/yellow] Environment variables automatically configured",
+                )
+                console.print(f"   • Review: {env_file}")
+                console.print("   • Set HATCH_INDEX_USER and HATCH_INDEX_AUTH in your local environment")
+                console.print("   • HATCH_INDEX_REPO automatically configured in devcontainer.json")
+                console.print("   • Variables will be passed to dev container on startup")
+                console.print(f"3. Review settings in {self.config.project_path}/.devcontainer/devcontainer.json")
+                console.print(f"4. Review tool versions in {self.config.project_path}/.mise.toml")
+            else:
+                console.print(f"2. Review settings in {self.config.project_path}/.devcontainer/devcontainer.json")
+                console.print(f"3. Review tool versions in {self.config.project_path}/.mise.toml")
+        else:
+            console.print(f"2. Review settings in {self.config.project_path}/.devcontainer/devcontainer.json")
+            console.print(f"3. Review tool versions in {self.config.project_path}/.mise.toml")
+
         console.print(f"\n[blue]You can now run:[/blue] cd {self.config.project_path} && ./dev.sh")
 
         # Exit after showing completion
@@ -3708,6 +5017,8 @@ class DynamicDevContainerApp(App[None]):
         self.sections, self.tool_selected, self.tool_version_value, self.tool_version_configurable = (
             MiseParser.parse_mise_sections(self.source_dir / ".mise.toml")
         )
+
+        logger.debug("DynamicDevContainerApp initialized successfully")
 
     def on_mount(self) -> None:
         """Initialize the screen when mounted."""
@@ -3763,14 +5074,15 @@ class DynamicDevContainerApp(App[None]):
     def after_tool_selection(self, _result: None = None) -> None:
         """Called after tool selection screen."""
 
-        # Version configuration is now handled inline in ToolSelectionScreen
-        # Skip the separate ToolVersionScreen and go directly to PSI Header configuration
+        # Python repository configuration is now handled inline in ToolSelectionScreen
+        # Version configuration is also handled inline in ToolSelectionScreen
+        # Skip the separate screens and go directly to PSI Header configuration
         self.show_psi_header_config()
 
     def after_python_repository(self, _result: None = None) -> None:
         """Called after Python repository configuration."""
-        # Show Python project metadata screen
-        self.push_screen(PythonProjectScreen(self.config), self.after_python_project)
+        # Continue to PSI Header configuration
+        self.show_psi_header_config()
 
     def after_python_project(self, _result: None = None) -> None:
         """Called after Python project metadata configuration."""
@@ -3879,6 +5191,7 @@ are located.
 
     try:
         app = DynamicDevContainerApp(project_path)
+        logger.debug("Application starting - Debug functionality available (Ctrl+D)")
         app.run()
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")
