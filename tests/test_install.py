@@ -46,9 +46,9 @@ class TestProjectConfig:
 
         # Test Python configuration defaults
         assert config.install_python_tools is False
-        assert config.python_publish_url == ""
-        assert config.python_index_url == ""
-        assert config.python_repository_type == ""
+        assert config.python_publish_url == "https://upload.pypi.org/legacy/"
+        assert config.python_index_url == "https://pypi.org/simple/"
+        assert config.python_repository_type == "PyPI"
 
         # Test PSI Header defaults
         assert config.install_psi_header is False
@@ -157,7 +157,7 @@ class TestMiseParser:
         mise_file = mock_source_dir / ".mise.toml"
 
         sections, tool_selected, tool_version_value, tool_version_configurable = MiseParser.parse_mise_sections(
-            mise_file
+            mise_file,
         )
 
         # Check that sections were found
@@ -184,7 +184,7 @@ class TestMiseParser:
         missing_file = temp_dir / "missing.toml"
 
         sections, tool_selected, tool_version_value, tool_version_configurable = MiseParser.parse_mise_sections(
-            missing_file
+            missing_file,
         )
 
         assert sections == []
