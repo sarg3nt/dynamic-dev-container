@@ -14,7 +14,6 @@ import argparse
 import json
 import logging
 import os
-import platform
 import re
 import shutil
 import subprocess
@@ -258,56 +257,6 @@ class ProjectConfig:
         self.install_psi_header: bool = False
         self.psi_header_company: str = ""
         self.psi_header_templates: list[tuple[str, str]] = []
-
-
-class OSDetector:
-    """Utility class for detecting OS and package managers."""
-
-    @staticmethod
-    def detect_os_and_package_manager() -> str:
-        """Detect the OS and return the appropriate package manager."""
-        system = platform.system().lower()
-
-        if system == "darwin" and shutil.which("brew"):
-            return "brew"
-
-        if system != "linux" or not Path("/etc/os-release").exists():
-            return "unknown"
-
-        with open("/etc/os-release") as f:
-            content = f.read().lower()
-
-        # Define package manager priorities for different distributions
-        distro_managers = [
-            (["rocky", "rhel", "centos", "fedora", "almalinux"], ["dnf", "yum"]),
-            (["ubuntu", "debian"], ["apt-get", "apt"]),
-            (["arch", "manjaro"], ["pacman"]),
-            (["opensuse", "sles"], ["zypper"]),
-            (["alpine"], ["apk"]),
-        ]
-
-        for distros, managers in distro_managers:
-            if any(distro in content for distro in distros):
-                for manager in managers:
-                    if shutil.which(manager):
-                        return manager
-
-        return "unknown"
-
-    @staticmethod
-    def get_install_command(package_manager: str, package: str) -> list[str] | None:
-        """Get the install command for a package manager."""
-        commands = {
-            "dnf": ["sudo", "dnf", "install", "-y", package],
-            "yum": ["sudo", "yum", "install", "-y", package],
-            "apt-get": ["sudo", "apt-get", "update", "&&", "sudo", "apt-get", "install", "-y", package],
-            "apt": ["sudo", "apt", "update", "&&", "sudo", "apt", "install", "-y", package],
-            "pacman": ["sudo", "pacman", "-Sy", "--noconfirm", package],
-            "zypper": ["sudo", "zypper", "install", "-y", package],
-            "apk": ["sudo", "apk", "add", package],
-            "brew": ["brew", "install", package],
-        }
-        return commands.get(package_manager)
 
 
 class ToolManager:
@@ -1996,6 +1945,35 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         # Update configuration panel
         self.refresh_configuration()
 
+    def _create_version_buttons(
+        self, tool: str, parent_container: Horizontal, version_limit: int | None = None
+    ) -> None:
+        """Create version buttons for a tool.
+
+        Parameters
+        ----------
+        tool : str
+            The tool name
+        parent_container : Container
+            The container to mount the buttons to
+        version_limit : int | None
+            Maximum number of versions to show, None for all
+
+        """
+        versions = ToolManager.get_version_list(tool)
+        if version_limit:
+            versions = versions[:version_limit]
+
+        for version in versions:
+            # Replace dots with underscores for valid CSS identifiers
+            safe_version = version.replace(".", "_")
+            version_btn = Button(
+                version,
+                id=f"version_btn_{tool}_{safe_version}",
+                classes="version-btn-small",
+            )
+            parent_container.mount(version_btn)
+
     def _refresh_python_repository_settings(self) -> None:
         """Refresh just the Python repository settings in the left column."""
         # Simply refresh the entire tools display, but with better duplicate prevention
@@ -2065,16 +2043,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 python_version_container.mount(Label("python:", classes="compact tool-label"))
 
                 # Version buttons for Python
-                versions = ToolManager.get_version_list("python")
-                for version in versions[:4]:  # Show first 4 versions
-                    # Replace dots with underscores for valid CSS identifiers
-                    safe_version = version.replace(".", "_")
-                    version_btn = Button(
-                        version,
-                        id=f"version_btn_python_{safe_version}",
-                        classes="version-btn-small",
-                    )
-                    python_version_container.mount(version_btn)
+                self._create_version_buttons("python", python_version_container, 4)
 
                 # Version input field
                 version_id = f"version_python_gen_{self._widget_generation}"
@@ -2288,17 +2257,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     tool_version_container.mount(Label(f"{tool}:", classes="compact tool-label"))
 
                     # Version buttons - get available versions for this tool dynamically
-                    versions = ToolManager.get_version_list(tool)
-
-                    for version in versions:
-                        # Replace dots with underscores for valid CSS identifiers
-                        safe_version = version.replace(".", "_")
-                        version_btn = Button(
-                            version,
-                            id=f"version_btn_{tool}_{safe_version}",
-                            classes="version-btn-small",
-                        )
-                        tool_version_container.mount(version_btn)
+                    self._create_version_buttons(tool, tool_version_container)
 
                     # Use generation-based ID to ensure uniqueness
                     version_id = f"version_{tool}_gen_{self._widget_generation}"
