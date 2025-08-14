@@ -1843,6 +1843,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self._widget_generation = 0  # Track widget generation to prevent ID conflicts
         self._active_version_inputs: set[str] = set()  # Track currently active version input IDs
         self._username_propagated = False  # Track if username has been propagated already
+        self._last_focused_input: str = ""  # Track the last focused input for focus loss detection
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
@@ -2458,15 +2459,93 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             self.config.python_project_name = event.value
             # Use call_later to ensure all widgets are mounted before updating
             self.call_later(self._update_package_related_fields, event.value)
+        elif event.input.id == "github_username":
+            # Handle GitHub username changes - update URL fields immediately on focus loss
+            logger.debug("GitHub username input changed to: %s", event.value)
+            self.config.python_github_username = event.value
+            # Update related URL fields immediately when GitHub username changes
+            self.call_later(self._update_github_related_fields, event.value)
         elif event.input.id == "pyproject_homepage":
-            # Handle Homepage URL changes for username propagation (only once)
-            # Use a timer to debounce and only propagate after user stops typing
-            if not self._username_propagated:
-                # Cancel any existing timer
-                if hasattr(self, "_username_timer"):
-                    self._username_timer.stop()
-                # Set a new timer that will fire after 1 second of no typing
-                self._username_timer = self.set_timer(1.0, lambda: self._check_and_propagate_username(event.value))
+            # Handle Homepage URL changes - rely on focus-loss detection for immediate processing
+            # Store the value but don't set timer - let focus loss handle the propagation
+            logger.debug("Homepage URL input changed to: %s", event.value)
+            # The actual username propagation will happen on focus loss via _process_input_on_focus_loss()
+
+    def on_focus(self, event) -> None:
+        """Handle focus events to track input focus changes."""
+        # Track the currently focused input
+        if hasattr(event.widget, "id") and event.widget.id:
+            self._last_focused_input = event.widget.id
+            logger.debug("Input gained focus: %s", event.widget.id)
+
+    def on_descendant_focus(self, event) -> None:
+        """Handle when focus moves to track focus loss from inputs."""
+        # When focus moves from one input to another, process the previous input
+        if hasattr(self, "_last_focused_input") and hasattr(event.widget, "id"):
+            previous_input_id = self._last_focused_input
+            current_input_id = event.widget.id if event.widget.id else None
+
+            # If focus moved from a tracked input to something else, process the previous input
+            if previous_input_id and previous_input_id != current_input_id:
+                self._process_input_on_focus_loss(previous_input_id)
+
+            # Update tracked input
+            if current_input_id:
+                self._last_focused_input = current_input_id
+
+    def _process_input_on_focus_loss(self, input_id: str) -> None:
+        """Process specific inputs when they lose focus.
+
+        Parameters
+        ----------
+        input_id : str
+            The ID of the input that lost focus
+
+        """
+        try:
+            if input_id == "github_username":
+                # Process GitHub username immediately on focus loss
+                github_input = self.query_one("#github_username", Input)
+                github_value = github_input.value.strip()
+                if github_value:
+                    logger.debug("Processing GitHub username on focus loss: %s", github_value)
+                    self.config.python_github_username = github_value
+                    self._update_github_related_fields(github_value)
+
+            elif input_id == "pyproject_homepage":
+                # Process homepage URL immediately on focus loss (instead of timer)
+                if not self._username_propagated:
+                    homepage_input = self.query_one("#pyproject_homepage", Input)
+                    homepage_value = homepage_input.value.strip()
+                    if homepage_value:
+                        logger.debug("Processing homepage URL on focus loss: %s", homepage_value)
+                        # Cancel any existing timer since we're processing immediately
+                        if hasattr(self, "_username_timer"):
+                            self._username_timer.stop()
+                        self._check_and_propagate_username(homepage_value)
+
+        except Exception as e:
+            logger.debug("Error processing input on focus loss (%s): %s", input_id, e)
+
+    def on_key(self, event) -> None:
+        """Handle key events for immediate processing."""
+        # Check if Enter was pressed in Homepage URL field
+        if (
+            event.key == "enter"
+            and hasattr(self, "app")
+            and self.app.focused
+            and hasattr(self.app.focused, "id")
+            and self.app.focused.id == "pyproject_homepage"
+        ):
+            # Process Homepage URL immediately when Enter is pressed
+            try:
+                homepage_input = self.query_one("#pyproject_homepage", Input)
+                homepage_value = homepage_input.value.strip()
+                if homepage_value and not self._username_propagated:
+                    logger.debug("Processing homepage URL on Enter key: %s", homepage_value)
+                    self._check_and_propagate_username(homepage_value)
+            except Exception as e:
+                logger.debug("Error processing homepage URL on Enter: %s", e)
 
     def _check_and_propagate_username(self, homepage_url: str) -> None:
         """Check if homepage URL contains a valid username and propagate it."""
@@ -2644,6 +2723,89 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             package_name_url = package_name.lower().replace("_", "-").replace(" ", "-")
             return f"https://github.com/yourusername/{package_name_url}/README.md"
         return "https://github.com/yourusername/my-awesome-project/README.md"
+
+    def _update_github_related_fields(self, github_username: str) -> None:
+        """Update URL fields when GitHub username changes.
+
+        Parameters
+        ----------
+        github_username : str
+            The new GitHub username
+
+        """
+        if not github_username or github_username.strip() == "":
+            logger.debug("GitHub username is empty, skipping URL updates")
+            return
+
+        username = github_username.strip()
+        logger.debug("Updating URL fields for GitHub username: %s", username)
+
+        try:
+            # Get the current project name for URL construction
+            project_name = self.config.python_project_name
+            if not project_name or project_name == "my-awesome-project":
+                project_name = "my-awesome-project"  # Fallback
+
+            # Clean project name for URL
+            project_name_url = project_name.lower().replace("_", "-").replace(" ", "-")
+
+            # Get URL input fields
+            try:
+                homepage_input = self.query_one("#pyproject_homepage", Input)
+            except NoMatches:
+                homepage_input = None
+
+            try:
+                source_input = self.query_one("#pyproject_source", Input)
+            except NoMatches:
+                source_input = None
+
+            try:
+                documentation_input = self.query_one("#pyproject_documentation", Input)
+            except NoMatches:
+                documentation_input = None
+
+            # Update Homepage URL if it still has default/template values
+            if homepage_input:
+                current_homepage = homepage_input.value
+                if (
+                    not current_homepage.strip()
+                    or "yourusername" in current_homepage
+                    or current_homepage == "https://github.com/yourusername/my-awesome-project"
+                    or current_homepage.startswith("https://github.com/yourusername/")
+                ):
+                    new_homepage = f"https://github.com/{username}/{project_name_url}"
+                    homepage_input.value = new_homepage
+                    logger.debug("Updated homepage URL to: %s", new_homepage)
+
+            # Update Source URL if it still has default/template values
+            if source_input:
+                current_source = source_input.value
+                if (
+                    not current_source.strip()
+                    or "yourusername" in current_source
+                    or current_source == "https://github.com/yourusername/my-awesome-project"
+                    or current_source.startswith("https://github.com/yourusername/")
+                ):
+                    new_source = f"https://github.com/{username}/{project_name_url}"
+                    source_input.value = new_source
+                    logger.debug("Updated source URL to: %s", new_source)
+
+            # Update Documentation URL if it still has default/template values
+            if documentation_input:
+                current_docs = documentation_input.value
+                if (
+                    not current_docs.strip()
+                    or "yourusername" in current_docs
+                    or current_docs == "https://github.com/yourusername/my-awesome-project/README.md"
+                    or current_docs.startswith("https://github.com/yourusername/")
+                ):
+                    new_docs = f"https://github.com/{username}/{project_name_url}/README.md"
+                    documentation_input.value = new_docs
+                    logger.debug("Updated documentation URL to: %s", new_docs)
+
+        except Exception as e:
+            logger.debug("Error updating GitHub-related fields: %s", e)
 
     def _extract_username_from_url(self, url: str) -> str:
         """Extract username from a GitHub URL.
