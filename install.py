@@ -1496,8 +1496,10 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
 
     def action_back(self) -> None:
         """Go to previous step."""
-        """Go back to previous screen."""
+        """Go back to tool selection screen."""
+        # Navigate back to tool selection screen
         self.app.pop_screen()
+        self.app.show_tool_selection()  # type: ignore[attr-defined]
 
     def action_toggle_debug(self) -> None:
         """Toggle debug mode."""
@@ -1946,7 +1948,10 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self.refresh_configuration()
 
     def _create_version_buttons(
-        self, tool: str, parent_container: Horizontal, version_limit: int | None = None
+        self,
+        tool: str,
+        parent_container: Horizontal,
+        version_limit: int | None = None,
     ) -> None:
         """Create version buttons for a tool.
 
@@ -3199,19 +3204,10 @@ class SummaryScreen(Screen[None], DebugMixin):
 
     def action_back(self) -> None:
         """Go to previous step."""
-        """Go back to previous screen."""
-        # Access the main app's parsed data for ToolSelectionScreen
-
-        app = cast("DynamicDevContainerApp", self.app)
-        self.app.push_screen(
-            ToolSelectionScreen(
-                self.config,
-                app.sections,
-                app.tool_selected,
-                app.tool_version_configurable,
-                app.tool_version_value,
-            ),
-        )
+        """Go back to PSI Header configuration screen."""
+        # Navigate back to PSI Header configuration screen
+        self.app.pop_screen()
+        self.app.show_psi_header_config()  # type: ignore[attr-defined]
 
     def action_toggle_debug(self) -> None:
         """Toggle debug mode."""
