@@ -1865,6 +1865,11 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     ),
                     id="main-layout",
                 ),
+                # Section navigation links
+                Horizontal(
+                    id="section-links",
+                    classes="compact-group",
+                ),
                 Horizontal(
                     Button("Back", id="back_btn"),
                     Button("Previous Section", id="prev_btn", disabled=self.current_section == 0),
@@ -1889,8 +1894,15 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
     def on_mount(self) -> None:
         """Initialize the screen when mounted."""
         """Called when the screen is mounted."""
+        print("=== DEBUG: ToolSelectionScreen.on_mount() called ===")
+        print(f"Sections: {self.sections}")
         logger.debug("ToolSelectionScreen mounted - Debug functionality available (Ctrl+D)")
+
         self.refresh_tools()
+        # Initialize section navigation links
+        print("About to call refresh_section_links()")
+        self.refresh_section_links()
+        print("Called refresh_section_links()")
         # Set up a timer to periodically update debug output
         self.set_interval(1.0, self.update_debug_output)
 
@@ -1997,6 +2009,143 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 classes="version-btn-small",
             )
             parent_container.mount(version_btn)
+
+    def _create_section_links(self) -> list[Button]:
+        """Create section navigation links styled like version buttons.
+
+        Returns
+        -------
+        list[Button]
+            List of section link buttons
+
+        """
+        logger.debug("=== CREATE SECTION LINKS DEBUG START ===")
+        logger.debug("Creating section links for %d sections: %s", len(self.sections), self.sections)
+        logger.debug("=== BUTTON TEXT DEBUG: Creating %d section buttons ===", len(self.sections))
+        section_links = []
+
+        for i, section in enumerate(self.sections):
+            # Create a display name for the section (capitalize and format nicely)
+            display_name = section.replace("_", " ").replace("-", " ").title()
+            logger.debug("Creating button %d: section='%s', display='%s'", i, section, display_name)
+
+            # Create button with version-btn-small styling (like version buttons)
+            if i == self.current_section:
+                # Current section - make it look selected/active
+                button_text = f"[bold]{display_name}[/bold]"
+                section_btn = Button(
+                    button_text,
+                    id=f"section_link_{i}",
+                    classes="version-btn-small",
+                    disabled=True,  # Make current section non-clickable
+                )
+                logger.debug(
+                    "BUTTON %d: CURRENT - Text='%s' ID='%s' Disabled=True",
+                    i,
+                    button_text,
+                    f"section_link_{i}",
+                )
+                logger.debug("Created CURRENT section button: %s (disabled)", section_btn.id)
+            else:
+                section_btn = Button(
+                    display_name,
+                    id=f"section_link_{i}",
+                    classes="version-btn-small",
+                )
+                logger.debug(
+                    "BUTTON %d: REGULAR - Text='%s' ID='%s' Disabled=False",
+                    i,
+                    display_name,
+                    f"section_link_{i}",
+                )
+                logger.debug("Created regular section button: %s", section_btn.id)
+
+            # Debug button properties
+            logger.debug(
+                "BUTTON %d PROPS: label='%s', classes=%s, disabled=%s",
+                i,
+                section_btn.label,
+                section_btn.classes,
+                section_btn.disabled,
+            )
+            section_links.append(section_btn)
+
+        logger.debug("Created %d section buttons total", len(section_links))
+        print(f"=== BUTTON TEXT DEBUG: Created {len(section_links)} total buttons ===")
+        logger.debug("=== CREATE SECTION LINKS DEBUG END ===")
+        return section_links
+
+    def refresh_section_links(self) -> None:
+        """Refresh the section navigation links to reflect current section."""
+        try:
+            logger.debug("=== SECTION LINKS DEBUG START ===")
+            logger.debug("Refreshing section links. Sections: %s, Current: %s", self.sections, self.current_section)
+
+            # Get the section links container
+            section_links_container = self.query_one("#section-links", Horizontal)
+            logger.debug("Found section-links container: %s", section_links_container)
+
+            # Check if we already have buttons - if not, create them once
+            existing_buttons = section_links_container.query("Button")
+            logger.debug("Found %d existing buttons", len(existing_buttons))
+
+            if len(existing_buttons) == 0:
+                logger.debug("No existing buttons found, creating initial set")
+
+                # Add the label only once
+                sections_label = Label("Sections:", classes="sections-links-label")
+                section_links_container.mount(sections_label)
+                logger.debug("Mounted sections label")
+
+                # Create and mount section links once
+                section_links = self._create_section_links()
+                logger.debug("Created %d section links", len(section_links))
+
+                for i, section_btn in enumerate(section_links):
+                    logger.debug("About to mount section button %d: %s", i, section_btn.label)
+                    section_links_container.mount(section_btn)
+                    logger.debug("Successfully mounted section button %d", i)
+            else:
+                logger.debug("Buttons already exist, just updating their disabled state")
+                # Get the current section name from the index and transform it the same way as button labels
+                current_section_raw = self.sections[self.current_section]
+                current_section_name = current_section_raw.replace("_", " ").replace("-", " ").title()
+                logger.debug(
+                    "Current section name: %s (raw: %s, index: %d)",
+                    current_section_name,
+                    current_section_raw,
+                    self.current_section,
+                )
+
+                # Update existing buttons' disabled state
+                for button in existing_buttons:
+                    if hasattr(button, "label") and hasattr(button.label, "plain"):
+                        section_name = button.label.plain
+                        if section_name == current_section_name:
+                            button.disabled = True
+                            logger.debug("Disabled button for current section: %s", section_name)
+                        else:
+                            button.disabled = False
+                            logger.debug("Enabled button for section: %s", section_name)
+
+            logger.debug("Final container children count: %d", len(list(section_links_container.children)))
+            logger.debug(
+                "Final container children IDs: %s",
+                [getattr(child, "id", None) for child in section_links_container.children],
+            )
+
+            # Force a screen refresh to make sure everything is visible
+            self.refresh()
+            print("Forced screen refresh")
+            logger.debug("Forced screen refresh")
+
+            logger.debug("=== SECTION LINKS DEBUG END ===")
+
+        except Exception as e:
+            print(f"ERROR in refresh_section_links: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
+            logger.debug("Failed to refresh section links: %s", e)
+            logger.debug("Traceback: %s", traceback.format_exc())
 
     def _refresh_python_repository_settings(self) -> None:
         """Refresh just the Python repository settings in the left column."""
@@ -2868,6 +3017,21 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     logger.debug("Version input widget '%s' not found for tool '%s': %s", version_id, tool, e)
             return
 
+        # Handle section link clicks
+        if button_id.startswith("section_link_"):
+            # Extract section index from button ID: "section_link_{index}"
+            try:
+                section_index = int(button_id.split("_")[-1])
+                if 0 <= section_index < len(self.sections) and section_index != self.current_section:
+                    self.save_current_section()
+                    self.current_section = section_index
+                    self.refresh_controls()
+                    self.refresh_tools()
+                    self.refresh_section_links()
+            except (ValueError, IndexError) as e:
+                logger.debug("Invalid section link button ID '%s': %s", button_id, e)
+            return
+
         if button_id == "back_btn":
             self.action_back()
         elif button_id == "prev_btn":
@@ -2896,7 +3060,9 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
         # Update title and subtitle
         title_label = self.query_one("Label", Label)
-        title_label.update(f"Development Tools - {self.sections[self.current_section]}")
+        title_label.update(
+            f"Development Tools - {self.sections[self.current_section]} - Section {self.current_section + 1} of {len(self.sections)}",
+        )
 
         # Update subtitle showing section progress
         try:
@@ -2904,6 +3070,9 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             subtitle_label.update(f"Section {self.current_section + 1} of {len(self.sections)}")
         except Exception as e:
             logger.debug("Subtitle label not found during section update: %s", e)
+
+        # Refresh section links to show current selection
+        self.refresh_section_links()
 
     def save_current_section(self) -> None:
         """Save selections for current section."""
