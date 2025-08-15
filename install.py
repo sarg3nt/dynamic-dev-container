@@ -37,7 +37,11 @@ DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
 
 # HTTP status codes
 HTTP_OK = 200
+HTTP_UNAUTHORIZED = 401
 HTTP_FORBIDDEN = 403  # Rate limit exceeded
+
+# GitHub token validation constants
+MIN_VALID_TOKEN_RATE_LIMIT = 1000  # Minimum rate limit for valid token
 
 # Repository format constants
 REPO_PARTS_COUNT = 2  # Expected number of parts in owner/repo format
@@ -410,6 +414,10 @@ class ToolManager:
     _description_cache: dict[str, str] = {}
     _repo_verification_cache: dict[str, bool] = {}
 
+    # GitHub token validation cache
+    _token_tested: bool = False
+    _token_valid: bool = False
+
     # Background loading system
     _background_loader: BackgroundDescriptionLoader | None = None
     _loading_started = False
@@ -454,9 +462,24 @@ class ToolManager:
         # Add GitHub token if available for better rate limiting
         github_token = os.getenv("GITHUB_TOKEN")
         if github_token:
+            # Test token access on first use (cache result)
+            if not ToolManager._token_tested:
+                has_access, message = ToolManager._test_github_token_access()
+                ToolManager._token_tested = True
+                ToolManager._token_valid = has_access
+
+                if DEBUG_MODE:
+                    if has_access:
+                        logger.debug("GitHub token validated: %s", message)
+                    else:
+                        logger.debug("GitHub token validation failed: %s", message)
+
+            # Always add the token (even if validation failed, let GitHub decide)
             request.add_header("Authorization", f"token {github_token}")
-            if DEBUG_MODE:
-                logger.debug("Using GitHub token for API request: %s", url)
+            if DEBUG_MODE and ToolManager._token_valid:
+                logger.debug("Using validated GitHub token for API request: %s", url)
+            elif DEBUG_MODE:
+                logger.debug("Using unvalidated GitHub token for API request: %s", url)
         elif DEBUG_MODE:
             logger.debug("No GitHub token found, using unauthenticated API request: %s", url)
 
@@ -464,6 +487,54 @@ class ToolManager:
         request.add_header("User-Agent", "dynamic-dev-container-installer/1.0")
 
         return request
+
+    @staticmethod
+    def _test_github_token_access() -> tuple[bool, str]:
+        """Test if the GitHub token has sufficient access for our needs.
+
+        Returns
+        -------
+        tuple[bool, str]
+            (has_access, message) indicating if token works and descriptive message
+
+        """
+        github_token = os.getenv("GITHUB_TOKEN")
+        if not github_token:
+            return False, "No GITHUB_TOKEN environment variable found"
+
+        try:
+            # Test rate limit endpoint to validate token
+            url = "https://api.github.com/rate_limit"
+            request = urllib.request.Request(url)  # noqa: S310
+            request.add_header("Authorization", f"token {github_token}")
+            request.add_header("User-Agent", "dynamic-dev-container-installer/1.0")
+
+            with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310
+                if response.status != HTTP_OK:
+                    return False, f"GitHub API returned status {response.status}"
+
+                data = json.loads(response.read().decode())
+                core_limit = data.get("rate", {}).get("limit", 0)
+                remaining = data.get("rate", {}).get("remaining", 0)
+
+                # Validate token by checking rate limits
+                if core_limit < MIN_VALID_TOKEN_RATE_LIMIT:
+                    return False, f"Token appears invalid - rate limit: {core_limit}/hour (expected 5000+)"
+
+                if DEBUG_MODE:
+                    logger.debug("GitHub token validation: %d/%d requests remaining", remaining, core_limit)
+
+                return True, f"Valid token with {core_limit} requests/hour ({remaining} remaining)"
+
+        except urllib.error.HTTPError as e:
+            error_messages = {
+                HTTP_UNAUTHORIZED: "GitHub token is invalid or expired",
+                HTTP_FORBIDDEN: "GitHub token lacks necessary permissions",
+            }
+            message = error_messages.get(e.code, f"GitHub API error: HTTP {e.code}")
+            return False, message
+        except Exception as e:
+            return False, f"GitHub token test failed: {e}"
 
     @staticmethod
     def detect_container_runtime() -> tuple[str, str] | None:
