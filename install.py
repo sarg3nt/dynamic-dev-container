@@ -23,6 +23,7 @@ import threading
 import time
 import traceback
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
@@ -38,6 +39,9 @@ HTTP_OK = 200
 
 # Repository format constants
 REPO_PARTS_COUNT = 2  # Expected number of parts in owner/repo format
+
+# Parallel processing configuration
+DEFAULT_WORKER_COUNT = 8  # Optimal for I/O-bound API calls (GitHub, Homebrew, etc.)
 
 
 # Define a protocol for our app interface
@@ -273,43 +277,58 @@ class ProjectConfig:
 class BackgroundDescriptionLoader(threading.Thread):
     """Background thread for loading tool descriptions."""
 
-    def __init__(self, tools: list[str]) -> None:
+    def __init__(self, tools: list[str], max_workers: int = DEFAULT_WORKER_COUNT) -> None:
         """Initialize the background loader.
 
         Parameters
         ----------
         tools : list[str]
             List of tool names to load descriptions for
+        max_workers : int, optional
+            Maximum number of parallel worker threads, by default 5
 
         """
         super().__init__(daemon=True)
         self.tools = tools
+        self.max_workers = max_workers
         self.completed = 0
         self.total = len(tools)
         self.start_time = 0.0
         self.end_time = 0.0
         self._complete = False
         self._completion_event = threading.Event()
+        self._lock = threading.Lock()  # For thread-safe counter updates
 
     def run(self) -> None:
-        """Run the background loading process."""
+        """Run the background loading process with parallel workers."""
         self.start_time = time.time()
 
         if DEBUG_MODE:
-            logger.debug("Background description loading started for %d tools", self.total)
+            logger.debug(
+                "Background description loading started for %d tools with %d workers",
+                self.total,
+                self.max_workers,
+            )
 
-        for tool in self.tools:
-            try:
-                # Import here to avoid circular imports - we know ToolManager exists by this point
-                # This will cache the description in ToolManager._description_cache
-                description = self._load_tool_description(tool)
-                if DEBUG_MODE and description:
-                    logger.debug("Loaded description for %s: %s", tool, description[:50] + "...")
-            except Exception as e:
-                if DEBUG_MODE:
-                    logger.debug("Failed to load description for %s: %s", tool, e)
+        # Use ThreadPoolExecutor for parallel processing
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # Submit all tasks
+            future_to_tool = {executor.submit(self._load_tool_description, tool): tool for tool in self.tools}
 
-            self.completed += 1
+            # Process completed tasks as they finish
+            for future in as_completed(future_to_tool):
+                tool = future_to_tool[future]
+                try:
+                    description = future.result()
+                    if DEBUG_MODE and description:
+                        logger.debug("Loaded description for %s: %s", tool, description[:50] + "...")
+                except Exception as e:
+                    if DEBUG_MODE:
+                        logger.debug("Failed to load description for %s: %s", tool, e)
+
+                # Thread-safe counter update
+                with self._lock:
+                    self.completed += 1
 
         self.end_time = time.time()
         self._complete = True
@@ -389,10 +408,10 @@ class ToolManager:
     _loading_started = False
 
     @classmethod
-    def start_background_loading(cls, all_tools: list[str]) -> None:
+    def start_background_loading(cls, all_tools: list[str], max_workers: int = DEFAULT_WORKER_COUNT) -> None:
         """Start background loading of tool descriptions."""
         if not cls._loading_started:
-            cls._background_loader = BackgroundDescriptionLoader(all_tools)
+            cls._background_loader = BackgroundDescriptionLoader(all_tools, max_workers=max_workers)
             cls._background_loader.start()
             cls._loading_started = True
 
@@ -5920,8 +5939,8 @@ class DynamicDevContainerApp(App[None]):
         if DEBUG_MODE:
             logger.debug("Starting background loading for %d tools: %s", len(tool_list), ", ".join(tool_list))
 
-        # Start the background loading
-        ToolManager.start_background_loading(tool_list)
+        # Start the background loading with parallel processing
+        ToolManager.start_background_loading(tool_list, max_workers=DEFAULT_WORKER_COUNT)
 
     def on_mount(self) -> None:
         """Initialize the screen when mounted."""
