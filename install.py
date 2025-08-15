@@ -19,6 +19,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import traceback
 import urllib.request
 from datetime import UTC, datetime
@@ -191,11 +193,13 @@ try:
         Header,
         Input,
         Label,
+        LoadingIndicator,
         Markdown,
         ProgressBar,
         RadioButton,
         RadioSet,
         RichLog,
+        Static,
     )
 except ImportError as e:
     print(f"Error importing required packages: {e}")
@@ -266,12 +270,150 @@ class ProjectConfig:
         self.psi_header_templates: list[tuple[str, str]] = []
 
 
+class BackgroundDescriptionLoader(threading.Thread):
+    """Background thread for loading tool descriptions."""
+
+    def __init__(self, tools: list[str]) -> None:
+        """Initialize the background loader.
+
+        Parameters
+        ----------
+        tools : list[str]
+            List of tool names to load descriptions for
+
+        """
+        super().__init__(daemon=True)
+        self.tools = tools
+        self.completed = 0
+        self.total = len(tools)
+        self.start_time = 0.0
+        self.end_time = 0.0
+        self._complete = False
+        self._completion_event = threading.Event()
+
+    def run(self) -> None:
+        """Run the background loading process."""
+        self.start_time = time.time()
+
+        if DEBUG_MODE:
+            logger.debug("Background description loading started for %d tools", self.total)
+
+        for tool in self.tools:
+            try:
+                # Import here to avoid circular imports - we know ToolManager exists by this point
+                # This will cache the description in ToolManager._description_cache
+                description = self._load_tool_description(tool)
+                if DEBUG_MODE and description:
+                    logger.debug("Loaded description for %s: %s", tool, description[:50] + "...")
+            except Exception as e:
+                if DEBUG_MODE:
+                    logger.debug("Failed to load description for %s: %s", tool, e)
+
+            self.completed += 1
+
+        self.end_time = time.time()
+        self._complete = True
+        self._completion_event.set()
+
+        total_time = self.end_time - self.start_time
+        if DEBUG_MODE:
+            logger.debug(
+                "Background description loading completed in %.2f seconds (%d/%d tools)",
+                total_time,
+                self.completed,
+                self.total,
+            )
+
+    def _load_tool_description(self, tool: str) -> str | None:
+        """Load description for a single tool (internal method to avoid circular imports)."""
+        # Check cache first
+        if tool in ToolManager._description_cache:
+            return ToolManager._description_cache[tool]
+
+        # Try different sources for getting descriptions
+        description = None
+
+        # 1. Try GitHub API (works for many tools)
+        description = ToolManager._get_github_description(tool)
+
+        # 2. Try Homebrew API (for macOS/Linux tools)
+        if not description:
+            description = ToolManager._get_homebrew_description(tool)
+
+        # 3. Try package.json for Node.js tools
+        if not description and tool in ["node", "npm", "yarn", "pnpm", "bun", "deno"]:
+            description = ToolManager._get_nodejs_description(tool)
+
+        # 4. Fall back to manual mapping for tools we know about
+        if not description:
+            description = ToolManager._get_fallback_description(tool)
+
+        # Use the tool name if no description found
+        if not description:
+            description = f"{tool} - Development tool"
+
+        # Cache the result
+        ToolManager._description_cache[tool] = description
+        return description
+
+    def is_complete(self) -> bool:
+        """Check if loading is complete."""
+        return self._complete
+
+    def get_progress(self) -> tuple[int, int]:
+        """Get loading progress (completed, total)."""
+        return self.completed, self.total
+
+    def wait_for_completion(self, timeout: float = 30.0) -> bool:
+        """Wait for loading to complete with timeout."""
+        return self._completion_event.wait(timeout)
+
+    def get_elapsed_time(self) -> float:
+        """Get elapsed time since loading started."""
+        if self.start_time == 0:
+            return 0.0
+        if self._complete:
+            return self.end_time - self.start_time
+        return time.time() - self.start_time
+
+
 class ToolManager:
     """Manages development tools and their versions."""
 
     # Class-level cache for tool descriptions and repository verification
     _description_cache: dict[str, str] = {}
     _repo_verification_cache: dict[str, bool] = {}
+
+    # Background loading system
+    _background_loader: BackgroundDescriptionLoader | None = None
+    _loading_started = False
+
+    @classmethod
+    def start_background_loading(cls, all_tools: list[str]) -> None:
+        """Start background loading of tool descriptions."""
+        if not cls._loading_started:
+            cls._background_loader = BackgroundDescriptionLoader(all_tools)
+            cls._background_loader.start()
+            cls._loading_started = True
+
+    @classmethod
+    def is_loading_complete(cls) -> bool:
+        """Check if background loading is complete."""
+        return cls._background_loader is not None and cls._background_loader.is_complete()
+
+    @classmethod
+    def get_loading_progress(cls) -> tuple[int, int]:
+        """Get loading progress (completed, total)."""
+        if cls._background_loader is None:
+            return 0, 0
+        return cls._background_loader.get_progress()
+
+    @classmethod
+    def wait_for_loading_complete(cls, timeout: float = 30.0) -> bool:
+        """Wait for background loading to complete with timeout."""
+        if cls._background_loader is None:
+            return True
+        return cls._background_loader.wait_for_completion(timeout)
 
     @staticmethod
     def detect_container_runtime() -> tuple[str, str] | None:
@@ -2192,6 +2334,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self._active_version_inputs: set[str] = set()  # Track currently active version input IDs
         self._username_propagated = False  # Track if username has been propagated already
         self._last_focused_input: str = ""  # Track the last focused input for focus loss detection
+        self._loading_timer = None  # Store reference to loading check timer
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
@@ -2267,6 +2410,56 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         print(f"Sections: {self.sections}")
         logger.debug("ToolSelectionScreen mounted - Debug functionality available (Ctrl+D)")
 
+        # Check if background loading is complete
+        if not ToolManager.is_loading_complete():
+            self._show_loading_screen()
+        else:
+            self._show_tools_screen()
+
+    def _show_loading_screen(self) -> None:
+        """Show loading screen while background description loading completes."""
+        # Clear existing content
+        tools_container = self.query_one("#tools-scroll", ScrollableContainer)
+        tools_container.remove_children()
+
+        # Show loading indicator
+        completed, total = ToolManager.get_loading_progress()
+        loading_text = f"Loading tool descriptions... ({completed}/{total})"
+
+        tools_container.mount(
+            Static(loading_text, id="loading-text"),
+            LoadingIndicator(id="loading-spinner"),
+        )
+
+        # Set up a timer to check for completion
+        self._loading_timer = self.set_interval(0.5, self._check_loading_complete)
+
+        if DEBUG_MODE:
+            logger.debug("Showing loading screen for tool descriptions")
+
+    def _check_loading_complete(self) -> None:
+        """Check if loading is complete and update display."""
+        if ToolManager.is_loading_complete():
+            # Loading complete, show the tools
+            self._show_tools_screen()
+            # Stop the checking timer
+            if self._loading_timer is not None:
+                self._loading_timer.stop()
+                self._loading_timer = None
+        else:
+            # Update progress
+            completed, total = ToolManager.get_loading_progress()
+            loading_text = f"Loading tool descriptions... ({completed}/{total})"
+
+            try:
+                loading_text_widget = self.query_one("#loading-text", Static)
+                loading_text_widget.update(loading_text)
+            except Exception:
+                # Widget might not exist anymore, ignore
+                pass
+
+    def _show_tools_screen(self) -> None:
+        """Show the actual tools screen after loading is complete."""
         self.refresh_tools()
         # Initialize section navigation links
         print("About to call refresh_section_links()")
@@ -2274,6 +2467,12 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         print("Called refresh_section_links()")
         # Set up a timer to periodically update debug output
         self.set_interval(1.0, self.update_debug_output)
+
+    def on_unmount(self) -> None:
+        """Clean up when screen is unmounted."""
+        if self._loading_timer is not None:
+            self._loading_timer.stop()
+            self._loading_timer = None
 
     def refresh_tools(self) -> None:
         """Refresh the tools display for current section."""
@@ -5701,7 +5900,28 @@ class DynamicDevContainerApp(App[None]):
             MiseParser.parse_mise_sections(self.source_dir / ".mise.toml")
         )
 
+        # Start background loading of tool descriptions
+        self._start_background_description_loading()
+
         logger.debug("DynamicDevContainerApp initialized successfully")
+
+    def _start_background_description_loading(self) -> None:
+        """Start background loading of tool descriptions for all available tools."""
+        all_tools = set()
+
+        # Collect all tools from all sections
+        for section in self.sections:
+            tools_in_section = MiseParser.get_section_tools(self.source_dir / ".mise.toml", section)
+            all_tools.update(tools_in_section)
+
+        # Convert to sorted list for consistent ordering
+        tool_list = sorted(all_tools)
+
+        if DEBUG_MODE:
+            logger.debug("Starting background loading for %d tools: %s", len(tool_list), ", ".join(tool_list))
+
+        # Start the background loading
+        ToolManager.start_background_loading(tool_list)
 
     def on_mount(self) -> None:
         """Initialize the screen when mounted."""
