@@ -1285,31 +1285,13 @@ class DevContainerParser:
                 break
 
             if in_psi_templates and '"language":' in stripped_line:
-                # Look for language entries
-                # Extract language ID (e.g., "python", "javascript")
+                # Extract language ID from the templates section
                 match = re.search(r'"language":\s*"([^"]+)"', stripped_line)
                 if match:
                     lang_id = match.group(1)
-                    # Convert to display name
-                    display_names = {
-                        "python": "Python (.py)",
-                        "javascript": "JavaScript (.js)",
-                        "typescript": "TypeScript (.ts)",
-                        "go": "Go (.go)",
-                        "shellscript": "Shell (.sh)",
-                        "powershell": "PowerShell (.ps1)",
-                        "csharp": "C# (.cs)",
-                        "terraform": "Terraform (.tf)",
-                        "yaml": "YAML (.yml)",
-                        "json": "JSON (.json)",
-                        "markdown": "Markdown (.md)",
-                        "dockerfile": "Dockerfile",
-                        "env": "Environment (.env)",
-                        "*": "Default (all languages)",
-                    }
-                    display_name = display_names.get(lang_id, f"{lang_id.title()} (.{lang_id})")
-                    if lang_id != "*":  # Skip wildcard for selection list
-                        languages.append((lang_id, display_name))
+                    # Skip wildcard language for selection list
+                    if lang_id != "*":
+                        languages.append((lang_id, lang_id))
 
         return languages
 
