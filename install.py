@@ -442,6 +442,30 @@ class ToolManager:
         return cls._background_loader.wait_for_completion(timeout)
 
     @staticmethod
+    def _make_github_api_request(url: str) -> urllib.request.Request:
+        """Create a GitHub API request with authentication if token is available."""
+        # Validate URL scheme for security
+        if not url.startswith(("http:", "https:")):
+            msg = "URL must start with 'http:' or 'https:'"
+            raise ValueError(msg)
+
+        request = urllib.request.Request(url)  # noqa: S310
+
+        # Add GitHub token if available for better rate limiting
+        github_token = os.getenv("GITHUB_TOKEN")
+        if github_token:
+            request.add_header("Authorization", f"token {github_token}")
+            if DEBUG_MODE:
+                logger.debug("Using GitHub token for API request: %s", url)
+        elif DEBUG_MODE:
+            logger.debug("No GitHub token found, using unauthenticated API request: %s", url)
+
+        # Add User-Agent header (required by GitHub API)
+        request.add_header("User-Agent", "dynamic-dev-container-installer/1.0")
+
+        return request
+
+    @staticmethod
     def detect_container_runtime() -> tuple[str, str] | None:
         """Detect available container runtime."""
 
@@ -657,14 +681,13 @@ class ToolManager:
         if repo:
             try:
                 url = f"https://api.github.com/repos/{repo}"
-                # Validate URL scheme for security
-                if url.startswith(("http:", "https:")):
-                    with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310
-                        if response.status == HTTP_OK:
-                            data = json.loads(response.read().decode())
-                            desc = data.get("description", "").strip()
-                            if desc:
-                                result = f"{tool} - {desc}"
+                request = ToolManager._make_github_api_request(url)
+                with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310
+                    if response.status == HTTP_OK:
+                        data = json.loads(response.read().decode())
+                        desc = data.get("description", "").strip()
+                        if desc:
+                            result = f"{tool} - {desc}"
             except urllib.error.HTTPError as e:
                 if e.code == HTTP_FORBIDDEN and DEBUG_MODE:  # Rate limit exceeded
                     logger.debug("GitHub API rate limit exceeded for %s", tool)
@@ -750,52 +773,54 @@ class ToolManager:
             for query in search_queries:
                 url = f"https://api.github.com/search/repositories?q={query}&sort=stars&order=desc&per_page=10"
 
-                if not url.startswith(("http:", "https:")):
-                    continue
+                try:
+                    request = ToolManager._make_github_api_request(url)
+                    with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310
+                        if response.status == HTTP_OK:
+                            data = json.loads(response.read().decode())
+                            items = data.get("items", [])
 
-                with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310
-                    if response.status == HTTP_OK:
-                        data = json.loads(response.read().decode())
-                        items = data.get("items", [])
+                            for item in items:
+                                repo_name = str(item.get("name", "")).lower()
+                                full_name = str(item.get("full_name", ""))
+                                description = str(item.get("description", "")).lower()
+                                stars = item.get("stargazers_count", 0)
 
-                        for item in items:
-                            repo_name = str(item.get("name", "")).lower()
-                            full_name = str(item.get("full_name", ""))
-                            description = str(item.get("description", "")).lower()
-                            stars = item.get("stargazers_count", 0)
+                                # High priority: exact name match with high stars (likely official)
+                                if repo_name == tool and stars > MIN_STARS_OFFICIAL_REPO:
+                                    return full_name
 
-                            # High priority: exact name match with high stars (likely official)
-                            if repo_name == tool and stars > MIN_STARS_OFFICIAL_REPO:
-                                return full_name
+                                # Medium-high priority: exact name match regardless of stars
+                                if repo_name == tool:
+                                    return full_name
 
-                            # Medium-high priority: exact name match regardless of stars
-                            if repo_name == tool:
-                                return full_name
+                                # Medium priority: tool appears in repo name and matches patterns
+                                if (
+                                    tool in repo_name
+                                    and not repo_name.startswith("node-")
+                                    and (
+                                        repo_name in {f"{tool}-cli", f"{tool}tool"}
+                                        or repo_name.endswith(f"-{tool}")
+                                        or repo_name.startswith(f"{tool}-")
+                                    )
+                                    and stars > MIN_STARS_PATTERN_MATCH  # Add star requirement for pattern matches
+                                ):
+                                    return full_name
 
-                            # Medium priority: tool appears in repo name and matches patterns
-                            if (
-                                tool in repo_name
-                                and not repo_name.startswith("node-")
-                                and (
-                                    repo_name in {f"{tool}-cli", f"{tool}tool"}
-                                    or repo_name.endswith(f"-{tool}")
-                                    or repo_name.startswith(f"{tool}-")
-                                )
-                                and stars > MIN_STARS_PATTERN_MATCH  # Add star requirement for pattern matches
-                            ):
-                                return full_name
-
-                            # Lower priority: tool mentioned prominently in description with good stars
-                            if (
-                                tool in description
-                                and stars > MIN_STARS_DESCRIPTION_MATCH
-                                and (
-                                    f"official {tool}" in description
-                                    or f"{tool} is a" in description
-                                    or description.startswith(tool)
-                                )
-                            ):
-                                return full_name
+                                # Lower priority: tool mentioned prominently in description with good stars
+                                if (
+                                    tool in description
+                                    and stars > MIN_STARS_DESCRIPTION_MATCH
+                                    and (
+                                        f"official {tool}" in description
+                                        or f"{tool} is a" in description
+                                        or description.startswith(tool)
+                                    )
+                                ):
+                                    return full_name
+                except Exception as e:
+                    if DEBUG_MODE:
+                        logger.debug("GitHub search failed for %s: %s", tool, e)
 
         except Exception as e:
             if DEBUG_MODE:
@@ -919,10 +944,8 @@ class ToolManager:
         """Verify that a GitHub repository exists."""
         try:
             url = f"https://api.github.com/repos/{repo}"
-            if not url.startswith(("http:", "https:")):
-                return False
-
-            with urllib.request.urlopen(url, timeout=3) as response:  # noqa: S310
+            request = ToolManager._make_github_api_request(url)
+            with urllib.request.urlopen(request, timeout=3) as response:  # noqa: S310
                 return int(response.status) == HTTP_OK
         except Exception:
             return False
