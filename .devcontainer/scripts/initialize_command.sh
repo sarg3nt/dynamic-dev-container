@@ -121,6 +121,67 @@ create_required_folders() {
 }
 
 #######################################
+# Setup Git configuration if .gitconfig doesn't exist
+# Arguments:
+#   None
+# Returns:
+#   0 on success, 1 on failure
+# Globals:
+#   HOME - The user's home directory
+#######################################
+setup_git_config() {
+  log_info "Checking Git configuration..."
+  
+  local gitconfig_path="${HOME}/.gitconfig"
+  
+  # Check if .gitconfig already exists
+  if [[ -f "$gitconfig_path" ]]; then
+    log_info "Found existing .gitconfig file, skipping Git configuration setup."
+    return 0
+  fi
+  
+  log_warning "No .gitconfig file found in your home directory."
+  log_info "Let's set up your Git configuration..."
+  
+  # Prompt for user name
+  local git_name=""
+  while [[ -z "$git_name" ]]; do
+    echo -n "Please enter your full name for Git commits: "
+    read -r git_name
+    if [[ -z "$git_name" ]]; then
+      log_warning "Name cannot be empty. Please try again."
+    fi
+  done
+  
+  # Prompt for user email
+  local git_email=""
+  while [[ -z "$git_email" ]]; do
+    echo -n "Please enter your email address for Git commits: "
+    read -r git_email
+    if [[ -z "$git_email" ]]; then
+      log_warning "Email cannot be empty. Please try again."
+    elif [[ ! "$git_email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+      log_warning "Please enter a valid email address."
+      git_email=""
+    fi
+  done
+  
+  # Set Git configuration with user-provided values
+  if git config --global user.name "$git_name" 2>/dev/null && \
+     git config --global user.email "$git_email" 2>/dev/null; then
+    
+    log_success "Git configuration created successfully!"
+    log_info "Name: $git_name"
+    log_info "Email: $git_email"
+    log_info "You can change these later using 'git config --global user.name \"New Name\"' and 'git config --global user.email \"new.email@example.com\"'"
+    return 0
+  else
+    log_error "Failed to create Git configuration."
+    return 1
+  fi
+}
+
+#######################################
 # Main function to orchestrate the initialization process
 # Arguments:
 #   None
@@ -142,6 +203,15 @@ main() {
   # Create required directories
   if ! create_required_folders; then
     log_error "Failed to create some required directories"
+    exit_code=1
+  fi
+  
+  # Setup Git configuration if needed
+  if ! setup_git_config; then
+    log_error "Failed to setup Git configuration"
+    log_error "You can manually configure Git using these commands:"
+    log_error "  git config --global user.name \"Your Full Name\""
+    log_error "  git config --global user.email \"your.email@example.com\""
     exit_code=1
   fi
   
