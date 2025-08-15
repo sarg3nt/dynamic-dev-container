@@ -37,6 +37,7 @@ DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
 
 # HTTP status codes
 HTTP_OK = 200
+HTTP_FORBIDDEN = 403  # Rate limit exceeded
 
 # Repository format constants
 REPO_PARTS_COUNT = 2  # Expected number of parts in owner/repo format
@@ -347,33 +348,33 @@ class BackgroundDescriptionLoader(threading.Thread):
     def _load_tool_description(self, tool: str) -> str | None:
         """Load description for a single tool (internal method to avoid circular imports)."""
         # Check cache first
-        if tool in ToolManager._description_cache:
-            return ToolManager._description_cache[tool]
+        if tool in ToolManager._description_cache:  # noqa: SLF001
+            return ToolManager._description_cache[tool]  # noqa: SLF001
 
         # Try different sources for getting descriptions
         description = None
 
         # 1. Try GitHub API (works for many tools)
-        description = ToolManager._get_github_description(tool)
+        description = ToolManager._get_github_description(tool)  # noqa: SLF001
 
         # 2. Try Homebrew API (for macOS/Linux tools)
         if not description:
-            description = ToolManager._get_homebrew_description(tool)
+            description = ToolManager._get_homebrew_description(tool)  # noqa: SLF001
 
         # 3. Try package.json for Node.js tools
         if not description and tool in ["node", "npm", "yarn", "pnpm", "bun", "deno"]:
-            description = ToolManager._get_nodejs_description(tool)
+            description = ToolManager._get_nodejs_description(tool)  # noqa: SLF001
 
         # 4. Fall back to manual mapping for tools we know about
         if not description:
-            description = ToolManager._get_fallback_description(tool)
+            description = ToolManager._get_fallback_description(tool)  # noqa: SLF001
 
         # Use the tool name if no description found
         if not description:
             description = f"{tool} - Development tool"
 
         # Cache the result
-        ToolManager._description_cache[tool] = description
+        ToolManager._description_cache[tool] = description  # noqa: SLF001
         return description
 
     def is_complete(self) -> bool:
@@ -644,48 +645,33 @@ class ToolManager:
         if tool in ToolManager._github_description_cache:
             return ToolManager._github_description_cache[tool]
 
+        result = None
+
         # Try multiple strategies to find the GitHub repository
         repo = ToolManager._discover_github_repo(tool)
-        if not repo:
-            ToolManager._github_description_cache[tool] = None
-            return None
-
-        try:
-            url = f"https://api.github.com/repos/{repo}"
-            # Validate URL scheme for security
-            if not url.startswith(("http:", "https:")):
-                ToolManager._github_description_cache[tool] = None
-                return None
-
-            with urllib.request.urlopen(url, timeout=5) as response:
-                if response.status == HTTP_OK:
-                    data = json.loads(response.read().decode())
-                    desc = data.get("description", "").strip()
-                    if desc:
-                        result = f"{tool} - {desc}"
-                        ToolManager._github_description_cache[tool] = result
-                        return result
-                    # Cache empty description to avoid repeated API calls
-                    ToolManager._github_description_cache[tool] = None
-                    return None
-        except urllib.error.HTTPError as e:
-            if e.code == 403:  # Rate limit exceeded
-                if DEBUG_MODE:
+        if repo:
+            try:
+                url = f"https://api.github.com/repos/{repo}"
+                # Validate URL scheme for security
+                if url.startswith(("http:", "https:")):
+                    with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310
+                        if response.status == HTTP_OK:
+                            data = json.loads(response.read().decode())
+                            desc = data.get("description", "").strip()
+                            if desc:
+                                result = f"{tool} - {desc}"
+            except urllib.error.HTTPError as e:
+                if e.code == HTTP_FORBIDDEN and DEBUG_MODE:  # Rate limit exceeded
                     logger.debug("GitHub API rate limit exceeded for %s", tool)
-                # Cache None to avoid repeated rate limit hits
-                ToolManager._github_description_cache[tool] = None
-                return None
-            if DEBUG_MODE:
-                logger.debug("GitHub API HTTP error for %s: %s", tool, e)
-            ToolManager._github_description_cache[tool] = None
-            return None
-        except Exception as e:
-            if DEBUG_MODE:
-                logger.debug("GitHub API failed for %s: %s", tool, e)
-            ToolManager._github_description_cache[tool] = None
+                elif DEBUG_MODE:
+                    logger.debug("GitHub API HTTP error for %s: %s", tool, e)
+            except Exception as e:
+                if DEBUG_MODE:
+                    logger.debug("GitHub API failed for %s: %s", tool, e)
 
-        ToolManager._github_description_cache[tool] = None
-        return None
+        # Cache and return result (whether None or actual description)
+        ToolManager._github_description_cache[tool] = result
+        return result
 
     @staticmethod
     def _discover_github_repo(tool: str) -> str | None:
@@ -720,7 +706,7 @@ class ToolManager:
             if not url.startswith(("http:", "https:")):
                 return None
 
-            with urllib.request.urlopen(url, timeout=5) as response:
+            with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310
                 if response.status == HTTP_OK:
                     data = json.loads(response.read().decode())
 
@@ -762,7 +748,7 @@ class ToolManager:
                 if not url.startswith(("http:", "https:")):
                     continue
 
-                with urllib.request.urlopen(url, timeout=5) as response:
+                with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310
                     if response.status == HTTP_OK:
                         data = json.loads(response.read().decode())
                         items = data.get("items", [])
@@ -810,7 +796,7 @@ class ToolManager:
             if not url.startswith(("http:", "https:")):
                 return None
 
-            with urllib.request.urlopen(url, timeout=5) as response:
+            with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310
                 if response.status == HTTP_OK:
                     data = json.loads(response.read().decode())
 
@@ -934,7 +920,7 @@ class ToolManager:
             if not url.startswith(("http:", "https:")):
                 return False
 
-            with urllib.request.urlopen(url, timeout=3) as response:
+            with urllib.request.urlopen(url, timeout=3) as response:  # noqa: S310
                 return int(response.status) == HTTP_OK
         except Exception:
             return False
@@ -948,7 +934,7 @@ class ToolManager:
             if not url.startswith(("http:", "https:")):
                 return None
 
-            with urllib.request.urlopen(url, timeout=5) as response:
+            with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310
                 if response.status == HTTP_OK:
                     data = json.loads(response.read().decode())
                     desc = data.get("desc", "").strip()
@@ -2474,9 +2460,10 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             try:
                 loading_text_widget = self.query_one("#loading-text", Static)
                 loading_text_widget.update(loading_text)
-            except Exception:
+            except Exception as e:
                 # Widget might not exist anymore, ignore
-                pass
+                if DEBUG_MODE:
+                    logger.debug("Failed to update loading text widget: %s", e)
 
     def _show_tools_screen(self) -> None:
         """Show the actual tools screen after loading is complete."""
