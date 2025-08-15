@@ -801,7 +801,8 @@ class DebugMixin:
         """Update the debug output with new messages."""
         try:
             # Use cast to tell mypy this mixin is used with Screen classes
-            debug_log = cast("Screen[None]", self).query_one("#debug_log", RichLog)
+            screen = cast("Screen[None]", self)
+            debug_log = screen.query_one("#debug_log", RichLog)
 
             # Clear and repopulate to ensure fresh content
             debug_log.clear()
@@ -834,7 +835,8 @@ class DebugMixin:
 
             for container_id in container_ids:
                 try:
-                    main_container = cast("Screen[None]", self).query_one(container_id)
+                    screen = cast("Screen[None]", self)
+                    main_container = screen.query_one(container_id)
                     break
                 except NoMatches:
                     continue
@@ -845,7 +847,8 @@ class DebugMixin:
 
             # Remove any existing debug container first
             try:
-                existing_debug = cast("Screen[None]", self).query_one("#debug_container")
+                screen = cast("Screen[None]", self)
+                existing_debug = screen.query_one("#debug_container")
                 existing_debug.remove()
                 logger.debug("DebugMixin: Removed existing debug container")
             except NoMatches:
@@ -887,9 +890,11 @@ class DebugMixin:
             messages = tui_log_handler.get_messages()
             debug_text = "\n".join(messages)
             pyperclip.copy(debug_text)
-            cast("Screen[None]", self).notify("Debug output copied to clipboard!", timeout=2, severity="information")
+            screen = cast("Screen[None]", self)
+            screen.notify("Debug output copied to clipboard!", timeout=2, severity="information")
         except Exception as e:
-            cast("Screen[None]", self).notify(f"Failed to copy debug output: {e}", timeout=3, severity="error")
+            screen = cast("Screen[None]", self)
+            screen.notify(f"Failed to copy debug output: {e}", timeout=3, severity="error")
 
 
 class DebugModal(ModalScreen[None]):
