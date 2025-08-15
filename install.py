@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import traceback
+import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
@@ -29,6 +30,12 @@ if TYPE_CHECKING:
 
 # Global debug flag - can be set via environment variable or command line
 DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
+
+# HTTP status codes
+HTTP_OK = 200
+
+# Repository format constants
+REPO_PARTS_COUNT = 2  # Expected number of parts in owner/repo format
 
 
 # Define a protocol for our app interface
@@ -262,6 +269,10 @@ class ProjectConfig:
 class ToolManager:
     """Manages development tools and their versions."""
 
+    # Class-level cache for tool descriptions and repository verification
+    _description_cache: dict[str, str] = {}
+    _repo_verification_cache: dict[str, bool] = {}
+
     @staticmethod
     def detect_container_runtime() -> tuple[str, str] | None:
         """Detect available container runtime."""
@@ -423,41 +434,394 @@ class ToolManager:
 
     @staticmethod
     def get_tool_description(tool: str) -> str:
-        """Get description for a development tool."""
-        descriptions = {
-            "opentofu": "OpenTofu - Open-source Terraform alternative",
-            "openbao": "OpenBao - Open-source Vault alternative",
-            "packer": "Packer - HashiCorp image builder",
-            "gitui": "gitui - Fast terminal UI for git repositories",
-            "tealdeer": "tealdeer - Fast implementation of tldr man pages",
-            "micro": "micro - Modern terminal-based text editor",
-            "powershell": "powershell - Microsoft PowerShell",
-            "cosign": "cosign - Container signing tool",
-            "kubectl": "kubectl - Kubernetes command-line tool",
-            "kubectx": "kubectx - Fast way to switch between clusters",
-            "kubens": "kubens - Fast way to switch between namespaces",
-            "k9s": "k9s - Terminal UI for Kubernetes clusters",
-            "helm": "Helm - The package manager for Kubernetes",
-            "krew": "krew - kubectl plugin manager",
-            "dive": "dive - Explore Docker image layers and optimize size",
-            "kubebench": "kubebench - CIS Kubernetes security benchmark",
-            "popeye": "popeye - Kubernetes cluster resource sanitizer",
-            "trivy": "trivy - Vulnerability scanner for containers & code",
-            "cmctl": "cmctl - CLI for cert-manager certificate management",
-            "k3d": "k3d - Lightweight Kubernetes for local development",
-            "golang": "golang - Go programming language",
-            "golangci-lint": "golangci-lint - Fast Go linters runner",
-            "goreleaser": "goreleaser - Release automation tool for Go projects",
-            "dotnet": "dotnet - .NET SDK",
-            "node": "node - Node.js JavaScript runtime",
-            "pnpm": "pnpm - Fast, disk space efficient package manager",
-            "yarn": "yarn - Popular alternative package manager",
-            "deno": "deno - Secure TypeScript/JavaScript runtime",
-            "bun": "bun - Fast all-in-one JavaScript runtime",
-            "python": "python - Python programming language",
-            "shellcheck": "shellcheck - Shell script static analysis tool",
+        """Get description for a development tool dynamically from various sources."""
+        # Try to get description from cache first
+        cached_desc = ToolManager._get_cached_description(tool)
+        if cached_desc:
+            return cached_desc
+
+        # Try different sources for getting descriptions
+        description = None
+
+        # 1. Try GitHub API (works for many tools)
+        description = ToolManager._get_github_description(tool)
+
+        # 2. Try Homebrew API (for macOS/Linux tools)
+        if not description:
+            description = ToolManager._get_homebrew_description(tool)
+
+        # 3. Try package.json for Node.js tools
+        if not description and tool in ["node", "npm", "yarn", "pnpm", "bun", "deno"]:
+            description = ToolManager._get_nodejs_description(tool)
+
+        # 4. Fall back to manual mapping for tools we know about
+        if not description:
+            description = ToolManager._get_fallback_description(tool)
+
+        # Cache the result
+        ToolManager._cache_description(tool, description)
+        return description
+
+    @staticmethod
+    def _get_cached_description(tool: str) -> str | None:
+        """Get cached description for a tool."""
+        return ToolManager._description_cache.get(tool)
+
+    @staticmethod
+    def _cache_description(tool: str, description: str) -> None:
+        """Cache description for a tool."""
+        ToolManager._description_cache[tool] = description
+
+    # Cache for GitHub API responses to avoid rate limiting
+    _github_description_cache: dict[str, str | None] = {}
+
+    @staticmethod
+    def _get_github_description(tool: str) -> str | None:
+        """Get tool description from GitHub API using automatic repository discovery."""
+        # Check cache first to avoid rate limiting
+        if tool in ToolManager._github_description_cache:
+            return ToolManager._github_description_cache[tool]
+
+        # Try multiple strategies to find the GitHub repository
+        repo = ToolManager._discover_github_repo(tool)
+        if not repo:
+            ToolManager._github_description_cache[tool] = None
+            return None
+
+        try:
+            url = f"https://api.github.com/repos/{repo}"
+            # Validate URL scheme for security
+            if not url.startswith(("http:", "https:")):
+                ToolManager._github_description_cache[tool] = None
+                return None
+
+            with urllib.request.urlopen(url, timeout=5) as response:
+                if response.status == HTTP_OK:
+                    data = json.loads(response.read().decode())
+                    desc = data.get("description", "").strip()
+                    if desc:
+                        result = f"{tool} - {desc}"
+                        ToolManager._github_description_cache[tool] = result
+                        return result
+                    # Cache empty description to avoid repeated API calls
+                    ToolManager._github_description_cache[tool] = None
+                    return None
+        except urllib.error.HTTPError as e:
+            if e.code == 403:  # Rate limit exceeded
+                if DEBUG_MODE:
+                    logger.debug("GitHub API rate limit exceeded for %s", tool)
+                # Cache None to avoid repeated rate limit hits
+                ToolManager._github_description_cache[tool] = None
+                return None
+            if DEBUG_MODE:
+                logger.debug("GitHub API HTTP error for %s: %s", tool, e)
+            ToolManager._github_description_cache[tool] = None
+            return None
+        except Exception as e:
+            if DEBUG_MODE:
+                logger.debug("GitHub API failed for %s: %s", tool, e)
+            ToolManager._github_description_cache[tool] = None
+
+        ToolManager._github_description_cache[tool] = None
+        return None
+
+    @staticmethod
+    def _discover_github_repo(tool: str) -> str | None:
+        """Discover GitHub repository for a tool using multiple strategies."""
+        # Strategy 1: Pattern matching (fastest, no API calls for known tools)
+        repo = ToolManager._guess_repo_patterns(tool)
+        if repo:
+            return repo
+
+        # Strategy 2: Check NPM registry for repository field
+        repo = ToolManager._get_repo_from_npm(tool)
+        if repo:
+            return repo
+
+        # Strategy 3: Search GitHub directly for the tool name (rate limited)
+        repo = ToolManager._search_github_repos(tool)
+        if repo:
+            return repo
+
+        # Strategy 4: Check Homebrew API for repository info
+        repo = ToolManager._get_repo_from_homebrew(tool)
+        if repo:
+            return repo
+
+        return None
+
+    @staticmethod
+    def _get_repo_from_npm(tool: str) -> str | None:
+        """Get repository information from NPM registry."""
+        try:
+            url = f"https://registry.npmjs.org/{tool}"
+            if not url.startswith(("http:", "https:")):
+                return None
+
+            with urllib.request.urlopen(url, timeout=5) as response:
+                if response.status == HTTP_OK:
+                    data = json.loads(response.read().decode())
+
+                    # Check repository field in package metadata
+                    repository = data.get("repository")
+                    if repository:
+                        repo_url = repository.get("url", "") if isinstance(repository, dict) else str(repository)
+
+                        # Extract GitHub repo from URL
+                        return ToolManager._extract_github_repo_from_url(repo_url)
+
+                    # Also check homepage field
+                    homepage = data.get("homepage", "")
+                    if homepage:
+                        return ToolManager._extract_github_repo_from_url(homepage)
+
+        except Exception as e:
+            if DEBUG_MODE:
+                logger.debug("NPM registry lookup failed for %s: %s", tool, e)
+
+        return None
+
+    @staticmethod
+    def _search_github_repos(tool: str) -> str | None:
+        """Search GitHub repositories for the tool."""
+        try:
+            # Use multiple search strategies with different query patterns
+            search_queries = [
+                f'"{tool}"+in:name',  # Exact name match in repository name
+                f"{tool}+in:name+in:description+sort:stars",  # Name and description with star sort
+                f"{tool}+language:Go+in:name",  # For Go tools
+                f"{tool}+language:Rust+in:name",  # For Rust tools
+                f"{tool}+cli+in:name+in:description",  # CLI tools
+            ]
+
+            for query in search_queries:
+                url = f"https://api.github.com/search/repositories?q={query}&sort=stars&order=desc&per_page=10"
+
+                if not url.startswith(("http:", "https:")):
+                    continue
+
+                with urllib.request.urlopen(url, timeout=5) as response:
+                    if response.status == HTTP_OK:
+                        data = json.loads(response.read().decode())
+                        items = data.get("items", [])
+
+                        for item in items:
+                            repo_name = item.get("name", "").lower()
+                            full_name = item.get("full_name", "")
+                            description = item.get("description", "").lower()
+
+                            # High priority: exact name match
+                            if repo_name == tool:
+                                return full_name
+
+                            # Medium priority: tool appears in repo name and matches patterns
+                            if (
+                                tool in repo_name
+                                and not repo_name.startswith("node-")
+                                and (
+                                    repo_name in {f"{tool}-cli", f"{tool}tool"}
+                                    or repo_name.endswith(f"-{tool}")
+                                    or repo_name.startswith(f"{tool}-")
+                                )
+                            ):
+                                return full_name
+
+                            # Lower priority: tool mentioned prominently in description
+                            if tool in description and (
+                                f"official {tool}" in description
+                                or f"{tool} is a" in description
+                                or description.startswith(tool)
+                            ):
+                                return full_name
+
+        except Exception as e:
+            if DEBUG_MODE:
+                logger.debug("GitHub search failed for %s: %s", tool, e)
+
+        return None
+
+    @staticmethod
+    def _get_repo_from_homebrew(tool: str) -> str | None:
+        """Extract repository info from Homebrew formula."""
+        try:
+            url = f"https://formulae.brew.sh/api/formula/{tool}.json"
+            if not url.startswith(("http:", "https:")):
+                return None
+
+            with urllib.request.urlopen(url, timeout=5) as response:
+                if response.status == HTTP_OK:
+                    data = json.loads(response.read().decode())
+
+                    # Check homepage field
+                    homepage = data.get("homepage", "")
+                    if homepage:
+                        repo = ToolManager._extract_github_repo_from_url(homepage)
+                        if repo:
+                            return repo
+
+                    # Check URLs in the formula
+                    urls = data.get("urls", {})
+                    if isinstance(urls, dict):
+                        for _url_type, url_data in urls.items():
+                            if isinstance(url_data, dict):
+                                url_val = url_data.get("url", "")
+                                if url_val:
+                                    repo = ToolManager._extract_github_repo_from_url(url_val)
+                                    if repo:
+                                        return repo
+
+        except Exception as e:
+            if DEBUG_MODE:
+                logger.debug("Homebrew repository lookup failed for %s: %s", tool, e)
+
+        return None
+
+    # Class constants for rate limiting
+    MAX_VERIFICATION_ATTEMPTS = 10
+
+    @staticmethod
+    def _guess_repo_patterns(tool: str) -> str | None:
+        """Try common repository naming patterns using known tool mappings."""
+        # Known tool to repository mappings (avoids API rate limiting)
+        known_mappings = {
+            "helm": "helm/helm",
+            "micro": "zyedidia/micro",
+            "dive": "wagoodman/dive",
+            "shellcheck": "koalaman/shellcheck",
+            "gitui": "extrawurst/gitui",
+            "k9s": "derailed/k9s",
+            "popeye": "derailed/popeye",
+            "tealdeer": "dbrgn/tealdeer",
+            "cosign": "sigstore/cosign",
+            "krew": "kubernetes-sigs/krew",
+            "kubebench": "aquasecurity/kube-bench",
+            "trivy": "aquasecurity/trivy",
+            "cmctl": "cert-manager/cmctl",
+            "k3d": "k3d-io/k3d",
+            "golangci-lint": "golangci/golangci-lint",
+            "goreleaser": "goreleaser/goreleaser",
+            "kubectx": "ahmetb/kubectx",
+            "kubens": "ahmetb/kubectx",  # kubens is part of kubectx repo
+            "opentofu": "opentofu/opentofu",
+            "openbao": "openbao/openbao",
+            "packer": "hashicorp/packer",
         }
-        return descriptions.get(tool, f"{tool} - Development tool")
+
+        # Check known mappings first
+        if tool in known_mappings:
+            return known_mappings[tool]
+
+        # Common patterns for unknown tools (only try a few to avoid rate limiting)
+        patterns = [
+            f"{tool}/{tool}",  # tool/tool (most common)
+            f"kubernetes/{tool}",  # kubernetes/tool (for k8s tools)
+            f"hashicorp/{tool}",  # hashicorp/tool (for HashiCorp tools)
+        ]
+
+        # Only verify existence for a limited set to avoid rate limiting
+        for pattern in patterns:
+            # Use cached verification result if available
+            if pattern in ToolManager._repo_verification_cache:
+                if ToolManager._repo_verification_cache[pattern]:
+                    return pattern
+            elif len(ToolManager._repo_verification_cache) < ToolManager.MAX_VERIFICATION_ATTEMPTS:
+                # Only verify a few patterns to avoid rate limiting
+                exists = ToolManager._verify_github_repo_exists(pattern)
+                ToolManager._repo_verification_cache[pattern] = exists
+                if exists:
+                    return pattern
+
+        return None
+
+    @staticmethod
+    def _extract_github_repo_from_url(url: str) -> str | None:
+        """Extract GitHub repository owner/repo from various URL formats."""
+        if not url:
+            return None
+
+        # Clean up common URL prefixes/suffixes
+        url = url.lower().strip()
+
+        # Remove git+ prefix and .git suffix
+        url = re.sub(r"^git\+", "", url)
+        url = re.sub(r"\.git$", "", url)
+
+        # Match GitHub repository patterns
+        github_patterns = [
+            r"github\.com[:/]([^/]+/[^/]+)",  # github.com/owner/repo or github.com:owner/repo
+            r"github\.com/([^/]+/[^/]+)",  # https://github.com/owner/repo
+        ]
+
+        for pattern in github_patterns:
+            match = re.search(pattern, url)
+            if match:
+                repo = match.group(1)
+                # Remove any query parameters or fragments
+                repo = repo.split("?")[0].split("#")[0]
+                # Ensure it's a valid owner/repo format
+                if "/" in repo and len(repo.split("/")) == REPO_PARTS_COUNT:
+                    return repo
+
+        return None
+
+    @staticmethod
+    def _verify_github_repo_exists(repo: str) -> bool:
+        """Verify that a GitHub repository exists."""
+        try:
+            url = f"https://api.github.com/repos/{repo}"
+            if not url.startswith(("http:", "https:")):
+                return False
+
+            with urllib.request.urlopen(url, timeout=3) as response:
+                return response.status == HTTP_OK
+        except Exception:
+            return False
+
+    @staticmethod
+    def _get_homebrew_description(tool: str) -> str | None:
+        """Get tool description from Homebrew Formulae API."""
+        try:
+            url = f"https://formulae.brew.sh/api/formula/{tool}.json"
+            # Validate URL scheme for security
+            if not url.startswith(("http:", "https:")):
+                return None
+
+            with urllib.request.urlopen(url, timeout=5) as response:
+                if response.status == HTTP_OK:
+                    data = json.loads(response.read().decode())
+                    desc = data.get("desc", "").strip()
+                    if desc:
+                        return f"{tool} - {desc}"
+        except Exception as e:
+            if DEBUG_MODE:
+                logger.debug("Homebrew API failed for %s: %s", tool, e)
+
+        return None
+
+    @staticmethod
+    def _get_nodejs_description(tool: str) -> str | None:
+        """Get description for Node.js related tools."""
+        nodejs_descriptions = {
+            "node": "Node.js - JavaScript runtime built on Chrome's V8 JavaScript engine",
+            "npm": "npm - Node package manager",
+            "yarn": "Yarn - Fast, reliable, and secure dependency management",
+            "pnpm": "pnpm - Fast, disk space efficient package manager",
+            "bun": "Bun - Fast all-in-one JavaScript runtime & toolkit",
+            "deno": "Deno - A modern runtime for JavaScript and TypeScript",
+        }
+        return nodejs_descriptions.get(tool)
+
+    @staticmethod
+    def _get_fallback_description(tool: str) -> str:
+        """Get fallback descriptions for tools we know about."""
+        fallback_descriptions = {
+            "kubectl": "kubectl - Kubernetes command-line tool",
+            "powershell": "PowerShell - Task automation and configuration management framework",
+            "dotnet": ".NET - Free, cross-platform, open-source developer platform",
+            "golang": "Go - Open source programming language that makes it easy to build software",
+            "python": "Python - Programming language that lets you work quickly and integrate systems",
+        }
+        return fallback_descriptions.get(tool, f"{tool} - Development tool")
 
 
 class MiseParser:
