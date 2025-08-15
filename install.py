@@ -45,6 +45,11 @@ REPO_PARTS_COUNT = 2  # Expected number of parts in owner/repo format
 # Parallel processing configuration
 DEFAULT_WORKER_COUNT = 8  # Optimal for I/O-bound API calls (GitHub, Homebrew, etc.)
 
+# GitHub repository discovery constants
+MIN_STARS_OFFICIAL_REPO = 100  # Minimum stars for high-confidence official repo
+MIN_STARS_PATTERN_MATCH = 50  # Minimum stars for pattern-based matches
+MIN_STARS_DESCRIPTION_MATCH = 200  # Minimum stars for description-based matches
+
 
 # Define a protocol for our app interface
 class DevContainerApp(Protocol):
@@ -757,8 +762,13 @@ class ToolManager:
                             repo_name = str(item.get("name", "")).lower()
                             full_name = str(item.get("full_name", ""))
                             description = str(item.get("description", "")).lower()
+                            stars = item.get("stargazers_count", 0)
 
-                            # High priority: exact name match
+                            # High priority: exact name match with high stars (likely official)
+                            if repo_name == tool and stars > MIN_STARS_OFFICIAL_REPO:
+                                return full_name
+
+                            # Medium-high priority: exact name match regardless of stars
                             if repo_name == tool:
                                 return full_name
 
@@ -771,14 +781,19 @@ class ToolManager:
                                     or repo_name.endswith(f"-{tool}")
                                     or repo_name.startswith(f"{tool}-")
                                 )
+                                and stars > MIN_STARS_PATTERN_MATCH  # Add star requirement for pattern matches
                             ):
                                 return full_name
 
-                            # Lower priority: tool mentioned prominently in description
-                            if tool in description and (
-                                f"official {tool}" in description
-                                or f"{tool} is a" in description
-                                or description.startswith(tool)
+                            # Lower priority: tool mentioned prominently in description with good stars
+                            if (
+                                tool in description
+                                and stars > MIN_STARS_DESCRIPTION_MATCH
+                                and (
+                                    f"official {tool}" in description
+                                    or f"{tool} is a" in description
+                                    or description.startswith(tool)
+                                )
                             ):
                                 return full_name
 
@@ -829,42 +844,29 @@ class ToolManager:
 
     @staticmethod
     def _guess_repo_patterns(tool: str) -> str | None:
-        """Try common repository naming patterns using known tool mappings."""
-        # Known tool to repository mappings (avoids API rate limiting)
-        known_mappings = {
-            "helm": "helm/helm",
-            "micro": "zyedidia/micro",
-            "dive": "wagoodman/dive",
-            "shellcheck": "koalaman/shellcheck",
-            "gitui": "extrawurst/gitui",
-            "k9s": "derailed/k9s",
-            "popeye": "derailed/popeye",
-            "tealdeer": "dbrgn/tealdeer",
-            "cosign": "sigstore/cosign",
-            "krew": "kubernetes-sigs/krew",
-            "kubebench": "aquasecurity/kube-bench",
-            "trivy": "aquasecurity/trivy",
-            "cmctl": "cert-manager/cmctl",
-            "k3d": "k3d-io/k3d",
-            "golangci-lint": "golangci/golangci-lint",
-            "goreleaser": "goreleaser/goreleaser",
-            "kubectx": "ahmetb/kubectx",
-            "kubens": "ahmetb/kubectx",  # kubens is part of kubectx repo
-            "opentofu": "opentofu/opentofu",
-            "openbao": "openbao/openbao",
-            "packer": "hashicorp/packer",
-        }
-
-        # Check known mappings first
-        if tool in known_mappings:
-            return known_mappings[tool]
-
-        # Common patterns for unknown tools (only try a few to avoid rate limiting)
+        """Try common repository naming patterns dynamically."""
+        # Common patterns for tools (fully dynamic approach)
         patterns = [
-            f"{tool}/{tool}",  # tool/tool (most common)
+            f"{tool}/{tool}",  # tool/tool (most common pattern)
             f"kubernetes/{tool}",  # kubernetes/tool (for k8s tools)
             f"hashicorp/{tool}",  # hashicorp/tool (for HashiCorp tools)
+            f"sigstore/{tool}",  # sigstore/tool (for security tools)
+            f"aquasecurity/{tool}",  # aquasecurity/tool (for security tools)
+            f"cert-manager/{tool}",  # cert-manager/tool (for cert-manager tools)
+            f"derailed/{tool}",  # derailed/tool (for k8s tools like k9s, popeye)
         ]
+
+        # Additional pattern variations for common cases
+        if "-" in tool:
+            # For tools like "golangci-lint", also try "golangci/golangci-lint"
+            base_name = tool.split("-")[0]
+            patterns.append(f"{base_name}/{tool}")
+
+        # For tools ending in common suffixes, try the org with same name
+        if tool.endswith(("cli", "tool", "ui")):
+            # For "kubectl", try "kubernetes/kubectl"
+            # For "gitui", try "extrawurst/gitui" (this will be discovered by other methods)
+            pass  # Let the other discovery methods handle these
 
         # Only verify existence for a limited set to avoid rate limiting
         for pattern in patterns:
