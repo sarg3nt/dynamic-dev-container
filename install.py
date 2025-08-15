@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 if TYPE_CHECKING:
     from textual.events import Focus, Key
+    from textual.timer import Timer
 
 # Global debug flag - can be set via environment variable or command line
 DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
@@ -767,9 +768,9 @@ class ToolManager:
                         items = data.get("items", [])
 
                         for item in items:
-                            repo_name = item.get("name", "").lower()
-                            full_name = item.get("full_name", "")
-                            description = item.get("description", "").lower()
+                            repo_name = str(item.get("name", "")).lower()
+                            full_name = str(item.get("full_name", ""))
+                            description = str(item.get("description", "")).lower()
 
                             # High priority: exact name match
                             if repo_name == tool:
@@ -934,7 +935,7 @@ class ToolManager:
                 return False
 
             with urllib.request.urlopen(url, timeout=3) as response:
-                return response.status == HTTP_OK
+                return int(response.status) == HTTP_OK
         except Exception:
             return False
 
@@ -2353,7 +2354,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self._active_version_inputs: set[str] = set()  # Track currently active version input IDs
         self._username_propagated = False  # Track if username has been propagated already
         self._last_focused_input: str = ""  # Track the last focused input for focus loss detection
-        self._loading_timer = None  # Store reference to loading check timer
+        self._loading_timer: Timer | None = None  # Store reference to loading check timer
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
