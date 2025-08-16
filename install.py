@@ -2780,6 +2780,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 id=f"version_btn_{tool}_{safe_version}",
                 classes="version-btn-small",
             )
+            version_btn.can_focus = False  # Make version buttons not focusable via tab
             parent_container.mount(version_btn)
 
     def _create_section_links(self) -> list[Button]:
@@ -2811,6 +2812,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     classes="version-btn-small",
                     disabled=True,  # Make current section non-clickable
                 )
+                section_btn.can_focus = False  # Make section buttons not focusable via tab
                 logger.debug(
                     "BUTTON %d: CURRENT - Text='%s' ID='%s' Disabled=True",
                     i,
@@ -2824,6 +2826,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     id=f"section_link_{i}",
                     classes="version-btn-small",
                 )
+                section_btn.can_focus = False  # Make section buttons not focusable via tab
                 logger.debug(
                     "BUTTON %d: REGULAR - Text='%s' ID='%s' Disabled=False",
                     i,
