@@ -1559,29 +1559,57 @@ class WelcomeScreen(Screen[None], DebugMixin):
 
     BINDINGS = [
         Binding("enter", "continue", "Continue"),
-        Binding("q", "quit", "Quit"),
+        Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
+        # Get some dynamic information
+        github_token_status = "✅ Available" if os.getenv("GITHUB_TOKEN") else "⚠️  Not set (rate limiting may occur)"
+
         yield Header()
         yield Container(
-            Markdown("""
+            Markdown(f"""
 # Dynamic Dev Container Setup
 
-Welcome to the Dynamic Dev Container TUI Setup!
+Welcome to the **Dynamic Dev Container TUI Setup**!
 
 This wizard will guide you through configuring your development container with the tools and extensions you need.
 
-## Navigation:
-- Use **TAB/SHIFT+TAB** to navigate between elements
-- Use **SPACE** to select/deselect checkboxes
-- Use **ENTER** to confirm selections
-- Use **Q** to quit at any time
+## System Status:
+- GitHub Token: {github_token_status}
+- Debug Mode: {"✅ Enabled" if DEBUG_MODE else "❌ Disabled"}
+
+## Getting Started:
+- Press **ENTER** to start the configuration wizard
+- Press **Ctrl+Q** to quit the application
 - Press **Ctrl+D** to view debug output
 
-Press **ENTER** to continue...
+## Navigation Tips:
+- Use **TAB** and **SHIFT+TAB** to move between elements
+- Use **SPACE** or **ENTER** to select/deselect checkboxes
+- Use **ENTER** to activate buttons and continue
+- Use **ESCAPE** to go back to previous screens
+- Most screens show available key bindings in the footer
+
+## What This Wizard Will Configure:
+- 🛠️  **Development tools** and their versions (Python, Go, Node.js, etc.)
+- 🧩 **VS Code extensions** for your selected languages
+- 🐳 **Container environment** and settings
+- 🐍 **Python project structure** (optional)
+- 📝 **File header templates** (optional)
+
+## Features:
+- ⚡ **Dynamic tool discovery using Mise** - automatically finds latest versions and allows users to set versions easily.
+- 🎯 **Smart defaults** - pre-selects common tool combinations
+- 📋 **Full customization** - override any setting
+
+---
+
+**Ready to create your perfect dev environment?**
+
+Press **ENTER** to begin the setup wizard...
             """),
             id="welcome-container",
         )
@@ -1633,6 +1661,7 @@ class PythonRepositoryScreen(Screen[None]):
     BINDINGS = [
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
@@ -1812,6 +1841,10 @@ class PythonRepositoryScreen(Screen[None]):
         """Continue to next screen."""
         self.save_config()
 
+    def action_quit(self) -> None:
+        """Quit the application."""
+        self.app.exit()
+
     def action_back(self) -> None:
         """Go to previous step."""
         """Go back to previous screen."""
@@ -1824,6 +1857,7 @@ class PythonProjectScreen(Screen[None]):
     BINDINGS = [
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
@@ -1931,6 +1965,10 @@ class PythonProjectScreen(Screen[None]):
         """Continue to next screen."""
         self.save_config()
 
+    def action_quit(self) -> None:
+        """Quit the application."""
+        self.app.exit()
+
     def action_back(self) -> None:
         """Go to previous step."""
         """Go back to previous screen."""
@@ -1943,6 +1981,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
     BINDINGS = [
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
 
@@ -2089,6 +2128,10 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         """Continue to next screen."""
         self.save_config()
 
+    def action_quit(self) -> None:
+        """Quit the application."""
+        self.app.exit()
+
     def action_back(self) -> None:
         """Go to previous step."""
         """Go back to tool selection screen."""
@@ -2114,6 +2157,7 @@ class ToolVersionScreen(Screen[None], DebugMixin):
     BINDINGS = [
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+q", "quit", "Quit"),
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
@@ -2212,6 +2256,10 @@ class ToolVersionScreen(Screen[None], DebugMixin):
         """Continue to next screen."""
         self.save_config()
 
+    def action_quit(self) -> None:
+        """Quit the application."""
+        self.app.exit()
+
     def action_back(self) -> None:
         """Go to previous step."""
         """Go back to previous screen."""
@@ -2224,6 +2272,7 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
     BINDINGS = [
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
 
@@ -2323,6 +2372,10 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
         """Save configuration and continue."""
         self.save_config()
 
+    def action_quit(self) -> None:
+        """Quit the application."""
+        self.app.exit()
+
     def action_back(self) -> None:
         """Go to previous step."""
         """Go back to previous screen."""
@@ -2377,6 +2430,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
     BINDINGS = [
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
 
@@ -3895,6 +3949,10 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self.save_current_section()
         self.finalize_selection()
 
+    def action_quit(self) -> None:
+        """Quit the application."""
+        self.app.exit()
+
     def action_back(self) -> None:
         """Go to previous step."""
         """Go back to previous screen."""
@@ -3907,6 +3965,7 @@ class SummaryScreen(Screen[None], DebugMixin):
     BINDINGS = [
         Binding("enter", "install", "Install"),
         Binding("escape", "back", "Back"),
+        Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
 
@@ -4042,6 +4101,10 @@ class SummaryScreen(Screen[None], DebugMixin):
         """Start the installation process."""
         self.app.call_later(self.app.after_summary)  # type: ignore[attr-defined]
         self.app.pop_screen()
+
+    def action_quit(self) -> None:
+        """Quit the application."""
+        self.app.exit()
 
     def action_back(self) -> None:
         """Go to previous step."""
@@ -5956,6 +6019,10 @@ class DynamicDevContainerApp(App[None]):
 
     CSS_PATH = "install.tcss"
 
+    BINDINGS = [
+        Binding("ctrl+q", "quit", "Quit"),
+    ]
+
     def __init__(self, project_path: str = "") -> None:
         """Initialize the Dynamic Dev Container application.
 
@@ -6109,6 +6176,10 @@ class DynamicDevContainerApp(App[None]):
         """Called after summary screen."""
         self.push_screen(InstallationScreen(self.config, self.source_dir))
 
+    async def action_quit(self) -> None:
+        """Quit the application."""
+        self.exit()
+
 
 def main() -> None:
     """Main entry point."""
@@ -6144,10 +6215,9 @@ def main() -> None:
 
     if args.help_extended:
         print("""
-Dynamic Dev Container TUI Setup - Python Version
+Dynamic Dev Container TUI Setup
 
-This is a Python implementation of the original install.sh script with enhanced
-TUI capabilities using the Textual library.
+This app creates a new dev container implementation for the tooling environment you select during setup.
 
 Usage: python install.py [project_path] [--debug]
 
