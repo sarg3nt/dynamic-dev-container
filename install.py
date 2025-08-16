@@ -1761,6 +1761,14 @@ class PythonRepositoryScreen(Screen[None]):
         )
         yield Footer()
 
+    def on_mount(self) -> None:
+        """Called when the screen is mounted."""
+        # Set focus to the first input field
+        try:
+            self.query_one("#project_name", Input).focus()
+        except Exception:
+            logger.debug("Could not set focus to project_name input")
+
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         """Handle checkbox state changes."""
         """Handle repository type selection - only one can be selected."""
@@ -1914,6 +1922,14 @@ class PythonProjectScreen(Screen[None]):
         )
         yield Footer()
 
+    def on_mount(self) -> None:
+        """Called when the screen is mounted."""
+        # Set focus to the first input field
+        try:
+            self.query_one("#python_project_name", Input).focus()
+        except Exception:
+            logger.debug("Could not set focus to python_project_name input")
+
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         """Handle checkbox state changes."""
         """Handle license selection - only one can be selected."""
@@ -2030,6 +2046,14 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             id="psi-header-container",
         )
         yield Footer()
+
+    def on_mount(self) -> None:
+        """Called when the screen is mounted."""
+        # Set focus to the first checkbox
+        try:
+            self.query_one("#install_psi", Checkbox).focus()
+        except Exception:
+            logger.debug("Could not set focus to install_psi checkbox")
 
     def _get_auto_selected_languages(self) -> set[str]:
         """Get languages that should be auto-selected based on selected tools."""
@@ -2233,6 +2257,15 @@ class ToolVersionScreen(Screen[None], DebugMixin):
             )
             scroll_container.mount(Label(""))  # Spacing
 
+        # Set focus to the first version input if any tools are configurable
+        if self.configurable_tools:
+            try:
+                first_tool = self.configurable_tools[0]
+                first_input = self.query_one(f"#version_{first_tool}", Input)
+                first_input.focus()
+            except Exception:
+                logger.debug("Could not set focus to first version input")
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
         if event.button.id == "next_btn":
@@ -2357,6 +2390,12 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
         logger.debug("ProjectConfigScreen mounted - Debug functionality available (Ctrl+D)")
         # Set up a timer to periodically update debug output
         self.set_interval(1.0, self.update_debug_output)
+
+        # Set focus to the first input field
+        try:
+            self.query_one("#project_path", Input).focus()
+        except Exception:
+            logger.debug("Could not set focus to project_path input")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
@@ -2607,6 +2646,23 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         # Set up a timer to periodically update debug output
         self.set_interval(1.0, self.update_debug_output)
 
+        # Set focus to the first tool checkbox
+        self._set_focus_to_first_tool()
+
+    def _set_focus_to_first_tool(self) -> None:
+        """Set focus to the first tool checkbox."""
+        try:
+            # Get the current section's tools
+            if self.sections and self.current_section < len(self.sections):
+                current_section = self.sections[self.current_section]
+                tools = MiseParser.get_section_tools(Path(".mise.toml"), current_section)
+                if tools:
+                    first_tool = tools[0]
+                    first_checkbox = self.query_one(f"#tool_{first_tool}", Checkbox)
+                    first_checkbox.focus()
+        except Exception:
+            logger.debug("Could not set focus to first tool checkbox")
+
     def on_unmount(self) -> None:
         """Clean up when screen is unmounted."""
         if self._loading_timer is not None:
@@ -2684,6 +2740,15 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
         # Update configuration panel
         self.refresh_configuration()
+
+        # Set focus to first tool if we rebuilt the tools
+        if needs_rebuild and tools:
+            try:
+                first_tool = tools[0]
+                first_checkbox = self.query_one(f"#tool_{first_tool}", Checkbox)
+                first_checkbox.focus()
+            except Exception:
+                logger.debug("Could not set focus to first tool checkbox in refresh_tools")
 
     def _create_version_buttons(
         self,
