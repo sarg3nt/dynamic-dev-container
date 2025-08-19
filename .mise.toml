@@ -1,5 +1,29 @@
 # cspell:ignore cmctl gitui krew kubebench kubectx direnv dotenv looztra kompiro kforsthoevel sarg kubeseal stefansedich nlamirault zufardhiyaulhaq sudermanjr openbao kubens
-# NOTE: The #### section #### headers below must not be altered or moved as they are used as markers for the install script.
+#
+# COMMENT FORMAT DOCUMENTATION:
+# ==============================
+# The comments in this file serve multiple purposes for the dynamic dev container setup:
+#
+# 1. TOOL DESCRIPTIONS: Comments after # are parsed to provide user-friendly descriptions
+#    Format: tool = 'version' # Description text here
+#    Example: python = '3.13' # Python programming language - high-level, interpreted language
+#
+# 2. LANGUAGE MAPPINGS: Special #language: tags map tools to PSI Header language templates
+#    Format: tool = 'version' # Description #language:language_id
+#    Example: python = '3.13' # Python programming language #language:python
+#    Available languages: python, go, javascript, typescript, csharp, terraform, powershell, shellscript, yaml, markdown
+#
+# 3. VERSION CONFIGURATION: #version# markers indicate tools with configurable versions
+#    Tools marked with #version# will show version selection in the TUI setup wizard
+#
+# 4. SECTION MARKERS: #### Begin/End markers define tool groupings for the setup wizard
+#    These markers must not be modified as they are parsed by the installation script
+#
+# Adding new tools:
+# - Add tool with description: newtool = 'latest' # Tool description here
+# - Add language mapping: newtool = 'latest' # Tool description #language:appropriate_language
+# - Make version configurable: Add #version# above the tool line
+# - Group tools logically within existing #### Begin/End sections
 
 #### Begin Environment
 [env]
@@ -9,69 +33,69 @@ MISE_PYTHON_COMPILE = false
 [tools]
 #### Begin Python
 #version#
-python = '3.13' # Python programming language - high-level, interpreted language for general-purpose programming
+python = '3.13' # Python programming language - high-level, interpreted language for general-purpose programming #language:python
 #### End Python
 
 #### Begin HashiCorp Tools
 #version#
-opentofu = 'latest' # OpenTofu - open-source Terraform alternative for infrastructure as code
+opentofu = 'latest' # OpenTofu - open-source Terraform alternative for infrastructure as code #language:terraform
 #version#
-openbao = 'latest' # OpenBao - open-source Vault alternative for secrets management
+openbao = 'latest' # OpenBao - open-source Vault alternative for secrets management #language:terraform
 #version#
-packer = 'latest' # Packer - tool for building automated machine images
+packer = 'latest' # Packer - tool for building automated machine images #language:terraform
 #### End HashiCorp Tools
 
 #### Begin Kubernetes
 #version#
-kubectl = 'latest' # kubectl - Kubernetes command-line tool for cluster management
-kubectx = 'latest' # kubectx - tool to switch between Kubernetes contexts
-kubens = 'latest' # kubens - tool to switch between Kubernetes namespaces
-k9s = 'latest' # k9s - terminal-based UI for Kubernetes cluster management
-helm = 'latest' # Helm - package manager for Kubernetes applications
-kubebench = 'latest' # kube-bench - security benchmark tool for Kubernetes
+kubectl = 'latest' # kubectl - Kubernetes command-line tool for cluster management #language:yaml
+kubectx = 'latest' # kubectx - tool to switch between Kubernetes contexts #language:shellscript
+kubens = 'latest' # kubens - tool to switch between Kubernetes namespaces #language:shellscript
+k9s = 'latest' # k9s - terminal-based UI for Kubernetes cluster management #language:yaml
+helm = 'latest' # Helm - package manager for Kubernetes applications #language:yaml
+kubebench = 'latest' # kube-bench - security benchmark tool for Kubernetes #language:yaml
 #### End Kubernetes
 
 #### Begin Kubernetes Utilities
-krew = 'latest' # krew - package manager for kubectl plugins
-dive = 'latest' # dive - tool for exploring Docker image layers
-popeye = 'latest' # popeye - Kubernetes cluster resource sanitizer
-trivy = 'latest' # trivy - vulnerability scanner for containers and other artifacts
-cmctl = 'latest' # cmctl - command-line tool for cert-manager
-k3d = 'latest' # k3d - lightweight Kubernetes cluster runner using Docker
+krew = 'latest' # krew - package manager for kubectl plugins #language:yaml
+dive = 'latest' # dive - tool for exploring Docker image layers #language:shellscript
+popeye = 'latest' # popeye - Kubernetes cluster resource sanitizer #language:yaml
+trivy = 'latest' # trivy - vulnerability scanner for containers and other artifacts #language:yaml
+cmctl = 'latest' # cmctl - command-line tool for cert-manager #language:yaml
+k3d = 'latest' # k3d - lightweight Kubernetes cluster runner using Docker #language:yaml
 #### End Kubernetes Utilities
 
 #### Begin Go Development
 #version#
-golang = 'latest' # Go - open-source programming language for building efficient software
-golangci-lint = 'latest' # golangci-lint - fast Go linters runner
-goreleaser = 'latest' # GoReleaser - tool for building and releasing Go projects
+golang = 'latest' # Go - open-source programming language for building efficient software #language:go
+golangci-lint = 'latest' # golangci-lint - fast Go linters runner #language:go
+goreleaser = 'latest' # GoReleaser - tool for building and releasing Go projects #language:go
 #### End Go Development
 
 #### Begin .NET Development
 #version#
-dotnet = 'latest' # .NET - free, cross-platform, open-source developer platform
+dotnet = 'latest' # .NET - free, cross-platform, open-source developer platform #language:csharp
 #### End .NET Development
 
 #### Begin Node Development
 #version#
-node = '22.0' # Node.js - JavaScript runtime built on Chrome's V8 engine
-pnpm = 'latest' # pnpm - fast, disk space efficient package manager
-yarn = 'latest' # Yarn - fast, reliable, and secure dependency management
-deno = 'latest' # Deno - secure runtime for JavaScript and TypeScript
-bun = 'latest' # Bun - fast all-in-one JavaScript runtime and toolkit
+node = '22.0' # Node.js - JavaScript runtime built on Chrome's V8 engine #language:javascript
+pnpm = 'latest' # pnpm - fast, disk space efficient package manager #language:javascript
+yarn = 'latest' # Yarn - fast, reliable, and secure dependency management #language:javascript
+deno = 'latest' # Deno - secure runtime for JavaScript and TypeScript #language:typescript
+bun = 'latest' # Bun - fast all-in-one JavaScript runtime and toolkit #language:javascript
 #### End Node Development
 
 #### Begin PowerShell
 #version#
-powershell = 'latest' # PowerShell - task automation and configuration management framework
+powershell = 'latest' # PowerShell - task automation and configuration management framework #language:powershell
 #### End PowerShell
 
 #### Begin Miscellaneous Tools
-gitui = 'latest' # GitUI - terminal-based Git user interface
-cosign = 'latest' # cosign - container signing and verification tool
-tealdeer = 'latest' # tealdeer - fast implementation of tldr pages
-micro = 'latest' # micro - modern and intuitive terminal-based text editor
-shellcheck = 'latest' # ShellCheck - static analysis tool for shell scripts
+gitui = 'latest' # GitUI - terminal-based Git user interface #language:shellscript
+cosign = 'latest' # cosign - container signing and verification tool #language:shellscript
+tealdeer = 'latest' # tealdeer - fast implementation of tldr pages #language:shellscript
+micro = 'latest' # micro - modern and intuitive terminal-based text editor #language:shellscript
+shellcheck = 'latest' # ShellCheck - static analysis tool for shell scripts #language:shellscript
 #### End Miscellaneous Tools
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.

@@ -2058,24 +2058,8 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         """Get languages that should be auto-selected based on selected tools."""
         auto_selected = set()
 
-        # Mapping of tools to their primary languages
-        tool_language_mapping = {
-            "python": "python",
-            "golang": "go",
-            "golangci-lint": "go",
-            "goreleaser": "go",
-            "node": "javascript",
-            "pnpm": "javascript",
-            "yarn": "javascript",
-            "bun": "javascript",
-            "deno": "typescript",
-            "dotnet": "csharp",
-            "powershell": "powershell",
-            "opentofu": "terraform",
-            "openbao": "terraform",
-            "packer": "terraform",
-            "shellcheck": "shellscript",
-        }
+        # Get language mappings from .mise.toml comments
+        tool_language_mapping = self._get_tool_language_mapping()
 
         # Add languages for selected tools
         for tool, selected in self.config.tool_selected.items():
@@ -2087,6 +2071,50 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             auto_selected.update(["shellscript", "markdown"])
 
         return auto_selected
+
+    def _get_tool_language_mapping(self) -> dict[str, str]:
+        """Get tool to language mappings from .mise.toml comments."""
+        mapping = {}
+
+        try:
+            # Look for .mise.toml in current directory or workspace
+            mise_file = Path(".mise.toml")
+            if not mise_file.exists():
+                # Try to find it in the workspace directory
+                workspace_paths = [
+                    Path("/workspaces/dynamic-dev-container/.mise.toml"),
+                    Path.cwd() / ".mise.toml",
+                    Path.cwd().parent / ".mise.toml",
+                ]
+                for path in workspace_paths:
+                    if path.exists():
+                        mise_file = path
+                        break
+                else:
+                    return mapping
+
+            with open(mise_file, encoding="utf-8") as f:
+                content = f.read()
+
+            # Look for tools with language mappings
+            lines = content.split("\n")
+            for line in lines:
+                stripped = line.strip()
+                # Look for lines like: tool = 'version' # description #language:python
+                if "=" in stripped and "#language:" in stripped:
+                    parts = stripped.split("=", 1)
+                    if len(parts) == TOOL_ASSIGNMENT_PARTS:
+                        tool_name = parts[0].strip()
+                        # Extract language after #language:
+                        language_part = stripped.split("#language:", 1)[1].strip()
+                        if language_part:
+                            mapping[tool_name] = language_part
+
+        except Exception as e:
+            if DEBUG_MODE:
+                logger.debug("Failed to parse .mise.toml language mappings: %s", e)
+
+        return mapping
 
     def _create_language_checkboxes(
         self,
