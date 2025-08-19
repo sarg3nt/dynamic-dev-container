@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# cspell:ignore gitui cmctl jdxcode sles noconfirm, nerdctl, openbao kubectx kubens krew pybuild tcss kubebench distros
+# cspell:ignore gitui cmctl jdxcode sles noconfirm, nerdctl, openbao kubectx kubens krew pybuild tcss kubebench distros unvalidated
 """Dynamic Dev Container TUI Setup.
 
 A Python Terminal User Interface (TUI) for installing .devcontainer and other files
@@ -38,19 +38,18 @@ if TYPE_CHECKING:
 # Global debug flag - can be set via environment variable or command line
 DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
 
-# HTTP status codes
-HTTP_OK = 200
-HTTP_UNAUTHORIZED = 401
-HTTP_FORBIDDEN = 403  # Rate limit exceeded
-
-# GitHub token validation constants
-MIN_VALID_TOKEN_RATE_LIMIT = 1000  # Minimum rate limit for valid token
-
-# Repository format constants
-REPO_PARTS_COUNT = 2  # Expected number of parts in owner/repo format
-
 # Parallel processing configuration
 DEFAULT_WORKER_COUNT = 8  # Optimal for I/O-bound API calls (GitHub, Homebrew, etc.)
+
+# Tool parsing constants
+TOOL_ASSIGNMENT_PARTS = 2  # Expected parts in tool = version assignment
+REPO_PARTS_COUNT = 2  # Expected parts in owner/repo format
+
+# HTTP status codes (minimal set for remaining network code)
+HTTP_OK = 200
+HTTP_UNAUTHORIZED = 401
+HTTP_FORBIDDEN = 403
+MIN_VALID_TOKEN_RATE_LIMIT = 1000  # Minimum rate limit for valid token
 
 # GitHub repository discovery constants
 MIN_STARS_OFFICIAL_REPO = 100  # Minimum stars for high-confidence official repo
@@ -366,30 +365,15 @@ class BackgroundDescriptionLoader(threading.Thread):
             )
 
     def _load_tool_description(self, tool: str) -> str | None:
-        """Load description for a single tool (internal method to avoid circular imports)."""
+        """Load description for a single tool using .mise.toml comments."""
         # Check cache first
         if tool in ToolManager._description_cache:  # noqa: SLF001
             return ToolManager._description_cache[tool]  # noqa: SLF001
 
-        # Try different sources for getting descriptions
-        description = None
+        # Get description from .mise.toml comments
+        description = ToolManager._get_mise_description(tool)  # noqa: SLF001
 
-        # 1. Try GitHub API (works for many tools)
-        description = ToolManager._get_github_description(tool)  # noqa: SLF001
-
-        # 2. Try Homebrew API (for macOS/Linux tools)
-        if not description:
-            description = ToolManager._get_homebrew_description(tool)  # noqa: SLF001
-
-        # 3. Try package.json for Node.js tools
-        if not description and tool in ["node", "npm", "yarn", "pnpm", "bun", "deno"]:
-            description = ToolManager._get_nodejs_description(tool)  # noqa: SLF001
-
-        # 4. Fall back to manual mapping for tools we know about
-        if not description:
-            description = ToolManager._get_fallback_description(tool)  # noqa: SLF001
-
-        # Use the tool name if no description found
+        # Use generic fallback if not found
         if not description:
             description = f"{tool} - Development tool"
 
@@ -425,7 +409,7 @@ class ToolManager:
     _description_cache: dict[str, str] = {}
     _repo_verification_cache: dict[str, bool] = {}
 
-    # GitHub token validation cache
+    # GitHub token validation cache - keeping for compatibility but not actively used
     _token_tested: bool = False
     _token_valid: bool = False
 
@@ -708,29 +692,18 @@ class ToolManager:
 
     @staticmethod
     def get_tool_description(tool: str) -> str:
-        """Get description for a development tool dynamically from various sources."""
+        """Get description for a development tool from .mise.toml comments."""
         # Try to get description from cache first
         cached_desc = ToolManager._get_cached_description(tool)
         if cached_desc:
             return cached_desc
 
-        # Try different sources for getting descriptions
-        description = None
+        # Get description from .mise.toml comments
+        description = ToolManager._get_mise_description(tool)
 
-        # 1. Try GitHub API (works for many tools)
-        description = ToolManager._get_github_description(tool)
-
-        # 2. Try Homebrew API (for macOS/Linux tools)
+        # Use generic fallback if not found
         if not description:
-            description = ToolManager._get_homebrew_description(tool)
-
-        # 3. Try package.json for Node.js tools
-        if not description and tool in ["node", "npm", "yarn", "pnpm", "bun", "deno"]:
-            description = ToolManager._get_nodejs_description(tool)
-
-        # 4. Fall back to manual mapping for tools we know about
-        if not description:
-            description = ToolManager._get_fallback_description(tool)
+            description = f"{tool} - Development tool"
 
         # Cache the result
         ToolManager._cache_description(tool, description)
@@ -748,6 +721,52 @@ class ToolManager:
 
     # Cache for GitHub API responses to avoid rate limiting
     _github_description_cache: dict[str, str | None] = {}
+
+    @staticmethod
+    def _get_mise_description(tool: str) -> str | None:
+        """Get tool description from .mise.toml comments."""
+        try:
+            # Look for .mise.toml in current directory or workspace
+            mise_file = Path(".mise.toml")
+            if not mise_file.exists():
+                # Try to find it in the workspace directory
+                workspace_paths = [
+                    Path("/workspaces/dynamic-dev-container/.mise.toml"),
+                    Path.cwd() / ".mise.toml",
+                    Path.cwd().parent / ".mise.toml",
+                ]
+                for path in workspace_paths:
+                    if path.exists():
+                        mise_file = path
+                        break
+                else:
+                    return None
+
+            with open(mise_file, encoding="utf-8") as f:
+                content = f.read()
+
+            # Look for the tool and its comment
+            lines = content.split("\n")
+            for line in lines:
+                stripped = line.strip()
+                # Look for lines like: tool = 'version' # description
+                if "=" in stripped and "#" in stripped:
+                    parts = stripped.split("=", 1)
+                    if len(parts) == TOOL_ASSIGNMENT_PARTS:
+                        tool_name = parts[0].strip()
+                        if tool_name == tool:
+                            # Extract comment after #
+                            right_side = parts[1]
+                            if "#" in right_side:
+                                comment = right_side.split("#", 1)[1].strip()
+                                if comment and not comment.startswith("version"):
+                                    return comment
+
+        except Exception as e:
+            if DEBUG_MODE:
+                logger.debug("Failed to parse .mise.toml descriptions for %s: %s", tool, e)
+
+        return None
 
     @staticmethod
     def _get_github_description(tool: str) -> str | None:
@@ -1052,31 +1071,6 @@ class ToolManager:
                 logger.debug("Homebrew API failed for %s: %s", tool, e)
 
         return None
-
-    @staticmethod
-    def _get_nodejs_description(tool: str) -> str | None:
-        """Get description for Node.js related tools."""
-        nodejs_descriptions = {
-            "node": "Node.js - JavaScript runtime built on Chrome's V8 JavaScript engine",
-            "npm": "npm - Node package manager",
-            "yarn": "Yarn - Fast, reliable, and secure dependency management",
-            "pnpm": "pnpm - Fast, disk space efficient package manager",
-            "bun": "Bun - Fast all-in-one JavaScript runtime & toolkit",
-            "deno": "Deno - A modern runtime for JavaScript and TypeScript",
-        }
-        return nodejs_descriptions.get(tool)
-
-    @staticmethod
-    def _get_fallback_description(tool: str) -> str:
-        """Get fallback descriptions for tools we know about."""
-        fallback_descriptions = {
-            "kubectl": "kubectl - Kubernetes command-line tool",
-            "powershell": "PowerShell - Task automation and configuration management framework",
-            "dotnet": ".NET - Free, cross-platform, open-source developer platform",
-            "golang": "Go - Open source programming language that makes it easy to build software",
-            "python": "Python - Programming language that lets you work quickly and integrate systems",
-        }
-        return fallback_descriptions.get(tool, f"{tool} - Development tool")
 
 
 class MiseParser:
@@ -1576,9 +1570,6 @@ class WelcomeScreen(Screen[None], DebugMixin):
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
-        # Get some dynamic information
-        github_token_status = "✅ Available" if os.getenv("GITHUB_TOKEN") else "⚠️  Not set (rate limiting may occur)"
-
         yield Header()
         yield Container(
             Markdown(f"""
@@ -1589,7 +1580,6 @@ Welcome to the **Dynamic Dev Container TUI Setup**!
 This wizard will guide you through configuring your development container with the tools and extensions you need.
 
 ## System Status:
-- GitHub Token: {github_token_status}
 - Debug Mode: {"✅ Enabled" if DEBUG_MODE else "❌ Disabled"}
 
 ## Getting Started:

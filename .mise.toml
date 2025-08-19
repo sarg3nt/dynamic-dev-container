@@ -9,69 +9,69 @@ MISE_PYTHON_COMPILE = false
 [tools]
 #### Begin Python
 #version#
-python = '3.13'
+python = '3.13' # Python programming language - high-level, interpreted language for general-purpose programming
 #### End Python
 
 #### Begin HashiCorp Tools
 #version#
-opentofu = 'latest'
+opentofu = 'latest' # OpenTofu - open-source Terraform alternative for infrastructure as code
 #version#
-openbao = 'latest'
+openbao = 'latest' # OpenBao - open-source Vault alternative for secrets management
 #version#
-packer = 'latest'
+packer = 'latest' # Packer - tool for building automated machine images
 #### End HashiCorp Tools
 
 #### Begin Kubernetes
 #version#
-kubectl = 'latest'
-kubectx = 'latest'
-kubens = 'latest'
-k9s = 'latest'
-helm = 'latest'
-kubebench = 'latest'
+kubectl = 'latest' # kubectl - Kubernetes command-line tool for cluster management
+kubectx = 'latest' # kubectx - tool to switch between Kubernetes contexts
+kubens = 'latest' # kubens - tool to switch between Kubernetes namespaces
+k9s = 'latest' # k9s - terminal-based UI for Kubernetes cluster management
+helm = 'latest' # Helm - package manager for Kubernetes applications
+kubebench = 'latest' # kube-bench - security benchmark tool for Kubernetes
 #### End Kubernetes
 
 #### Begin Kubernetes Utilities
-krew = 'latest'
-dive = 'latest'
-popeye = 'latest'
-trivy = 'latest'
-cmctl = 'latest'
-k3d = 'latest'
+krew = 'latest' # krew - package manager for kubectl plugins
+dive = 'latest' # dive - tool for exploring Docker image layers
+popeye = 'latest' # popeye - Kubernetes cluster resource sanitizer
+trivy = 'latest' # trivy - vulnerability scanner for containers and other artifacts
+cmctl = 'latest' # cmctl - command-line tool for cert-manager
+k3d = 'latest' # k3d - lightweight Kubernetes cluster runner using Docker
 #### End Kubernetes Utilities
 
 #### Begin Go Development
 #version#
-golang = 'latest'
-golangci-lint = 'latest'
-goreleaser = 'latest'
+golang = 'latest' # Go - open-source programming language for building efficient software
+golangci-lint = 'latest' # golangci-lint - fast Go linters runner
+goreleaser = 'latest' # GoReleaser - tool for building and releasing Go projects
 #### End Go Development
 
 #### Begin .NET Development
 #version#
-dotnet = 'latest'
+dotnet = 'latest' # .NET - free, cross-platform, open-source developer platform
 #### End .NET Development
 
 #### Begin Node Development
 #version#
-node = '22.0'
-pnpm = 'latest'
-yarn = 'latest'
-deno = 'latest'
-bun = 'latest'
+node = '22.0' # Node.js - JavaScript runtime built on Chrome's V8 engine
+pnpm = 'latest' # pnpm - fast, disk space efficient package manager
+yarn = 'latest' # Yarn - fast, reliable, and secure dependency management
+deno = 'latest' # Deno - secure runtime for JavaScript and TypeScript
+bun = 'latest' # Bun - fast all-in-one JavaScript runtime and toolkit
 #### End Node Development
 
 #### Begin PowerShell
 #version#
-powershell = 'latest'
+powershell = 'latest' # PowerShell - task automation and configuration management framework
 #### End PowerShell
 
 #### Begin Miscellaneous Tools
-gitui = 'latest'
-cosign = 'latest'
-tealdeer = 'latest'
-micro = 'latest'
-shellcheck = 'latest'
+gitui = 'latest' # GitUI - terminal-based Git user interface
+cosign = 'latest' # cosign - container signing and verification tool
+tealdeer = 'latest' # tealdeer - fast implementation of tldr pages
+micro = 'latest' # micro - modern and intuitive terminal-based text editor
+shellcheck = 'latest' # ShellCheck - static analysis tool for shell scripts
 #### End Miscellaneous Tools
 
 # See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
