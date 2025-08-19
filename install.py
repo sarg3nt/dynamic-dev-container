@@ -22,15 +22,18 @@ import tempfile
 import threading
 import time
 import traceback
+import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
+
+# Add missing imports for type checking and protocol
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 if TYPE_CHECKING:
-    from textual.events import Focus, Key
-    from textual.timer import Timer
+    from textual.events import Focus, Key  # type: ignore[import,unused-ignore]
+    from textual.timer import Timer  # type: ignore[import,unused-ignore]
 
 # Global debug flag - can be set via environment variable or command line
 DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
@@ -61,27 +64,35 @@ class DevContainerApp(Protocol):
 
     def after_welcome(self, result: None = None) -> None:
         """Called after welcome screen completes."""
+        ...
 
     def after_project_config(self, result: None = None) -> None:
         """Called after project config screen completes."""
+        ...
 
     def after_tool_selection(self, result: None = None) -> None:
         """Called after tool selection screen completes."""
+        ...
 
     def after_python_repository(self, result: None = None) -> None:
         """Called after Python repository screen completes."""
+        ...
 
     def after_python_project(self, result: None = None) -> None:
         """Called after Python project screen completes."""
+        ...
 
     def after_tool_versions(self, result: None = None) -> None:
         """Called after tool versions screen completes."""
+        ...
 
     def after_psi_header(self, result: None = None) -> None:
         """Called after PSI header screen completes."""
+        ...
 
     def after_summary(self, result: None = None) -> None:
         """Called after summary screen completes."""
+        ...
 
 
 class TUILogHandler(logging.Handler):
@@ -1623,13 +1634,12 @@ Press **ENTER** to begin the setup wizard...
 
     def action_continue(self) -> None:
         """Continue to the next screen."""
-        """Continue to the next screen."""
         # Call the next step directly
-        self.app.call_later(self.app.after_welcome)  # type: ignore[attr-defined]
+        app = cast("DevContainerApp", self.app)
+        self.app.call_later(app.after_welcome)
         self.app.pop_screen()
 
     def action_quit(self) -> None:
-        """Quit the application."""
         """Quit the application."""
         self.app.exit()
 
@@ -1805,7 +1815,6 @@ class PythonRepositoryScreen(Screen[None]):
 
     def save_config(self) -> None:
         """Save current configuration."""
-        """Save Python repository configuration."""
         # Save project metadata
         self.config.python_project_name = self.query_one("#project_name", Input).value or "my-awesome-project"
         self.config.python_project_description = (
@@ -1841,7 +1850,8 @@ class PythonRepositoryScreen(Screen[None]):
         self.config.python_index_url = self.query_one("#index_url", Input).value or "https://pypi.org/simple/"
         self.config.python_extra_index_url = self.query_one("#extra_index_url", Input).value
 
-        self.app.call_later(self.app.after_python_repository)  # type: ignore[attr-defined]
+        app = cast("DevContainerApp", self.app)
+        self.app.call_later(app.after_python_repository)
         self.app.pop_screen()
 
     def action_next(self) -> None:
@@ -1949,7 +1959,6 @@ class PythonProjectScreen(Screen[None]):
 
     def save_config(self) -> None:
         """Save current configuration."""
-        """Save Python project metadata."""
         self.config.python_project_name = self.query_one("#python_project_name", Input).value
         self.config.python_project_description = self.query_one("#project_description", Input).value
         self.config.python_author_name = self.query_one("#author_name", Input).value
@@ -1958,7 +1967,6 @@ class PythonProjectScreen(Screen[None]):
         self.config.python_github_project = self.query_one("#github_project", Input).value
         self.config.python_keywords = self.query_one("#keywords", Input).value
 
-        # Determine license
         # Determine license
         if self.query_one("#license_mit", Checkbox).value:
             self.config.python_license = "MIT"
@@ -1973,7 +1981,8 @@ class PythonProjectScreen(Screen[None]):
         else:
             self.config.python_license = "MIT"  # Default
 
-        self.app.call_later(self.app.after_python_project)  # type: ignore[attr-defined]
+        app = cast("DevContainerApp", self.app)
+        self.app.call_later(app.after_python_project)
         self.app.pop_screen()
 
     def action_next(self) -> None:
@@ -2144,7 +2153,8 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
                 # Skip if checkbox doesn't exist
                 continue
 
-        self.app.call_later(self.app.after_psi_header)  # type: ignore[attr-defined]
+        app = cast("DevContainerApp", self.app)
+        self.app.call_later(app.after_psi_header)
         self.app.pop_screen()
 
     def action_next(self) -> None:
@@ -2275,13 +2285,13 @@ class ToolVersionScreen(Screen[None], DebugMixin):
 
     def save_config(self) -> None:
         """Save current configuration."""
-        """Save tool version configurations."""
         for tool in self.configurable_tools:
             version_input = self.query_one(f"#version_{tool}", Input)
             version = version_input.value.strip() or "latest"
             self.config.tool_version_value[tool] = version
 
-        self.app.call_later(self.app.after_tool_versions)  # type: ignore[attr-defined]
+        app = cast("DevContainerApp", self.app)
+        self.app.call_later(app.after_tool_versions)
         self.app.pop_screen()
 
     def action_next(self) -> None:
@@ -2433,7 +2443,6 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
 
     def save_config(self) -> None:
         """Save current configuration."""
-        """Save the configuration and continue."""
         # Get values from inputs
         self.config.project_path = self.query_one("#project_path", Input).value
         self.config.project_name = self.query_one("#project_name", Input).value
@@ -2459,7 +2468,8 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
             self.config.container_name = f"{self.config.project_name}-container"
 
         # Schedule the callback and pop the screen
-        self.app.call_later(self.app.after_project_config)  # type: ignore[attr-defined]
+        app = cast("DevContainerApp", self.app)
+        self.app.call_later(app.after_project_config)
         self.app.pop_screen()
 
 
@@ -3991,13 +4001,20 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     self.config.include_python_extensions = True
                 elif tool in ["node", "pnpm", "yarn", "deno", "bun"]:
                     self.config.include_js_extensions = True
+            if selected:
+                if tool == "python":
+                    self.config.install_python_tools = True
+                    self.config.include_python_extensions = True
+                elif tool in ["node", "pnpm", "yarn", "deno", "bun"]:
+                    self.config.include_js_extensions = True
 
         # Always include markdown and shell extensions by default
         self.config.include_markdown_extensions = True
         self.config.include_shell_extensions = True
 
         # Go directly to tool version configuration or next step
-        self.app.call_later(self.app.after_tool_selection)  # type: ignore[attr-defined]
+        app = cast("DevContainerApp", self.app)
+        self.app.call_later(app.after_tool_selection)
         self.app.pop_screen()
 
     def action_toggle_debug(self) -> None:
@@ -4167,7 +4184,8 @@ class SummaryScreen(Screen[None], DebugMixin):
 
     def action_install(self) -> None:
         """Start the installation process."""
-        self.app.call_later(self.app.after_summary)  # type: ignore[attr-defined]
+        app = cast("DevContainerApp", self.app)
+        self.app.call_later(app.after_summary)
         self.app.pop_screen()
 
     def action_quit(self) -> None:
@@ -4176,10 +4194,7 @@ class SummaryScreen(Screen[None], DebugMixin):
 
     def action_back(self) -> None:
         """Go to previous step."""
-        """Go back to PSI Header configuration screen."""
-        # Navigate back to PSI Header configuration screen
         self.app.pop_screen()
-        self.app.show_psi_header_config()  # type: ignore[attr-defined]
 
     def action_toggle_debug(self) -> None:
         """Toggle debug mode."""
