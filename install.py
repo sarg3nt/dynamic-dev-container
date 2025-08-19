@@ -62,35 +62,91 @@ class DevContainerApp(Protocol):
     """Protocol defining the interface needed by screens."""
 
     def after_welcome(self, result: None = None) -> None:
-        """Called after welcome screen completes."""
+        """Called after welcome screen completes.
+
+        Parameters
+        ----------
+        result : None, optional
+            Unused parameter for callback compatibility, by default None
+
+        """
         ...
 
     def after_project_config(self, result: None = None) -> None:
-        """Called after project config screen completes."""
+        """Called after project config screen completes.
+
+        Parameters
+        ----------
+        result : None, optional
+            Unused parameter for callback compatibility, by default None
+
+        """
         ...
 
     def after_tool_selection(self, result: None = None) -> None:
-        """Called after tool selection screen completes."""
+        """Called after tool selection screen completes.
+
+        Parameters
+        ----------
+        result : None, optional
+            Unused parameter for callback compatibility, by default None
+
+        """
         ...
 
     def after_python_repository(self, result: None = None) -> None:
-        """Called after Python repository screen completes."""
+        """Called after Python repository screen completes.
+
+        Parameters
+        ----------
+        result : None, optional
+            Unused parameter for callback compatibility, by default None
+
+        """
         ...
 
     def after_python_project(self, result: None = None) -> None:
-        """Called after Python project screen completes."""
+        """Called after Python project screen completes.
+
+        Parameters
+        ----------
+        result : None, optional
+            Unused parameter for callback compatibility, by default None
+
+        """
         ...
 
     def after_tool_versions(self, result: None = None) -> None:
-        """Called after tool versions screen completes."""
+        """Called after tool versions screen completes.
+
+        Parameters
+        ----------
+        result : None, optional
+            Unused parameter for callback compatibility, by default None
+
+        """
         ...
 
     def after_psi_header(self, result: None = None) -> None:
-        """Called after PSI header screen completes."""
+        """Called after PSI header screen completes.
+
+        Parameters
+        ----------
+        result : None, optional
+            Unused parameter for callback compatibility, by default None
+
+        """
         ...
 
     def after_summary(self, result: None = None) -> None:
-        """Called after summary screen completes."""
+        """Called after summary screen completes.
+
+        Parameters
+        ----------
+        result : None, optional
+            Unused parameter for callback compatibility, by default None
+
+        """
         ...
 
 
@@ -98,13 +154,25 @@ class TUILogHandler(logging.Handler):
     """Custom logging handler that captures messages for TUI display."""
 
     def __init__(self) -> None:
-        """Initialize the TUI log handler."""
+        """Initialize the TUI log handler.
+
+        Initializes the logging handler with an empty message list and sets
+        the maximum number of stored messages to prevent memory growth.
+
+        """
         super().__init__()
         self.messages: list[str] = []
         self.max_messages = 100  # Keep only the last 100 messages
 
     def emit(self, record: logging.LogRecord) -> None:
-        """Emit a log record by storing it for TUI display."""
+        """Emit a log record by storing it for TUI display.
+
+        Parameters
+        ----------
+        record : logging.LogRecord
+            The log record to emit
+
+        """
         try:
             msg = self.format(record)
             self.messages.append(msg)
@@ -115,11 +183,22 @@ class TUILogHandler(logging.Handler):
             self.handleError(record)
 
     def get_messages(self) -> list[str]:
-        """Get all captured log messages."""
+        """Get all captured log messages.
+
+        Returns
+        -------
+        list[str]
+            A copy of all captured log messages
+
+        """
         return self.messages.copy()
 
     def clear_messages(self) -> None:
-        """Clear all captured messages."""
+        """Clear all captured messages.
+
+        Removes all stored log messages from the handler's message list.
+
+        """
         self.messages.clear()
 
 
@@ -129,7 +208,14 @@ tui_log_handler = TUILogHandler()
 
 # Configure logging for debugging
 def setup_logging(debug_mode: bool = False) -> None:
-    """Set up logging configuration based on debug mode."""
+    """Set up logging configuration based on debug mode.
+
+    Parameters
+    ----------
+    debug_mode : bool, optional
+        Whether to enable debug mode with file logging, by default False
+
+    """
     # Clear any existing handlers to prevent duplicates
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
@@ -165,7 +251,14 @@ logger = logging.getLogger(__name__)
 
 # Check if required dependencies are available
 def check_and_install_dependencies() -> None:
-    """Check for required dependencies and install them if needed."""
+    """Check for required dependencies and install them if needed.
+
+    Raises
+    ------
+    SystemExit
+        If dependencies cannot be installed after multiple attempts
+
+    """
     required_packages = [
         ("textual", "textual[dev]>=0.41.0"),
         ("rich", "rich>=13.0.0"),
@@ -365,7 +458,19 @@ class BackgroundDescriptionLoader(threading.Thread):
             )
 
     def _load_tool_description(self, tool: str) -> str | None:
-        """Load description for a single tool using .mise.toml comments."""
+        """Load description for a single tool using .mise.toml comments.
+
+        Parameters
+        ----------
+        tool : str
+            The name of the tool to load description for
+
+        Returns
+        -------
+        str | None
+            The tool description if found, None otherwise
+
+        """
         # Check cache first
         if tool in ToolManager._description_cache:  # noqa: SLF001
             return ToolManager._description_cache[tool]  # noqa: SLF001
@@ -382,19 +487,52 @@ class BackgroundDescriptionLoader(threading.Thread):
         return description
 
     def is_complete(self) -> bool:
-        """Check if loading is complete."""
+        """Check if loading is complete.
+
+        Returns
+        -------
+        bool
+            True if background loading has completed, False otherwise
+
+        """
         return self._complete
 
     def get_progress(self) -> tuple[int, int]:
-        """Get loading progress (completed, total)."""
+        """Get loading progress (completed, total).
+
+        Returns
+        -------
+        tuple[int, int]
+            A tuple containing (completed_count, total_count)
+
+        """
         return self.completed, self.total
 
     def wait_for_completion(self, timeout: float = 30.0) -> bool:
-        """Wait for loading to complete with timeout."""
+        """Wait for loading to complete with timeout.
+
+        Parameters
+        ----------
+        timeout : float, optional
+            Maximum time to wait in seconds, by default 30.0
+
+        Returns
+        -------
+        bool
+            True if loading completed within timeout, False if timeout occurred
+
+        """
         return self._completion_event.wait(timeout)
 
     def get_elapsed_time(self) -> float:
-        """Get elapsed time since loading started."""
+        """Get elapsed time since loading started.
+
+        Returns
+        -------
+        float
+            Elapsed time in seconds since loading started, or 0.0 if not started
+
+        """
         if self.start_time == 0:
             return 0.0
         if self._complete:
@@ -419,7 +557,16 @@ class ToolManager:
 
     @classmethod
     def start_background_loading(cls, all_tools: list[str], max_workers: int = DEFAULT_WORKER_COUNT) -> None:
-        """Start background loading of tool descriptions."""
+        """Start background loading of tool descriptions.
+
+        Parameters
+        ----------
+        all_tools : list[str]
+            List of all tools to load descriptions for
+        max_workers : int, optional
+            Maximum number of worker threads, by default DEFAULT_WORKER_COUNT
+
+        """
         if not cls._loading_started:
             cls._background_loader = BackgroundDescriptionLoader(all_tools, max_workers=max_workers)
             cls._background_loader.start()
@@ -427,26 +574,69 @@ class ToolManager:
 
     @classmethod
     def is_loading_complete(cls) -> bool:
-        """Check if background loading is complete."""
+        """Check if background loading is complete.
+
+        Returns
+        -------
+        bool
+            True if background loading has finished, False otherwise
+
+        """
         return cls._background_loader is not None and cls._background_loader.is_complete()
 
     @classmethod
     def get_loading_progress(cls) -> tuple[int, int]:
-        """Get loading progress (completed, total)."""
+        """Get loading progress (completed, total).
+
+        Returns
+        -------
+        tuple[int, int]
+            A tuple containing (completed_count, total_count) for background loading
+
+        """
         if cls._background_loader is None:
             return 0, 0
         return cls._background_loader.get_progress()
 
     @classmethod
     def wait_for_loading_complete(cls, timeout: float = 30.0) -> bool:
-        """Wait for background loading to complete with timeout."""
+        """Wait for background loading to complete with timeout.
+
+        Parameters
+        ----------
+        timeout : float, optional
+            Maximum time to wait in seconds, by default 30.0
+
+        Returns
+        -------
+        bool
+            True if loading completed within timeout, False if timeout occurred
+
+        """
         if cls._background_loader is None:
             return True
         return cls._background_loader.wait_for_completion(timeout)
 
     @staticmethod
     def _make_github_api_request(url: str) -> urllib.request.Request:
-        """Create a GitHub API request with authentication if token is available."""
+        """Create a GitHub API request with authentication if token is available.
+
+        Parameters
+        ----------
+        url : str
+            The GitHub API URL to request
+
+        Returns
+        -------
+        urllib.request.Request
+            A configured request object with authentication headers
+
+        Raises
+        ------
+        ValueError
+            If URL doesn't use http or https scheme
+
+        """
         # Validate URL scheme for security
         if not url.startswith(("http:", "https:")):
             msg = "URL must start with 'http:' or 'https:'"
@@ -533,7 +723,14 @@ class ToolManager:
 
     @staticmethod
     def detect_container_runtime() -> tuple[str, str] | None:
-        """Detect available container runtime."""
+        """Detect available container runtime.
+
+        Returns
+        -------
+        tuple[str, str] | None
+            Tuple of (command, runtime_type) if found, None if no runtime available
+
+        """
 
         # Check for available container runtimes in order of preference
         if shutil.which("docker"):
@@ -633,7 +830,19 @@ class ToolManager:
 
     @staticmethod
     def get_version_list(tool_name: str) -> list[str]:
-        """Get latest major versions for a tool, similar to install.sh logic."""
+        """Get latest major versions for a tool, similar to install.sh logic.
+
+        Parameters
+        ----------
+        tool_name : str
+            Name of the tool to get version list for
+
+        Returns
+        -------
+        list[str]
+            List of available versions with 'latest' first, followed by recent major versions
+
+        """
         versions = ToolManager.get_tool_versions(tool_name)
 
         if not versions:
@@ -684,7 +893,19 @@ class ToolManager:
 
     @staticmethod
     def get_latest_major_versions(tool_name: str) -> str:
-        """Get latest major versions for a tool (legacy method for compatibility)."""
+        """Get latest major versions for a tool (legacy method for compatibility).
+
+        Parameters
+        ----------
+        tool_name : str
+            Name of the tool to get version display string for
+
+        Returns
+        -------
+        str
+            Formatted string of available versions for display
+
+        """
         versions = ToolManager.get_version_list(tool_name)
         if len(versions) > 1:
             return f"(e.g., {', '.join(versions[1:])})"  # Skip 'latest' for display
@@ -692,7 +913,19 @@ class ToolManager:
 
     @staticmethod
     def get_tool_description(tool: str) -> str:
-        """Get description for a development tool from .mise.toml comments."""
+        """Get description for a development tool from .mise.toml comments.
+
+        Parameters
+        ----------
+        tool : str
+            The name of the tool to get description for
+
+        Returns
+        -------
+        str
+            The tool description, uses fallback if not found in .mise.toml
+
+        """
         # Try to get description from cache first
         cached_desc = ToolManager._get_cached_description(tool)
         if cached_desc:
@@ -711,12 +944,33 @@ class ToolManager:
 
     @staticmethod
     def _get_cached_description(tool: str) -> str | None:
-        """Get cached description for a tool."""
+        """Get cached description for a tool.
+
+        Parameters
+        ----------
+        tool : str
+            The tool name to get cached description for
+
+        Returns
+        -------
+        str | None
+            Cached description if available, None otherwise
+
+        """
         return ToolManager._description_cache.get(tool)
 
     @staticmethod
     def _cache_description(tool: str, description: str) -> None:
-        """Cache description for a tool."""
+        """Cache description for a tool.
+
+        Parameters
+        ----------
+        tool : str
+            The tool name to cache description for
+        description : str
+            The description to cache
+
+        """
         ToolManager._description_cache[tool] = description
 
     # Cache for GitHub API responses to avoid rate limiting
@@ -724,7 +978,19 @@ class ToolManager:
 
     @staticmethod
     def _get_mise_description(tool: str) -> str | None:
-        """Get tool description from .mise.toml comments."""
+        """Get tool description from .mise.toml comments.
+
+        Parameters
+        ----------
+        tool : str
+            The name of the tool to get description for
+
+        Returns
+        -------
+        str | None
+            The tool description from .mise.toml comment, None if not found
+
+        """
         try:
             # Look for .mise.toml in current directory or workspace
             mise_file = Path(".mise.toml")
@@ -770,7 +1036,19 @@ class ToolManager:
 
     @staticmethod
     def _get_github_description(tool: str) -> str | None:
-        """Get tool description from GitHub API using automatic repository discovery."""
+        """Get tool description from GitHub API using automatic repository discovery.
+
+        Parameters
+        ----------
+        tool : str
+            The name of the tool to get description for
+
+        Returns
+        -------
+        str | None
+            The tool description from GitHub repository, None if not found
+
+        """
         # Check cache first to avoid rate limiting
         if tool in ToolManager._github_description_cache:
             return ToolManager._github_description_cache[tool]
@@ -804,7 +1082,19 @@ class ToolManager:
 
     @staticmethod
     def _discover_github_repo(tool: str) -> str | None:
-        """Discover GitHub repository for a tool using multiple strategies."""
+        """Discover GitHub repository for a tool using multiple strategies.
+
+        Parameters
+        ----------
+        tool : str
+            The name of the tool to find repository for
+
+        Returns
+        -------
+        str | None
+            GitHub repository in 'owner/repo' format, None if not found
+
+        """
         # Strategy 1: Pattern matching (fastest, no API calls for known tools)
         repo = ToolManager._guess_repo_patterns(tool)
         if repo:
@@ -829,7 +1119,19 @@ class ToolManager:
 
     @staticmethod
     def _get_repo_from_npm(tool: str) -> str | None:
-        """Get repository information from NPM registry."""
+        """Get repository information from NPM registry.
+
+        Parameters
+        ----------
+        tool : str
+            The npm package name to look up
+
+        Returns
+        -------
+        str | None
+            GitHub repository in 'owner/repo' format, None if not found
+
+        """
         try:
             url = f"https://registry.npmjs.org/{tool}"
             if not url.startswith(("http:", "https:")):
@@ -860,7 +1162,19 @@ class ToolManager:
 
     @staticmethod
     def _search_github_repos(tool: str) -> str | None:
-        """Search GitHub repositories for the tool."""
+        """Search GitHub repositories for the tool.
+
+        Parameters
+        ----------
+        tool : str
+            The tool name to search for on GitHub
+
+        Returns
+        -------
+        str | None
+            GitHub repository in 'owner/repo' format, None if not found
+
+        """
         try:
             # Use multiple search strategies with different query patterns
             search_queries = [
@@ -931,7 +1245,19 @@ class ToolManager:
 
     @staticmethod
     def _get_repo_from_homebrew(tool: str) -> str | None:
-        """Extract repository info from Homebrew formula."""
+        """Extract repository info from Homebrew formula.
+
+        Parameters
+        ----------
+        tool : str
+            The Homebrew formula name to look up
+
+        Returns
+        -------
+        str | None
+            GitHub repository in 'owner/repo' format, None if not found
+
+        """
         try:
             url = f"https://formulae.brew.sh/api/formula/{tool}.json"
             if not url.startswith(("http:", "https:")):
@@ -970,7 +1296,19 @@ class ToolManager:
 
     @staticmethod
     def _guess_repo_patterns(tool: str) -> str | None:
-        """Try common repository naming patterns dynamically."""
+        """Try common repository naming patterns dynamically.
+
+        Parameters
+        ----------
+        tool : str
+            The tool name to generate repository patterns for
+
+        Returns
+        -------
+        str | None
+            GitHub repository in 'owner/repo' format, None if not found
+
+        """
         # Common patterns for tools (fully dynamic approach)
         patterns = [
             f"{tool}/{tool}",  # tool/tool (most common pattern)
@@ -1011,7 +1349,19 @@ class ToolManager:
 
     @staticmethod
     def _extract_github_repo_from_url(url: str) -> str | None:
-        """Extract GitHub repository owner/repo from various URL formats."""
+        """Extract GitHub repository owner/repo from various URL formats.
+
+        Parameters
+        ----------
+        url : str
+            The URL to extract repository information from
+
+        Returns
+        -------
+        str | None
+            GitHub repository in 'owner/repo' format, None if not found
+
+        """
         if not url:
             return None
 
@@ -1042,7 +1392,19 @@ class ToolManager:
 
     @staticmethod
     def _verify_github_repo_exists(repo: str) -> bool:
-        """Verify that a GitHub repository exists."""
+        """Verify that a GitHub repository exists.
+
+        Parameters
+        ----------
+        repo : str
+            Repository in 'owner/repo' format to check
+
+        Returns
+        -------
+        bool
+            True if repository exists, False otherwise
+
+        """
         try:
             url = f"https://api.github.com/repos/{repo}"
             request = ToolManager._make_github_api_request(url)
@@ -1053,7 +1415,19 @@ class ToolManager:
 
     @staticmethod
     def _get_homebrew_description(tool: str) -> str | None:
-        """Get tool description from Homebrew Formulae API."""
+        """Get tool description from Homebrew Formulae API.
+
+        Parameters
+        ----------
+        tool : str
+            The Homebrew formula name to get description for
+
+        Returns
+        -------
+        str | None
+            The tool description from Homebrew, None if not found
+
+        """
         try:
             url = f"https://formulae.brew.sh/api/formula/{tool}.json"
             # Validate URL scheme for security
@@ -1078,7 +1452,19 @@ class MiseParser:
 
     @staticmethod
     def parse_mise_sections(mise_file: Path) -> tuple[list[str], dict[str, bool], dict[str, str], dict[str, bool]]:
-        """Parse tool sections from .mise.toml file."""
+        """Parse tool sections from .mise.toml file.
+
+        Parameters
+        ----------
+        mise_file : Path
+            Path to the .mise.toml file to parse
+
+        Returns
+        -------
+        tuple[list[str], dict[str, bool], dict[str, str], dict[str, bool]]
+            Tuple containing (sections, tool_selected, tool_version_value, tool_version_configurable)
+
+        """
         if not mise_file.exists():
             return [], {}, {}, {}
 
@@ -1137,7 +1523,21 @@ class MiseParser:
 
     @staticmethod
     def get_section_tools(mise_file: Path, section_name: str) -> list[str]:
-        """Get all tools in a specific section."""
+        """Get all tools in a specific section.
+
+        Parameters
+        ----------
+        mise_file : Path
+            Path to the .mise.toml file to parse
+        section_name : str
+            Name of the section to get tools from
+
+        Returns
+        -------
+        list[str]
+            List of tool names in the specified section
+
+        """
         if not mise_file.exists():
             return []
 
@@ -1170,7 +1570,19 @@ class DevContainerParser:
 
     @staticmethod
     def parse_extension_sections(devcontainer_file: Path) -> list[str]:
-        """Parse extension sections from devcontainer.json file."""
+        """Parse extension sections from devcontainer.json file.
+
+        Parameters
+        ----------
+        devcontainer_file : Path
+            Path to the devcontainer.json file to parse
+
+        Returns
+        -------
+        list[str]
+            List of extension section names found in the file
+
+        """
         if not devcontainer_file.exists():
             return []
 
@@ -1204,7 +1616,19 @@ class DevContainerParser:
 
     @staticmethod
     def parse_settings_sections(devcontainer_file: Path) -> list[str]:
-        """Parse settings sections from devcontainer.json file."""
+        """Parse settings sections from devcontainer.json file.
+
+        Parameters
+        ----------
+        devcontainer_file : Path
+            Path to the devcontainer.json file to parse
+
+        Returns
+        -------
+        list[str]
+            List of settings section names found in the file
+
+        """
         if not devcontainer_file.exists():
             return []
 
@@ -1250,7 +1674,21 @@ class DevContainerParser:
 
     @staticmethod
     def create_section_tool_mapping(mise_file: Path, devcontainer_file: Path) -> dict[str, list[str]]:
-        """Create a mapping of sections to tools based on .mise.toml sections."""
+        """Create a mapping of sections to tools based on .mise.toml sections.
+
+        Parameters
+        ----------
+        mise_file : Path
+            Path to the .mise.toml file
+        devcontainer_file : Path
+            Path to the devcontainer.json file
+
+        Returns
+        -------
+        dict[str, list[str]]
+            Mapping from section names to lists of tools in that section
+
+        """
         mise_sections, _, _, _ = MiseParser.parse_mise_sections(mise_file)
         _extension_sections = DevContainerParser.parse_extension_sections(devcontainer_file)
         _settings_sections = DevContainerParser.parse_settings_sections(devcontainer_file)
@@ -1267,7 +1705,19 @@ class DevContainerParser:
 
     @staticmethod
     def parse_psi_header_languages(devcontainer_file: Path) -> list[tuple[str, str]]:
-        """Parse available PSI header languages from devcontainer.json template."""
+        """Parse available PSI header languages from devcontainer.json template.
+
+        Parameters
+        ----------
+        devcontainer_file : Path
+            Path to the devcontainer.json file containing PSI header templates
+
+        Returns
+        -------
+        list[tuple[str, str]]
+            List of tuples containing (language_id, display_name) for each available language
+
+        """
         if not devcontainer_file.exists():
             return []
 
@@ -1326,7 +1776,18 @@ class FileManager:
 
     @staticmethod
     def copy_files_and_directories(source_dir: Path, target_dir: Path, include_python: bool = False) -> None:
-        """Copy required files and directories to target."""
+        """Copy required files and directories to target.
+
+        Parameters
+        ----------
+        source_dir : Path
+            Source directory to copy files from
+        target_dir : Path
+            Target directory to copy files to
+        include_python : bool, optional
+            Whether to include Python-specific files, by default False
+
+        """
         # Copy directories
         for dir_name in FileManager.DIRECTORIES_TO_COPY:
             source_path = source_dir / dir_name
@@ -1356,7 +1817,14 @@ class DebugMixin:
     """
 
     def get_debug_widget(self) -> Container:
-        """Create a debug output widget for the screen."""
+        """Create a debug output widget for the screen.
+
+        Returns
+        -------
+        Container
+            A container widget with debug log display
+
+        """
         debug_log = RichLog(
             max_lines=50,
             wrap=True,
@@ -1376,7 +1844,14 @@ class DebugMixin:
         )
 
     def _populate_debug_log(self, debug_log: RichLog) -> None:
-        """Populate debug log with current messages."""
+        """Populate debug log with current messages.
+
+        Parameters
+        ----------
+        debug_log : RichLog
+            The RichLog widget to populate with debug messages
+
+        """
         messages = tui_log_handler.get_messages()
 
         if not messages:
@@ -1393,7 +1868,11 @@ class DebugMixin:
                     debug_log.write(f"[red]Error displaying message: {e}[/red]")
 
     def update_debug_output(self) -> None:
-        """Update the debug output with new messages."""
+        """Update the debug output with new messages.
+
+        Refreshes the debug log widget with the latest captured log messages.
+
+        """
         try:
             # Use cast to tell mypy this mixin is used with Screen classes
             screen = cast("Screen[None]", self)
@@ -1414,7 +1893,12 @@ class DebugMixin:
             logger.debug("Failed to update debug output: %s", e)
 
     def _rebuild_with_debug_panel(self) -> None:
-        """Standard debug panel creation for all screens."""
+        """Standard debug panel creation for all screens.
+
+        Attempts to add a debug panel to the current screen by finding
+        the main container and mounting a debug widget.
+
+        """
         try:
             # Try to find a main container with common IDs
             main_container = None
@@ -1480,7 +1964,12 @@ class DebugMixin:
             logger.debug("DebugMixin: Error creating debug panel: %s", e)
 
     def _copy_debug_output(self) -> None:
-        """Standard debug copy functionality for all screens."""
+        """Standard debug copy functionality for all screens.
+
+        Copies all captured debug messages to the system clipboard and
+        displays a notification to the user.
+
+        """
         try:
             messages = tui_log_handler.get_messages()
             debug_text = "\n".join(messages)
@@ -1533,14 +2022,26 @@ class DebugModal(ModalScreen[None]):
         )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button presses in the debug modal."""
+        """Handle button presses in the debug modal.
+
+        Parameters
+        ----------
+        event : Button.Pressed
+            The button press event containing button information
+
+        """
         if event.button.id == "copy_debug_btn":
             self.action_copy_debug()
         elif event.button.id == "close_debug_btn":
             self.dismiss()
 
     def action_copy_debug(self) -> None:
-        """Copy debug output to clipboard."""
+        """Copy debug output to clipboard.
+
+        Attempts to copy all captured debug messages to the system clipboard
+        and displays a notification to the user.
+
+        """
         try:
             # Get all debug messages
             messages = tui_log_handler.get_messages()
@@ -1555,7 +2056,14 @@ class DebugModal(ModalScreen[None]):
             self.notify(f"Failed to copy debug output: {e}", timeout=3, severity="error")
 
     async def action_dismiss(self, result: None = None) -> None:
-        """Close the debug modal."""
+        """Close the debug modal.
+
+        Parameters
+        ----------
+        result : None, optional
+            Result value to pass when dismissing, by default None
+
+        """
         self.dismiss(result)
 
 
@@ -1617,13 +2125,21 @@ Press **ENTER** to begin the setup wizard...
         yield Footer()
 
     def on_mount(self) -> None:
-        """Called when the screen is mounted."""
+        """Called when the screen is mounted.
+
+        Sets up debug logging and periodic debug output updates for the welcome screen.
+
+        """
         logger.debug("WelcomeScreen mounted - Debug functionality available (Ctrl+D)")
         # Set up a timer to periodically update debug output
         self.set_interval(1.0, self.update_debug_output)
 
     def action_continue(self) -> None:
-        """Continue to the next screen."""
+        """Continue to the next screen.
+
+        Triggers the transition to the project configuration screen.
+
+        """
         # Call the next step directly
         app = cast("DevContainerApp", self.app)
         self.app.call_later(app.after_welcome)
@@ -2055,7 +2571,17 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             logger.debug("Could not set focus to install_psi checkbox")
 
     def _get_auto_selected_languages(self) -> set[str]:
-        """Get languages that should be auto-selected based on selected tools."""
+        """Get languages that should be auto-selected based on selected tools.
+
+        Analyzes the selected development tools and returns a set of language
+        identifiers that should be automatically selected for PSI Header templates.
+
+        Returns
+        -------
+        set[str]
+            Set of language identifiers to auto-select (e.g., 'python', 'go', 'javascript')
+
+        """
         auto_selected = set()
 
         # Get language mappings from .mise.toml comments
@@ -2073,7 +2599,17 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         return auto_selected
 
     def _get_tool_language_mapping(self) -> dict[str, str]:
-        """Get tool to language mappings from .mise.toml comments."""
+        """Get tool to language mappings from .mise.toml comments.
+
+        Parses .mise.toml file to extract #language: suffixes from tool comments
+        and creates a mapping dictionary for PSI Header language selection.
+
+        Returns
+        -------
+        dict[str, str]
+            Mapping from tool names to language identifiers (e.g., {'python': 'python', 'golang': 'go'})
+
+        """
         mapping = {}
 
         try:
@@ -2185,7 +2721,6 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         self.app.exit()
 
     def action_back(self) -> None:
-        """Go to previous step."""
         """Go back to tool selection screen."""
         # Navigate back to tool selection screen
         self.app.pop_screen()
@@ -2622,7 +3157,12 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             self._show_tools_screen()
 
     def _show_loading_screen(self) -> None:
-        """Show loading screen while background description loading completes."""
+        """Show loading screen while background description loading completes.
+
+        Displays a loading indicator and progress text while tool descriptions
+        are being loaded in the background. Sets up a timer to check for completion.
+
+        """
         # Clear existing content
         tools_container = self.query_one("#tools-scroll", ScrollableContainer)
         tools_container.remove_children()
@@ -2643,7 +3183,12 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             logger.debug("Showing loading screen for tool descriptions")
 
     def _check_loading_complete(self) -> None:
-        """Check if loading is complete and update display."""
+        """Check if loading is complete and update display.
+
+        Called periodically by a timer to check if background loading has completed.
+        Updates the progress display or transitions to the tools screen when done.
+
+        """
         if ToolManager.is_loading_complete():
             # Loading complete, show the tools
             self._show_tools_screen()
@@ -2665,7 +3210,12 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     logger.debug("Failed to update loading text widget: %s", e)
 
     def _show_tools_screen(self) -> None:
-        """Show the actual tools screen after loading is complete."""
+        """Show the actual tools screen after loading is complete.
+
+        Transitions from the loading screen to the main tools selection interface.
+        Refreshes the tools display and sets up periodic debug output updates.
+
+        """
         self.refresh_tools()
         # Initialize section navigation links
         print("About to call refresh_section_links()")
@@ -2698,7 +3248,12 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             self._loading_timer = None
 
     def refresh_tools(self) -> None:
-        """Refresh the tools display for current section."""
+        """Refresh the tools display for current section.
+
+        Updates the tools list display to show the tools available in the
+        currently selected section, handling UI rebuilding as needed.
+
+        """
         if not self.sections:
             return
 
@@ -2879,7 +3434,12 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         return section_links
 
     def refresh_section_links(self) -> None:
-        """Refresh the section navigation links to reflect current section."""
+        """Refresh the section navigation links to reflect current section.
+
+        Updates the section navigation buttons to show the current section as active
+        and allows navigation between different tool sections.
+
+        """
         try:
             logger.debug("=== SECTION LINKS DEBUG START ===")
             logger.debug("Refreshing section links. Sections: %s, Current: %s", self.sections, self.current_section)
@@ -2951,12 +3511,22 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             logger.debug("Traceback: %s", traceback.format_exc())
 
     def _refresh_python_repository_settings(self) -> None:
-        """Refresh just the Python repository settings in the left column."""
+        """Refresh just the Python repository settings in the left column.
+
+        Updates the Python repository configuration display without rebuilding
+        the entire tools interface.
+
+        """
         # Simply refresh the entire tools display, but with better duplicate prevention
         self.refresh_tools()
 
     def refresh_configuration(self) -> None:
-        """Refresh the configuration panel based on selected tools."""
+        """Refresh the configuration panel based on selected tools.
+
+        Updates the right-side configuration panel to show relevant settings
+        for the currently selected tools, preventing concurrent refresh calls.
+
+        """
         # Prevent concurrent calls
         if self._refreshing_config:
             return
@@ -3492,7 +4062,18 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 logger.debug("Error processing homepage URL on Enter: %s", e)
 
     def _check_and_propagate_username(self, homepage_url: str) -> None:
-        """Check if homepage URL contains a valid username and propagate it."""
+        """Check if homepage URL contains a valid username and propagate it.
+
+        Extracts username from a GitHub URL and automatically populates
+        other URL fields (source, documentation) if they still contain
+        template values.
+
+        Parameters
+        ----------
+        homepage_url : str
+            The homepage URL to analyze for username extraction
+
+        """
         logger.debug("Checking homepage URL for username propagation: %s", homepage_url)
 
         # Only propagate if the URL looks complete (contains github.com and has a slash after username)
@@ -3854,7 +4435,12 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             self._copy_debug_output()
 
     def refresh_controls(self) -> None:
-        """Refresh button states."""
+        """Refresh button states.
+
+        Updates the navigation button states (enabled/disabled) and screen titles
+        based on the current section position and available sections.
+
+        """
         prev_btn = self.query_one("#prev_btn", Button)
         next_section_btn = self.query_one("#next_section_btn", Button)
 
@@ -3878,7 +4464,11 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self.refresh_section_links()
 
     def save_current_section(self) -> None:
-        """Save selections for current section."""
+        """Save tool selections and configuration values for the current section.
+
+        Iterates through all tools in the current section and saves their checkbox states
+        to the tool_selected dictionary. Also triggers saving of configuration values.
+        """
         if not self.sections:
             return
 
@@ -3896,7 +4486,12 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self.save_configuration_values()
 
     def save_configuration_values(self) -> None:
-        """Save current configuration values from input fields."""
+        """Save current configuration values from input fields and controls.
+
+        Retrieves values from various UI elements including Python repository settings,
+        repository type selections, and configuration URLs, then updates the
+        application configuration object with these values.
+        """
         # Save Python repository configuration enable/disable
         try:
             py_repo_checkbox = self.query_one("#py_repo_enabled", Checkbox)
@@ -4036,7 +4631,12 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self.app.pop_screen()
 
     def action_toggle_debug(self) -> None:
-        """Toggle debug mode."""
+        """Toggle debug mode.
+
+        Shows or hides the debug panel based on current state. If the debug
+        panel exists, it will be removed. If it doesn't exist, it will be created.
+
+        """
         # Check if debug panel already exists
         try:
             debug_container = self.query_one("#debug_container")
@@ -4047,18 +4647,29 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             self._rebuild_with_debug_panel()
 
     def action_next(self) -> None:
-        """Go to next step."""
-        """Continue to next screen."""
+        """Go to next step.
+
+        Saves the current section configuration and finalizes the tool selection
+        to proceed to the next screen in the configuration workflow.
+
+        """
         self.save_current_section()
         self.finalize_selection()
 
     def action_quit(self) -> None:
-        """Quit the application."""
+        """Quit the application.
+
+        Exits the application immediately without saving any pending changes.
+
+        """
         self.app.exit()
 
     def action_back(self) -> None:
-        """Go to previous step."""
-        """Go back to previous screen."""
+        """Go to previous step.
+
+        Returns to the previous screen (ProjectConfigScreen) in the workflow.
+
+        """
         self.app.push_screen(ProjectConfigScreen(self.config))
 
 
@@ -4111,7 +4722,18 @@ class SummaryScreen(Screen[None], DebugMixin):
         yield Footer()
 
     def generate_summary(self) -> str:
-        """Generate summary markdown text."""
+        """Generate a markdown summary of the project configuration.
+
+        Creates a formatted markdown string containing project settings,
+        selected development tools, and configuration details for display
+        in the summary screen.
+
+        Returns
+        -------
+        str
+            Formatted markdown text summarizing the project configuration
+
+        """
         summary = "## Project Settings\n\n"
         summary += f"- **Name:** {self.config.project_name}\n"
         summary += f"- **Display Name:** {self.config.display_name}\n"
@@ -4312,12 +4934,21 @@ class InstallationScreen(Screen[None]):
         status_label.update(status)
 
     def create_project_directory(self) -> None:
-        """Create project directory if it doesn't exist."""
+        """Create the project directory structure if it doesn't exist.
+
+        Creates the directory specified in config.project_path including
+        any necessary parent directories using mkdir with parents=True.
+        """
         project_path = Path(self.config.project_path)
         project_path.mkdir(parents=True, exist_ok=True)
 
     def copy_files(self) -> None:
-        """Copy files and directories to target."""
+        """Copy source files and directories to the target project location.
+
+        Copies all necessary files from the source directory to the configured
+        project path using FileManager. Includes Python-specific files if
+        Python tools are enabled in the configuration.
+        """
         source_dir = self.source_dir
         target_dir = Path(self.config.project_path)
 
@@ -4328,7 +4959,13 @@ class InstallationScreen(Screen[None]):
         )
 
     def generate_mise_toml(self) -> None:
-        """Generate custom .mise.toml based on selected tools."""
+        """Generate a customized .mise.toml file based on selected tools.
+
+        Reads the source .mise.toml template and creates a new version
+        containing only the tools that were selected during configuration.
+        Filters tools based on user selections and includes appropriate
+        environment and tool sections.
+        """
         source_file = self.source_dir / ".mise.toml"
         target_file = Path(self.config.project_path) / ".mise.toml"
 
@@ -4402,7 +5039,18 @@ class InstallationScreen(Screen[None]):
             f.write("\n".join(lines))
 
     def generate_devcontainer_json(self) -> None:
-        """Generate the devcontainer.json file using manual section-based approach."""
+        """Generate a customized devcontainer.json file based on configuration.
+
+        Creates a devcontainer.json file from the template by replacing
+        placeholder values with user-configured settings including project
+        name, display name, container name, and other customizations.
+
+        Raises
+        ------
+        Exception
+            If the source devcontainer.json template file is not found
+
+        """
         source_file = self.source_dir / ".devcontainer" / "devcontainer.json"
         target_file = Path(self.config.project_path) / ".devcontainer" / "devcontainer.json"
 
@@ -5721,7 +6369,12 @@ class DynamicDevContainerApp(App[None]):
         self.show_tool_selection()
 
     def check_tool_versions(self) -> None:
-        """Check if we need to show tool version configuration screen."""
+        """Check if tool version configuration is needed and navigate accordingly.
+
+        Examines the selected tools to determine if any have configurable versions.
+        If configurable tools are found, shows the ToolVersionScreen. Otherwise,
+        proceeds directly to PSI header configuration.
+        """
         configurable_tools = [
             tool
             for tool, configurable in self.config.tool_version_configurable.items()
@@ -5758,7 +6411,12 @@ class DynamicDevContainerApp(App[None]):
 
 
 def main() -> None:
-    """Main entry point."""
+    """Main entry point for the Dynamic Dev Container TUI application.
+
+    Parses command line arguments, sets up debugging if requested,
+    and launches the Textual TUI application for configuring and
+    generating development container configurations.
+    """
     global DEBUG_MODE  # noqa: PLW0603  # Needed for CLI debug configuration
 
     parser = argparse.ArgumentParser(
