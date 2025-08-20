@@ -636,18 +636,18 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 if first_checkbox is None:
                     first_checkbox = checkbox
 
-            # Handle Python repository configuration if Python is available
+            # Handle Python repository configuration if Python is available AND selected
             if "python" in tools:
-                # Add pyproject.toml configuration checkbox
                 python_selected = self.tool_selected.get("python", False)
-                repo_checkbox = Checkbox(
-                    "Configure pyproject.toml",
-                    id="py_repo_enabled",
-                    value=self.config.install_python_repository and python_selected,
-                    disabled=not python_selected,
-                    classes="compact repo-checkbox",
-                )
-                tools_container.mount(repo_checkbox)
+                if python_selected:
+                    # Add pyproject.toml configuration checkbox only when Python is selected
+                    repo_checkbox = Checkbox(
+                        "Configure pyproject.toml",
+                        id="py_repo_enabled",
+                        value=self.config.install_python_repository,
+                        classes="compact repo-checkbox",
+                    )
+                    tools_container.mount(repo_checkbox)
 
             # Set focus to the first checkbox
             if first_checkbox is not None:
@@ -1076,13 +1076,17 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             # Update Python repository checkbox if Python is selected
             if "python" in tools:
                 try:
+                    # The checkbox should be created by the Python checkbox selection logic
+                    # but if it doesn't exist yet, we may need to create it here
                     repo_checkbox = self.query_one("#py_repo_enabled", Checkbox)
-                    repo_checkbox.disabled = False  # Enable since Python is now selected
                     # Optionally auto-enable pyproject.toml configuration
                     repo_checkbox.value = True
                     self.config.install_python_repository = True
                 except Exception as e:
-                    logger.debug("Could not update Python repository checkbox: %s", e)
+                    logger.debug(
+                        "Could not update Python repository checkbox (will be created by checkbox handler): %s",
+                        e,
+                    )
 
             # Refresh configuration panel to show settings for all selected tools
             self.refresh_configuration()
@@ -1435,17 +1439,36 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             self.tool_selected[tool_name] = event.value
             logger.debug("Tool %s %s", tool_name, "selected" if event.value else "deselected")
 
-            # If Python was selected/deselected, update pyproject checkbox state
+            # If Python was selected/deselected, add/remove pyproject checkbox
             if tool_name == "python":
                 self._updating_checkboxes = True
                 try:
-                    repo_checkbox = self.query_one("#py_repo_enabled", Checkbox)
-                    repo_checkbox.disabled = not event.value
-                    if not event.value:
-                        repo_checkbox.value = False
-                        self.config.install_python_repository = False
+                    tools_container = self.query_one("#tools-scroll")
+
+                    if event.value:
+                        # Python was selected - add the pyproject checkbox if it doesn't exist
+                        try:
+                            # Check if checkbox already exists
+                            self.query_one("#py_repo_enabled", Checkbox)
+                        except Exception:
+                            # Checkbox doesn't exist, create and add it
+                            repo_checkbox = Checkbox(
+                                "Configure pyproject.toml",
+                                id="py_repo_enabled",
+                                value=self.config.install_python_repository,
+                                classes="compact repo-checkbox",
+                            )
+                            tools_container.mount(repo_checkbox)
+                    else:
+                        # Python was deselected - remove the pyproject checkbox if it exists
+                        try:
+                            repo_checkbox = self.query_one("#py_repo_enabled", Checkbox)
+                            repo_checkbox.remove()
+                            self.config.install_python_repository = False
+                        except Exception as e:
+                            # Checkbox doesn't exist, nothing to remove
+                            logger.debug("Pyproject checkbox not found for removal: %s", e)
                 except Exception as e:
-                    # Pyproject checkbox might not exist
                     logger.debug("Could not update pyproject checkbox: %s", e)
                 finally:
                     self._updating_checkboxes = False
