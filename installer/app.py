@@ -33,6 +33,7 @@ class DynamicDevContainerApp(App[None]):
     """
 
     CSS_PATH = "install.tcss"
+    TITLE = "Dynamic Dev Container Setup"
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit"),

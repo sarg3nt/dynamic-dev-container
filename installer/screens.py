@@ -35,8 +35,9 @@ except ImportError as e:
     sys.exit(1)
 
 # Import our modules
+from . import utils
 from .tools import DevContainerParser, MiseParser, ToolManager
-from .utils import DEBUG_MODE, MAX_DEBUG_MESSAGES, logger, tui_log_handler
+from .utils import MAX_DEBUG_MESSAGES, logger, tui_log_handler
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
@@ -235,7 +236,7 @@ Welcome to the **Dynamic Dev Container TUI Setup**!
 This wizard will guide you through configuring your development container with the tools and extensions you need.
 
 ## System Status:
-- Debug Mode: {"✅ Enabled" if DEBUG_MODE else "❌ Disabled"}
+- Debug Mode: {"✅ Enabled" if utils.DEBUG_MODE else "❌ Disabled"}
 
 ## Getting Started:
 - Press **ENTER** to start the configuration wizard

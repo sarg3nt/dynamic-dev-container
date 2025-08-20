@@ -185,20 +185,38 @@ def setup_logging(debug_mode: bool = False) -> None:
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
 
-    # Always set root logger to DEBUG level so TUI handler can capture all messages
-    root_logger.setLevel(logging.DEBUG)
-
-    # Always add the TUI handler for capturing debug messages (even if not displayed)
-    tui_log_handler.setLevel(logging.DEBUG)
-    root_logger.addHandler(tui_log_handler)
-
     if debug_mode:
-        # In debug mode, also log to file
+        # In debug mode, set root logger to DEBUG level for all messages
+        root_logger.setLevel(logging.DEBUG)
+
+        # Add console handler for debug output
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        root_logger.addHandler(console_handler)
+
+        # Add the TUI handler for capturing all debug messages
+        tui_log_handler.setLevel(logging.DEBUG)
+        root_logger.addHandler(tui_log_handler)
+
+        # Also log to file in debug mode
         file_handler = logging.FileHandler(tempfile.gettempdir() + "/install_debug.log")
         file_handler.setLevel(logging.DEBUG)
         root_logger.addHandler(file_handler)
     else:
-        # In normal mode, only log warnings/errors to file
+        # In normal mode, set root logger to WARNING level to suppress debug/info messages
+        root_logger.setLevel(logging.WARNING)
+
+        # Set our app logger to INFO level - NO debug messages generated at all
+        app_logger = logging.getLogger("installer")
+        app_logger.setLevel(logging.INFO)
+        app_logger.handlers.clear()
+        app_logger.propagate = True  # Let messages go to root logger
+
+        # Add TUI handler to capture INFO+ messages for debug panel (not debug level!)
+        tui_log_handler.setLevel(logging.INFO)
+        app_logger.addHandler(tui_log_handler)
+
+        # Only log warnings/errors to file in normal mode
         file_handler = logging.FileHandler(tempfile.gettempdir() + "/install_debug.log")
         file_handler.setLevel(logging.WARNING)
         root_logger.addHandler(file_handler)
@@ -207,6 +225,12 @@ def setup_logging(debug_mode: bool = False) -> None:
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     for handler in root_logger.handlers:
         handler.setFormatter(formatter)
+
+    # Also format the TUI handler if it's attached to our app logger
+    if not debug_mode:
+        app_logger = logging.getLogger("installer")
+        for handler in app_logger.handlers:
+            handler.setFormatter(formatter)
 
 
 def check_and_install_dependencies() -> None:
