@@ -11,7 +11,18 @@ class ProjectConfig:
     """Container for project configuration data."""
 
     def __init__(self) -> None:
-        """Initialize the ProjectConfig with default values for project, tool, and extension settings."""
+        """Initialize the ProjectConfig with default values.
+
+        Sets up default values for all project configuration parameters including
+        project information, tool selection, extensions, Python configuration,
+        and PSI header settings.
+
+        Notes
+        -----
+        All configuration values are initialized to sensible defaults that can
+        be modified through the TUI screens.
+
+        """
         # Project information
         self.project_path: str = ""
         self.project_name: str = ""

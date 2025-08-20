@@ -74,7 +74,11 @@ class DynamicDevContainerApp(App[None]):
         logger.debug("DynamicDevContainerApp initialized successfully")
 
     def _start_background_description_loading(self) -> None:
-        """Start background loading of tool descriptions for all available tools."""
+        """Start background loading of tool descriptions for all available tools.
+
+        Collects all tools from all sections in the .mise.toml file and starts
+        background loading of their descriptions for improved user experience.
+        """
         all_tools = set()
 
         # Collect all tools from all sections
@@ -92,11 +96,27 @@ class DynamicDevContainerApp(App[None]):
         ToolManager.start_background_loading(tool_list, max_workers=DEFAULT_WORKER_COUNT)
 
     def on_mount(self) -> None:
-        """Initialize the screen when mounted."""
+        """Initialize the screen when mounted.
+
+        Called by Textual when the app is first mounted. Pushes the welcome
+        screen as the initial screen in the application flow.
+        """
         self.push_screen(WelcomeScreen(), self.after_welcome)
 
     def after_welcome(self, _result: None = None) -> None:
-        """Called after welcome screen."""
+        """Called after welcome screen completes.
+
+        Parameters
+        ----------
+        _result : None, optional
+            Unused result parameter for callback compatibility, by default None
+
+        Notes
+        -----
+        Sets default project path if none provided and proceeds to project
+        configuration screen. Handles exceptions gracefully.
+
+        """
         try:
             # Set a default project path if none provided
             if not self.config.project_path:
@@ -112,7 +132,18 @@ class DynamicDevContainerApp(App[None]):
             self.exit()
 
     def after_project_config(self, _result: None = None) -> None:
-        """Called after project config screen."""
+        """Called after project config screen completes.
+
+        Parameters
+        ----------
+        _result : None, optional
+            Unused result parameter for callback compatibility, by default None
+
+        Notes
+        -----
+        Proceeds to tool selection screen with current configuration state.
+
+        """
         # Always show tool selection screen, even if no tools available
 
         self.push_screen(
@@ -127,7 +158,11 @@ class DynamicDevContainerApp(App[None]):
         )
 
     def show_tool_selection(self) -> None:
-        """Show tool selection screen with current state."""
+        """Show tool selection screen with current state.
+
+        Displays the tool selection screen using the current configuration
+        and tool selection state. Used for returning to tool selection.
+        """
         # Show tool selection screen with current selections
 
         self.push_screen(
@@ -142,7 +177,19 @@ class DynamicDevContainerApp(App[None]):
         )
 
     def after_tool_selection(self, _result: None = None) -> None:
-        """Called after tool selection screen."""
+        """Called after tool selection screen completes.
+
+        Parameters
+        ----------
+        _result : None, optional
+            Unused result parameter for callback compatibility, by default None
+
+        Notes
+        -----
+        Proceeds directly to PSI Header configuration since tool version
+        and Python repository configuration are now handled inline.
+
+        """
         logger.debug("App after_tool_selection: config.tool_selected = %s", self.config.tool_selected)
         logger.debug("App after_tool_selection: Config object ID: %s", id(self.config))
 
@@ -152,12 +199,34 @@ class DynamicDevContainerApp(App[None]):
         self.show_psi_header_config()
 
     def after_python_repository(self, _result: None = None) -> None:
-        """Called after Python repository configuration."""
+        """Called after Python repository configuration completes.
+
+        Parameters
+        ----------
+        _result : None, optional
+            Unused result parameter for callback compatibility, by default None
+
+        Notes
+        -----
+        Continues to PSI Header configuration.
+
+        """
         # Continue to PSI Header configuration
         self.show_psi_header_config()
 
     def after_python_project(self, _result: None = None) -> None:
-        """Called after Python project metadata configuration."""
+        """Called after Python project metadata configuration completes.
+
+        Parameters
+        ----------
+        _result : None, optional
+            Unused result parameter for callback compatibility, by default None
+
+        Notes
+        -----
+        Returns to tool selection to allow selection of other tools.
+
+        """
         # Return to tool selection to allow selection of other tools
         self.show_tool_selection()
 
@@ -181,27 +250,68 @@ class DynamicDevContainerApp(App[None]):
             self.show_psi_header_config()
 
     def after_tool_versions(self, _result: None = None) -> None:
-        """Called after tool version configuration."""
+        """Called after tool version configuration completes.
+
+        Parameters
+        ----------
+        _result : None, optional
+            Unused result parameter for callback compatibility, by default None
+
+        Notes
+        -----
+        Proceeds to PSI Header configuration.
+
+        """
         # Show PSI Header configuration
         self.show_psi_header_config()
 
     def show_psi_header_config(self) -> None:
-        """Show PSI Header configuration screen."""
+        """Show PSI Header configuration screen.
+
+        Displays the PSI (Project Specific Information) header configuration
+        screen where users can configure file header templates.
+        """
         logger.debug("App: About to show PSI Header screen with config.tool_selected: %s", self.config.tool_selected)
         logger.debug("App: Config object ID: %s", id(self.config))
         self.push_screen(PSIHeaderScreen(self.config, self.source_dir), self.after_psi_header)
 
     def after_psi_header(self, _result: None = None) -> None:
-        """Called after PSI Header configuration."""
+        """Called after PSI Header configuration completes.
+
+        Parameters
+        ----------
+        _result : None, optional
+            Unused result parameter for callback compatibility, by default None
+
+        Notes
+        -----
+        Proceeds to the summary screen to show configuration overview.
+
+        """
         # Now show summary
 
         self.push_screen(SummaryScreen(self.config), self.after_summary)
 
     def after_summary(self, _result: None = None) -> None:
-        """Called after summary screen."""
+        """Called after summary screen completes.
+
+        Parameters
+        ----------
+        _result : None, optional
+            Unused result parameter for callback compatibility, by default None
+
+        Notes
+        -----
+        Proceeds to the installation screen to begin the actual installation.
+
+        """
 
         self.push_screen(InstallationScreen(self.config, self.source_dir))
 
     async def action_quit(self) -> None:
-        """Quit the application."""
+        """Quit the application.
+
+        Async action handler for quitting the application. Called when
+        the user presses Ctrl+Q or other quit actions.
+        """
         self.exit()

@@ -20,6 +20,16 @@ def main() -> None:
     Parses command line arguments, sets up debugging if requested,
     and launches the Textual TUI application for configuring and
     generating development container configurations.
+
+    Raises
+    ------
+    KeyboardInterrupt
+        When user cancels operation with Ctrl+C
+    FileNotFoundError
+        When script is not run from dynamic-dev-container directory
+    SystemExit
+        On unexpected errors or dependency installation failures
+
     """
     parser = argparse.ArgumentParser(
         description="Dynamic Dev Container TUI Setup - Python Version",
