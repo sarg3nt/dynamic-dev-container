@@ -32,7 +32,7 @@ class DynamicDevContainerApp(App[None]):
     different screens for configuration, tool selection, and installation.
     """
 
-    CSS_PATH = "../install.tcss"
+    CSS_PATH = "install.tcss"
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit"),
