@@ -40,10 +40,10 @@ from .utils import DEBUG_MODE, MAX_DEBUG_MESSAGES, logger, tui_log_handler
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
-    from textual.events import Focus
+    from textual.events import Focus, Key
 
+    from .app import DynamicDevContainerApp
     from .config import ProjectConfig
-    from .utils import DevContainerApp
 
 
 class DebugMixin:
@@ -159,7 +159,7 @@ class DebugMixin:
                 "#install-container",
                 "#tools-container",
                 "#main-content",
-                "#psi-header-container",
+                "#psi-container",
             ]
 
             for container_id in container_ids:
@@ -286,7 +286,7 @@ Press **ENTER** to begin the setup wizard...
         Triggers the transition to the project configuration screen.
         """
         # Call the next step directly
-        app = cast("DevContainerApp", self.app)
+        app = cast("DynamicDevContainerApp", self.app)
         self.app.call_later(app.after_welcome)
         self.app.pop_screen()
 
@@ -320,7 +320,7 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
         Binding("ctrl+q", "quit", "Quit"),
-        Binding("ctrl+d", "toggle_debug", "Debug"),
+        Binding("ctrl+d", "toggle_debug", "Debug", show=True),
     ]
 
     def __init__(self, config: ProjectConfig) -> None:
@@ -358,37 +358,39 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
         default_exec = "".join(word[0].lower() for word in words if word) if words else "mp"  # fallback
 
         yield Header()
-        yield ScrollableContainer(
-            Label("Project Configuration", classes="title"),
-            Label(
-                "Enter your project configuration details:\n[dim]Configuration that will be injected into the 'devcontainer.json' and 'dev.sh' files.[/dim]",
-            ),
-            Horizontal(
-                # Left column
-                Container(
-                    Label(
-                        "Project Path:\n[dim]Path to the project source which is usually includes the git repository name.[/dim]",
-                    ),
-                    Input(value=self.config.project_path or str(Path.home() / default_name), id="project_path"),
-                    Label("Project Name:\n[dim]Name of the project, usually the git repository name.[/dim]"),
-                    Input(value=default_name, id="project_name"),
-                    Label("Display Name:\n[dim]Pretty printed project name with spaces and capitalization.[/dim]"),
-                    Input(value=default_display, id="display_name"),
-                    classes="config-column",
+        yield Container(
+            ScrollableContainer(
+                Label("Project Configuration", classes="title"),
+                Label(
+                    "Enter your project configuration details:\n[dim]Configuration that will be injected into the 'devcontainer.json' and 'dev.sh' files.[/dim]",
                 ),
-                # Right column
-                Container(
-                    Label(
-                        "Container Name:\n[dim]Dev Container name, typically the git repository name plus '-dev'[/dim]",
+                Horizontal(
+                    # Left column
+                    Container(
+                        Label(
+                            "Project Path:\n[dim]Path to the project source which is usually includes the git repository name.[/dim]",
+                        ),
+                        Input(value=self.config.project_path or str(Path.home() / default_name), id="project_path"),
+                        Label("Project Name:\n[dim]Name of the project, usually the git repository name.[/dim]"),
+                        Input(value=default_name, id="project_name"),
+                        Label("Display Name:\n[dim]Pretty printed project name with spaces and capitalization.[/dim]"),
+                        Input(value=default_display, id="display_name"),
+                        classes="config-column",
                     ),
-                    Input(value=default_container, id="container_name"),
-                    Label(
-                        "Docker Exec Command:\n[dim]Optional command to be injected into users shell init file to exec into running container.[/dim]",
+                    # Right column
+                    Container(
+                        Label(
+                            "Container Name:\n[dim]Dev Container name, typically the git repository name plus '-dev'[/dim]",
+                        ),
+                        Input(value=default_container, id="container_name"),
+                        Label(
+                            "Docker Exec Command:\n[dim]Optional command to be injected into users shell init file to exec into running container.[/dim]",
+                        ),
+                        Input(value=default_exec, id="docker_command"),
+                        classes="config-column",
                     ),
-                    Input(value=default_exec, id="docker_command"),
-                    classes="config-column",
+                    id="config-columns",
                 ),
-                id="config-columns",
             ),
             Horizontal(
                 Button("Back", id="back_btn"),
@@ -443,6 +445,11 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
             # Debug panel doesn't exist, create it
             self._rebuild_with_debug_panel()
 
+    def key_ctrl_d(self, event: Key) -> None:
+        """Handle Ctrl+D key even when Input widgets have focus."""
+        event.stop()  # Stop event propagation to prevent Input handling
+        self.action_toggle_debug()
+
     def save_config(self) -> None:
         """Save current configuration."""
         # Get values from inputs
@@ -470,7 +477,7 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
             self.config.container_name = f"{self.config.project_name}-container"
 
         # Schedule the callback and pop the screen
-        app = cast("DevContainerApp", self.app)
+        app = cast("DynamicDevContainerApp", self.app)
         self.app.call_later(app.after_project_config)
         self.app.pop_screen()
 
@@ -482,7 +489,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
         Binding("ctrl+q", "quit", "Quit"),
-        Binding("ctrl+d", "toggle_debug", "Debug"),
+        Binding("ctrl+d", "toggle_debug", "Debug", show=True),
     ]
 
     def __init__(
@@ -547,7 +554,11 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 Horizontal(
                     # Left column for tool selection
                     Container(
-                        Label("Available Tools:", classes="column-title"),
+                        Horizontal(
+                            Label("Available Tools:", classes="column-title"),
+                            Button("Select All", id="select_all_tools", classes="version-btn-small"),
+                            id="tools-header",
+                        ),
                         ScrollableContainer(id="tools-scroll", classes="tools-list"),
                         id="tools-column",
                         classes="left-column",
@@ -598,6 +609,19 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
             current_section = self.sections[self.current_section]
             tools = MiseParser.get_section_tools(Path(".mise.toml"), current_section)
+
+            # Update Select All button visibility
+            try:
+                select_all_btn = self.query_one("#select_all_tools", Button)
+                # Show button only if there are multiple tools
+                if len(tools) > 1:
+                    select_all_btn.display = True
+                    select_all_btn.can_focus = False  # Make it not focusable via tab
+                else:
+                    select_all_btn.display = False
+            except Exception as e:
+                # Button might not exist yet during initialization
+                logger.debug("Could not update select all button visibility: %s", e)
 
             if not tools:
                 tools_container.mount(Label("No tools found in this section", classes="compact"))
@@ -948,6 +972,8 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             self.action_prev_section()
         elif event.button.id == "next_section_btn":
             self.action_next_section()
+        elif event.button.id == "select_all_tools":
+            self._select_all_tools()
         elif event.button.id == "copy_debug_btn":
             self._copy_debug_output()
         elif event.button.id and event.button.id.startswith("version_btn_"):
@@ -1012,6 +1038,50 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 logger.debug("Set %s version to %s", tool, version)
         except Exception as e:
             logger.debug("Error handling version button click: %s", e)
+
+    def _select_all_tools(self) -> None:
+        """Select all available tools in the current section."""
+        try:
+            if not self.sections:
+                return
+
+            current_section = self.sections[self.current_section]
+            tools = MiseParser.get_section_tools(Path(".mise.toml"), current_section)
+
+            if not tools:
+                return
+
+            # Set all tools as selected in the internal state
+            for tool in tools:
+                self.tool_selected[tool] = True
+
+            # Update all tool checkboxes to checked state
+            for tool in tools:
+                checkbox_id = f"tool_{tool}"
+                try:
+                    checkbox = self.query_one(f"#{checkbox_id}", Checkbox)
+                    checkbox.value = True
+                except Exception as e:
+                    logger.debug("Could not find checkbox for tool %s: %s", tool, e)
+
+            # Update Python repository checkbox if Python is selected
+            if "python" in tools:
+                try:
+                    repo_checkbox = self.query_one("#py_repo_enabled", Checkbox)
+                    repo_checkbox.disabled = False  # Enable since Python is now selected
+                    # Optionally auto-enable pyproject.toml configuration
+                    repo_checkbox.value = True
+                    self.config.install_python_repository = True
+                except Exception as e:
+                    logger.debug("Could not update Python repository checkbox: %s", e)
+
+            # Refresh configuration panel to show settings for all selected tools
+            self.refresh_configuration()
+
+            logger.debug("Selected all tools in section %s: %s", current_section, tools)
+
+        except Exception as e:
+            logger.debug("Error selecting all tools: %s", e)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle input field changes."""
@@ -1387,7 +1457,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         # Save the current tool selection state to config before transitioning
         self.save_tool_selection()
 
-        app = cast("DevContainerApp", self.app)
+        app = cast("DynamicDevContainerApp", self.app)
         self.app.call_later(app.after_tool_selection)
         self.app.pop_screen()
 
@@ -1522,7 +1592,7 @@ class ToolVersionScreen(Screen[None], DebugMixin):
 
     def action_next(self) -> None:
         """Continue to next screen."""
-        app = cast("DevContainerApp", self.app)
+        app = cast("DynamicDevContainerApp", self.app)
         self.app.call_later(app.after_tool_versions)
         self.app.pop_screen()
 
@@ -1554,7 +1624,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         Binding("ctrl+n", "next", "Next"),
         Binding("escape", "back", "Back"),
         Binding("ctrl+q", "quit", "Quit"),
-        Binding("ctrl+d", "toggle_debug", "Debug"),
+        Binding("ctrl+d", "toggle_debug", "Debug", show=True),
     ]
 
     def __init__(self, config: ProjectConfig, source_dir: Path) -> None:
@@ -1591,37 +1661,43 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         logger.debug("PSI Header: Auto-selected languages: %s", auto_selected_languages)
 
         yield Header()
-        yield ScrollableContainer(
-            Label("PSI Header Configuration", classes="title"),
-            Label(
-                "Configure PSI Header extension for file templates:\n[dim]PSI Header automatically adds copyright and metadata headers to new files.[/dim]",
-            ),
-            Checkbox("Install PSI Header Extension", id="install_psi", value=self.config.install_psi_header),
-            # Configuration panel that shows/hides based on extension installation
-            Container(
-                Label("Company Name:\n[dim]Your company/organization name for copyright headers[/dim]"),
-                Input(
-                    placeholder="Your Company Name",
-                    id="company_name",
-                    value=self.config.psi_header_company,
-                    classes="compact-input",
+        yield Container(
+            ScrollableContainer(
+                Label("PSI Header Configuration", classes="title"),
+                Label(
+                    "Configure PSI Header extension for file templates:\n[dim]PSI Header automatically adds copyright and metadata headers to new files.[/dim]",
                 ),
-                Label("Language Templates:", classes="section-header"),
-                Label("Select languages for custom headers (auto-selected based on your tools):", classes="compact"),
+                Checkbox("Install PSI Header Extension", id="install_psi", value=self.config.install_psi_header),
+                # Configuration panel that shows/hides based on extension installation
                 Container(
-                    *self._create_language_checkboxes(available_languages, auto_selected_languages),
-                    id="language-container",
-                    classes="language-selection",
+                    Label("Company Name:\n[dim]Your company/organization name for copyright headers[/dim]"),
+                    Input(
+                        placeholder="Your Company Name",
+                        id="company_name",
+                        value=self.config.psi_header_company,
+                        classes="compact-input",
+                    ),
+                    Label("Language Templates:", classes="section-header"),
+                    Label(
+                        "Select languages for custom headers (auto-selected based on your tools):",
+                        classes="compact",
+                    ),
+                    Container(
+                        *self._create_language_checkboxes(available_languages, auto_selected_languages),
+                        id="language-container",
+                        classes="language-selection",
+                    ),
+                    id="extension-config-panel",
+                    classes="extension-config",
                 ),
-                id="extension-config-panel",
-                classes="extension-config",
+                id="psi-header-container",
             ),
             Horizontal(
                 Button("Back", id="back_btn"),
                 Button("Next", id="next_btn", variant="primary"),
                 id="button-row",
             ),
-            id="psi-header-container",
+            id="psi-container",
         )
         yield Footer()
 
@@ -1660,7 +1736,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         # Try to get tool selection from the app if config is empty
         if not self.config.tool_selected:
             try:
-                app = cast("DevContainerApp", self.app)
+                app = cast("DynamicDevContainerApp", self.app)
                 if hasattr(app, "config") and hasattr(app.config, "tool_selected"):
                     logger.debug(
                         "PSI Header: Config tool_selected is empty, trying app.config: %s",
@@ -1878,7 +1954,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             self.config.psi_header_templates,
         )
 
-        app = cast("DevContainerApp", self.app)
+        app = cast("DynamicDevContainerApp", self.app)
         self.app.call_later(app.after_psi_header)
         self.app.pop_screen()
 
@@ -1892,8 +1968,10 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
 
     def action_back(self) -> None:
         """Go back to previous screen."""
-        # Go back to previous screen
+        # Go back to tool selection screen
+        app = cast("DynamicDevContainerApp", self.app)
         self.app.pop_screen()
+        app.show_tool_selection()
 
     def action_toggle_debug(self) -> None:
         """Toggle debug mode."""
@@ -1903,8 +1981,41 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             # Remove existing debug panel
             debug_container.remove()
         except Exception:
-            # Debug panel doesn't exist, create it
-            self._rebuild_with_debug_panel()
+            # Debug panel doesn't exist, create it and mount to main container
+            try:
+                main_container = self.query_one("#psi-container")
+
+                debug_log = RichLog(
+                    max_lines=50,
+                    wrap=True,
+                    highlight=True,
+                    markup=True,
+                    id="debug_log",
+                )
+
+                # Populate immediately with current messages
+                self._populate_debug_log(debug_log)
+
+                debug_container = Container(
+                    Horizontal(
+                        Label("Debug Output (Ctrl+D to toggle):", classes="debug-title"),
+                        Button("Copy Debug", id="copy_debug_btn", classes="debug-copy-btn"),
+                        id="debug-header",
+                    ),
+                    debug_log,
+                    id="debug_container",
+                    classes="debug-panel",
+                )
+
+                # Mount to main container instead of screen level
+                main_container.mount(debug_container)
+            except Exception as e:
+                logger.debug("PSI Header: Failed to create debug panel: %s", e)
+
+    def key_ctrl_d(self, event: Key) -> None:
+        """Handle Ctrl+D key even when Input widgets have focus."""
+        event.stop()  # Stop event propagation to prevent Input handling
+        self.action_toggle_debug()
 
 
 class SummaryScreen(Screen[None], DebugMixin):
@@ -2105,14 +2216,16 @@ class SummaryScreen(Screen[None], DebugMixin):
 
     def action_next(self) -> None:
         """Continue to installation."""
-        app = cast("DevContainerApp", self.app)
+        app = cast("DynamicDevContainerApp", self.app)
         self.app.call_later(app.after_summary)
         self.app.pop_screen()
 
     def action_back(self) -> None:
         """Go back to PSI Header configuration."""
-        # Go back to previous screen
+        # Go back to PSI Header screen
+        app = cast("DynamicDevContainerApp", self.app)
         self.app.pop_screen()
+        app.show_psi_header_config()
 
     def action_quit(self) -> None:
         """Quit the application."""

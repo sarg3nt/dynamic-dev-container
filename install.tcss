@@ -96,7 +96,7 @@
 }
 
 /* Container styles */
-#welcome-container, #project-container, #summary-container, #install-container {
+#welcome-container, #project-container, #summary-container, #install-container, #psi-container {
     padding: 1;
     margin: 0;
     height: auto;
@@ -218,6 +218,31 @@ Button.-primary {
     height: auto;
 }
 
+/* Tools header horizontal layout */
+#tools-header {
+    height: 1;
+    margin: 0;
+    padding: 0;
+    layout: horizontal;
+    align: left middle;
+}
+
+#tools-header Label.column-title {
+    margin: 0 1 0 0;
+    height: 1;
+}
+
+#tools-header Button {
+    margin: 0;
+    height: 1;
+}
+
+/* Configuration column title - reduce bottom margin */
+#config-column Label.column-title {
+    margin: 0 0 0 0;
+    height: auto;
+}
+
 /* Input field styling */
 Input {
     margin: 0 0 1 0;
@@ -284,6 +309,7 @@ ProgressBar {
     border: solid $accent;
     background: $surface;
     margin: 1 0 0 0;
+    padding: 0;
     dock: bottom;
 }
 
@@ -338,7 +364,7 @@ ProgressBar {
 }
 
 /* Main containers should use full space by default */
-#welcome-container, #project-container, #summary-container, #install-container, #tools-container {
+#welcome-container, #project-container, #summary-container, #install-container, #tools-container, #psi-container {
     height: auto;
 }
 
