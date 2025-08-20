@@ -628,11 +628,14 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 return
 
             # Add checkboxes for each tool
+            first_checkbox = None
             for tool in tools:
                 description = ToolManager.get_tool_description(tool)
                 checkbox = Checkbox(description, id=f"tool_{tool}", classes="compact")
                 checkbox.value = self.tool_selected.get(tool, False)
                 tools_container.mount(checkbox)
+                if first_checkbox is None:
+                    first_checkbox = checkbox
 
             # Handle Python repository configuration if Python is available
             if "python" in tools:
@@ -646,6 +649,13 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     classes="compact repo-checkbox",
                 )
                 tools_container.mount(repo_checkbox)
+
+            # Set focus to the first checkbox
+            if first_checkbox is not None:
+                try:
+                    first_checkbox.focus()
+                except Exception as e:
+                    logger.debug("Could not focus first checkbox: %s", e)
 
             # Update configuration panel
             self.refresh_configuration()
