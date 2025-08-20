@@ -228,10 +228,8 @@ class WelcomeScreen(Screen[None], DebugMixin):
         """Create the layout for this screen."""
         yield Header()
         yield Container(
-            Markdown(f"""
-# Dynamic Dev Container Setup
-
-Welcome to the **Dynamic Dev Container TUI Setup**!
+            Label("Dynamic Dev Container Setup", classes="title"),
+            Markdown(f"""Welcome to the **Dynamic Dev Container TUI Setup**!
 
 This wizard will guide you through configuring your development container with the tools and extensions you need.
 
