@@ -104,7 +104,7 @@ class DynamicDevContainerApp(App[None]):
         self.push_screen(WelcomeScreen(), self.after_welcome)
 
     def after_welcome(self, _result: None = None) -> None:
-        """Called after welcome screen completes.
+        """Handle completion of the welcome screen.
 
         Parameters
         ----------
@@ -132,7 +132,7 @@ class DynamicDevContainerApp(App[None]):
             self.exit()
 
     def after_project_config(self, _result: None = None) -> None:
-        """Called after project config screen completes.
+        """Handle completion of the project config screen.
 
         Parameters
         ----------
@@ -153,6 +153,7 @@ class DynamicDevContainerApp(App[None]):
                 self.tool_selected,
                 self.tool_version_configurable,
                 self.tool_version_value,
+                self.source_dir,
             ),
             self.after_tool_selection,
         )
@@ -172,12 +173,13 @@ class DynamicDevContainerApp(App[None]):
                 self.tool_selected,
                 self.tool_version_configurable,
                 self.tool_version_value,
+                self.source_dir,
             ),
             self.after_tool_selection,
         )
 
     def after_tool_selection(self, _result: None = None) -> None:
-        """Called after tool selection screen completes.
+        """Handle completion of the tool selection screen.
 
         Parameters
         ----------
@@ -199,7 +201,7 @@ class DynamicDevContainerApp(App[None]):
         self.show_psi_header_config()
 
     def after_python_repository(self, _result: None = None) -> None:
-        """Called after Python repository configuration completes.
+        """Handle completion of the Python repository configuration.
 
         Parameters
         ----------
@@ -215,7 +217,7 @@ class DynamicDevContainerApp(App[None]):
         self.show_psi_header_config()
 
     def after_python_project(self, _result: None = None) -> None:
-        """Called after Python project metadata configuration completes.
+        """Handle completion of the Python project metadata configuration.
 
         Parameters
         ----------
@@ -250,7 +252,7 @@ class DynamicDevContainerApp(App[None]):
             self.show_psi_header_config()
 
     def after_tool_versions(self, _result: None = None) -> None:
-        """Called after tool version configuration completes.
+        """Handle completion of the tool version configuration.
 
         Parameters
         ----------
@@ -276,7 +278,7 @@ class DynamicDevContainerApp(App[None]):
         self.push_screen(PSIHeaderScreen(self.config, self.source_dir), self.after_psi_header)
 
     def after_psi_header(self, _result: None = None) -> None:
-        """Called after PSI Header configuration completes.
+        """Handle completion of the PSI Header configuration.
 
         Parameters
         ----------
@@ -293,7 +295,7 @@ class DynamicDevContainerApp(App[None]):
         self.push_screen(SummaryScreen(self.config), self.after_summary)
 
     def after_summary(self, _result: None = None) -> None:
-        """Called after summary screen completes.
+        """Handle completion of the summary screen.
 
         Parameters
         ----------
@@ -305,7 +307,6 @@ class DynamicDevContainerApp(App[None]):
         Proceeds to the installation screen to begin the actual installation.
 
         """
-
         self.push_screen(InstallationScreen(self.config, self.source_dir))
 
     async def action_quit(self) -> None:

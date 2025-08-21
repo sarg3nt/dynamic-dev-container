@@ -28,7 +28,7 @@ class DevContainerApp(Protocol):
     """Protocol defining the interface needed by screens."""
 
     def after_welcome(self, result: None = None) -> None:
-        """Called after welcome screen completes.
+        """Handle completion of the welcome screen.
 
         Parameters
         ----------
@@ -39,7 +39,7 @@ class DevContainerApp(Protocol):
         ...
 
     def after_project_config(self, result: None = None) -> None:
-        """Called after project config screen completes.
+        """Handle completion of the project config screen.
 
         Parameters
         ----------
@@ -50,7 +50,7 @@ class DevContainerApp(Protocol):
         ...
 
     def after_tool_selection(self, result: None = None) -> None:
-        """Called after tool selection screen completes.
+        """Handle completion of the tool selection screen.
 
         Parameters
         ----------
@@ -61,7 +61,7 @@ class DevContainerApp(Protocol):
         ...
 
     def after_python_repository(self, result: None = None) -> None:
-        """Called after Python repository screen completes.
+        """Handle completion of the Python repository screen.
 
         Parameters
         ----------
@@ -72,7 +72,7 @@ class DevContainerApp(Protocol):
         ...
 
     def after_python_project(self, result: None = None) -> None:
-        """Called after Python project screen completes.
+        """Handle completion of the Python project screen.
 
         Parameters
         ----------
@@ -83,7 +83,7 @@ class DevContainerApp(Protocol):
         ...
 
     def after_tool_versions(self, result: None = None) -> None:
-        """Called after tool versions screen completes.
+        """Handle completion of the tool versions screen.
 
         Parameters
         ----------
@@ -94,7 +94,7 @@ class DevContainerApp(Protocol):
         ...
 
     def after_psi_header(self, result: None = None) -> None:
-        """Called after PSI header screen completes.
+        """Handle completion of the PSI header screen.
 
         Parameters
         ----------
@@ -105,7 +105,7 @@ class DevContainerApp(Protocol):
         ...
 
     def after_summary(self, result: None = None) -> None:
-        """Called after summary screen completes.
+        """Handle completion of the summary screen.
 
         Parameters
         ----------

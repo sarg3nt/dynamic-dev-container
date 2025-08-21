@@ -15,7 +15,7 @@ from installer.utils import check_and_install_dependencies, logger, setup_loggin
 
 
 def main() -> None:
-    """Main entry point for the Dynamic Dev Container TUI application.
+    """Run the Dynamic Dev Container TUI application.
 
     Parses command line arguments, sets up debugging if requested,
     and launches the Textual TUI application for configuring and

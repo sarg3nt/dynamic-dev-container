@@ -263,7 +263,6 @@ class ToolManager:
             Tuple of (command, runtime_type) if found, None if no runtime available
 
         """
-
         # Check for available container runtimes in order of preference
         if shutil.which("docker"):
             return ("docker", "docker")

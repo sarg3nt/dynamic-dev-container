@@ -213,7 +213,7 @@ def dev(continuously: bool = False) -> None:
 
 
 def _continuous_build_loop(event_handler: ChangeHandler) -> None:
-    """Main loop for continuous building."""
+    """Run the main loop for continuous building."""
     last_modified_time = None
     spinner_index = 0
 
@@ -469,7 +469,6 @@ def is_package_installed(package_name: str) -> bool:
         True if the package is installed, False otherwise.
 
     """
-
     try:
         subprocess.run(
             [sys.executable, "-m", "pip", "show", package_name],
@@ -593,7 +592,6 @@ def parse_arguments() -> argparse.ArgumentParser:
         Argument parser.
 
     """
-
     parser = argparse.ArgumentParser(
         prog="pybuild.py",
         description="Build and deploy Python packages to configurable repositories.",
@@ -647,7 +645,7 @@ def parse_arguments() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    """Main entry point for the script."""
+    """Run the build script main entry point."""
     logger.remove()
     logger.level("INFO", color="<fg 92,168,255>")
     logger.add(
