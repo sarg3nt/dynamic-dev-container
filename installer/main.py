@@ -97,8 +97,12 @@ are located.
         # Check and install dependencies first
         check_and_install_dependencies()
 
+        print("*** DYNAMIC DEV CONTAINER TUI STARTING ***")
+        print(f"*** Debug mode: {utils.DEBUG_MODE} ***")
+        print(f"*** Project path: {project_path} ***")
+
         app = DynamicDevContainerApp(project_path)
-        logger.debug("Application starting - Debug functionality available (Ctrl+D)")
+        logger.info("🔧 STARTUP: Application starting - Debug functionality available (Ctrl+D)")
         app.run()
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")

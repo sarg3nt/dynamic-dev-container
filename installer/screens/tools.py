@@ -6,6 +6,7 @@ This module contains screens for tool selection and version configuration.
 from __future__ import annotations
 
 import re
+import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -13,7 +14,7 @@ try:
     from textual.binding import Binding
     from textual.containers import Container, Horizontal, ScrollableContainer
     from textual.screen import Screen
-    from textual.widgets import Button, Checkbox, Footer, Header, Input, Label
+    from textual.widgets import Button, Checkbox, Footer, Header, Input, Label, RadioButton, RadioSet
 except ImportError as e:
     print(f"Error importing required packages: {e}")
     print("Please ensure all dependencies are installed correctly.")
@@ -162,13 +163,18 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
     def on_mount(self) -> None:
         """Initialize the screen when mounted."""
-        logger.debug("ToolSelectionScreen mounted - Debug functionality available (Ctrl+D)")
+        logger.info("🔧 MOUNT: ToolSelectionScreen mounted - Debug functionality available (Ctrl+D)")
+        logger.info("🔧 MOUNT: Initial tool_selected = %s", self.tool_selected)
         # Set up a timer to periodically update debug output
         self.set_interval(1.0, self.update_debug_output)
 
         # Initialize the tools display and update header
         self.refresh_tools()
         self._update_tools_header_if_needed()
+
+        # Call initial refresh to set up the configuration panel
+        logger.info("🔧 MOUNT: Calling initial refresh_configuration")
+        self.refresh_configuration()
 
     def refresh_tools(self) -> None:
         """Refresh the tools display for current section."""
@@ -190,8 +196,10 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             first_checkbox = None
             for tool in tools:
                 description = ToolManager.get_tool_description(tool)
-                checkbox = Checkbox(description, id=f"tool_{tool}", classes="compact")
+                checkbox_id = f"tool_{tool}"
+                checkbox = Checkbox(description, id=checkbox_id, classes="compact")
                 checkbox.value = self.tool_selected.get(tool, False)
+                logger.info("🔧 CHECKBOX_CREATE: Created checkbox %s with value %s", checkbox_id, checkbox.value)
                 tools_container.mount(checkbox)
 
                 # Remember the first checkbox for focus
@@ -223,246 +231,90 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
     def refresh_configuration(self) -> None:
         """Refresh the configuration panel based on selected tools."""
+        logger.info("🔧 REFRESH_START: refresh_configuration called")
+        logger.info("🔧 REFRESH_START: Current tool_selected: %s", self.tool_selected)
+
         # Prevent overlapping calls
         if self._refreshing_config:
-            logger.debug("Skipping refresh_configuration - already refreshing")
+            logger.info("🔧 REFRESH_SKIP: already refreshing")
             return
 
         # Check if we're in the middle of updating to prevent recursion
         if self._updating_checkboxes:
-            logger.debug("Skipping refresh_configuration due to _updating_checkboxes")
+            logger.info("🔧 REFRESH_SKIP: _updating_checkboxes is True")
             return
 
+        logger.info("🔧 REFRESH_PROCEED: Starting refresh process")
         self._refreshing_config = True
         self._widget_counter += 1  # Increment counter for unique IDs
 
         try:
-            config_container = self.query_one("#config-scroll", ScrollableContainer)
+            # Instead of recreating the entire container, just clear its children
+            config_column = self.query_one("#config-column", Container)
 
-            # Clear all children
-            config_container.remove_children()
+            # Get or create the config scroll container
+            try:
+                config_container = self.query_one("#config-scroll", ScrollableContainer)
+                # Clear existing content
+                child_count_before = len(config_container.children)
+                config_container.remove_children()
+                child_count_after = len(config_container.children)
+                logger.info("🔧 MOUNT_CLEAR: Cleared existing config container content (%d -> %d children)", child_count_before, child_count_after)
+            except Exception:
+                # Config container doesn't exist, create it
+                config_container = ScrollableContainer(id="config-scroll", classes="config-area")
+                config_column.mount(config_container)
+                logger.info("🔧 MOUNT_CREATE: Created new config container")
 
-            # Check which tools are selected
+            # Check which tools are selected IN THE CURRENT SECTION
             if not self.sections:
+                logger.debug("No sections available")
                 config_container.mount(Label("No tools available", classes="compact"))
                 return
 
+            # Get tools in the current section
             current_section = self.sections[self.current_section]
-            tools_in_current_section = MiseParser.get_section_tools(self.source_dir / ".mise.toml", current_section)
+            tools_in_section = MiseParser.get_section_tools(self.source_dir / ".mise.toml", current_section)
 
-            # Debug logging
-            logger.debug("Current section: %s", current_section)
-            logger.debug("Tools in current section: %s", tools_in_current_section)
-            logger.debug("Tool selected dict: %s", self.tool_selected)
-            logger.debug("Python selected: %s", self.tool_selected.get("python", False))
+            # Check if any tools in the CURRENT SECTION are selected
+            section_tools_selected = {tool: self.tool_selected.get(tool, False) for tool in tools_in_section}
+            any_tool_selected_in_section = any(section_tools_selected.values())
 
-            # Only show tools that are BOTH selected AND in the current section
-            selected_tools_in_section = [
-                tool for tool in tools_in_current_section if self.tool_selected.get(tool, False)
-            ]
+            logger.info("🔧 CONFIG_CHECK: Current section = %s", current_section)
+            logger.info("🔧 CONFIG_CHECK: Tools in section = %s", tools_in_section)
+            logger.info("🔧 CONFIG_CHECK: Section tools selected = %s", section_tools_selected)
+            logger.info("🔧 CONFIG_CHECK: any_tool_selected_in_section = %s", any_tool_selected_in_section)
 
-            logger.debug("Selected tools in section: %s", selected_tools_in_section)
-
-            if not selected_tools_in_section:
+            if not any_tool_selected_in_section:
+                logger.info("🔧 CONFIG_RESULT: No tools selected in current section - showing prompt")
                 config_container.mount(Label("Select tools to see configuration options", classes="compact"))
+                logger.info("🔧 MOUNT_LABEL: Mounted 'Select tools' label")
                 return
 
-            # Show Python configuration first if Python is selected
-            if "python" in selected_tools_in_section:
-                config_container.mount(Label("Python Version:", classes="compact section-header"))
-                python_version = self.tool_version_value.get("python", "latest")
+            logger.info("🔧 CONFIG_RESULT: Adding configuration options for current section...")
 
-                # Create a horizontal container for Python version
-                python_version_container = Horizontal(classes="tool-version-row")
-                config_container.mount(python_version_container)
+            # Add configuration for each selected tool in the current section
+            for tool in tools_in_section:
+                if self.tool_selected.get(tool, False):
+                    logger.info("🔧 CONFIG_TOOL: Adding configuration for %s", tool)
 
-                # Tool name label
-                python_version_container.mount(Label("python:", classes="compact tool-label"))
-
-                # Version buttons for Python
-                self._create_version_buttons("python", python_version_container, 4)
-
-                # Version input field
-                config_container.mount(
-                    Input(
-                        value=python_version,
-                        placeholder="version or 'latest'",
-                        id=f"version_python_{self._widget_counter}",
-                        classes="version-input",
-                    ),
-                )
-
-                # Add pyproject.toml configuration if enabled
-                if self.config.install_python_repository:
-                    config_container.mount(Label("PyProject.toml Configuration:", classes="compact section-header"))
-
-                    # Project metadata section
-                    config_container.mount(Label("Project Metadata:", classes="compact subsection-header"))
-
-                    # Project name
-                    config_container.mount(Label("Package Name:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_project_name or "my-awesome-project",
-                            placeholder="Enter package name (lowercase, no spaces)",
-                            id=f"pyproject_name_{self._widget_counter}",
-                            classes="compact-input",
-                        ),
-                    )
-
-                    # Project description
-                    config_container.mount(Label("Description:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_project_description or "A brief description of your project",
-                            placeholder="Enter project description",
-                            id=f"pyproject_description_{self._widget_counter}",
-                            classes="compact-input",
-                        ),
-                    )
-
-                    # Required Python version
-                    config_container.mount(Label("Required Python Version:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_requires_python or ">=3.12",
-                            placeholder="e.g., >=3.12",
-                            id=f"pyproject_requires_python_{self._widget_counter}",
-                            classes="compact-input",
-                        ),
-                    )
-
-                    # Author name
-                    config_container.mount(Label("Author Name:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_author_name or "Your Name",
-                            placeholder="Enter author name",
-                            id=f"pyproject_author_name_{self._widget_counter}",
-                            classes="compact-input",
-                        ),
-                    )
-
-                    # Author email
-                    config_container.mount(Label("Author Email:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_author_email or "your.email@example.com",
-                            placeholder="Enter author email",
-                            id="pyproject_author_email",
-                            classes="compact-input",
-                        ),
-                    )
-
-                    # Project URLs section
-                    config_container.mount(Label("Project URLs:", classes="compact subsection-header"))
-
-                    # Homepage URL
-                    config_container.mount(Label("Homepage URL:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_homepage_url or self._get_default_homepage_url(),
-                            placeholder="Enter homepage URL",
-                            id="pyproject_homepage",
-                            classes="compact-input",
-                        ),
-                    )
-
-                    # Source URL
-                    config_container.mount(Label("Source URL:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_source_url or self._get_default_source_url(),
-                            placeholder="Enter source repository URL",
-                            id="pyproject_source",
-                            classes="compact-input",
-                        ),
-                    )
-
-                    # Documentation URL
-                    config_container.mount(Label("Documentation URL:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_documentation_url or self._get_default_documentation_url(),
-                            placeholder="Enter documentation URL",
-                            id="pyproject_documentation",
-                            classes="compact-input",
-                        ),
-                    )
-
-                    # Build configuration section
-                    config_container.mount(Label("Build Configuration:", classes="compact subsection-header"))
-
-                    # Package path
-                    config_container.mount(Label("Package Path:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_packages_path or self._get_default_package_path(),
-                            placeholder="Enter package path (e.g., src/package_name)",
-                            id="pyproject_packages",
-                            classes="compact-input",
-                        ),
-                    )
-
-                    # Repository publishing section
-                    config_container.mount(Label("Repository Publishing:", classes="compact subsection-header"))
-
-                    # Package Index URL
-                    config_container.mount(Label("Package Index URL:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_index_url or "https://pypi.org/simple/",
-                            placeholder="Package index URL",
-                            id="pyproject_index_url",
-                            classes="compact-input",
-                        ),
-                    )
-
-                    # Publishing URL
-                    config_container.mount(Label("Publishing URL:", classes="compact"))
-                    config_container.mount(
-                        Input(
-                            value=self.config.python_publish_url or "https://upload.pypi.org/legacy/",
-                            placeholder="Publishing URL",
-                            id="pyproject_publish_url",
-                            classes="compact-input",
-                        ),
-                    )
-
-            # Show other tool configurations
-            configurable_tools_in_current_section = [
-                tool
-                for tool in selected_tools_in_section
-                if self.tool_version_configurable.get(tool, False) and tool != "python"
-            ]
-
-            if configurable_tools_in_current_section:
-                config_container.mount(Label("Tool Versions:", classes="compact section-header"))
-                for tool in configurable_tools_in_current_section:
-                    current_version = self.tool_version_value.get(tool, "latest")
-
-                    # Create a horizontal container for tool name and version buttons
-                    tool_version_container = Horizontal(classes="tool-version-row")
-                    config_container.mount(tool_version_container)
-
-                    # Tool name label
-                    tool_version_container.mount(Label(f"{tool}:", classes="compact tool-label"))
-
-                    # Version buttons
-                    self._create_version_buttons(tool, tool_version_container)
-
-                    # Version input field - use unique ID to avoid conflicts
-                    config_container.mount(
-                        Input(
-                            value=current_version,
-                            placeholder="version or 'latest'",
-                            id=f"version_{tool}_{self._widget_counter}",
-                            classes="version-input",
-                        ),
-                    )
+                    # Add tool-specific configuration
+                    if tool == "python":
+                        self._add_python_configuration(config_container)
+                    elif tool in ["golang", "go"]:
+                        self._add_golang_configuration(config_container)
+                    elif tool == "node":
+                        self._add_node_configuration(config_container)
+                    elif tool == "dotnet":
+                        self._add_dotnet_configuration(config_container)
+                    else:
+                        # Generic tool configuration
+                        self._add_generic_tool_configuration(config_container, tool)
 
         except Exception as e:
-            logger.debug("Error refreshing configuration: %s", e)
+            logger.info("🔧 ERROR: Error refreshing configuration: %s", e)
+            logger.info("🔧 ERROR: Exception type: %s", type(e).__name__)
+            logger.info("🔧 ERROR: Traceback: %s", traceback.format_exc())
         finally:
             self._refreshing_config = False
 
@@ -552,18 +404,23 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         """Handle checkbox state changes."""
+        logger.info("🔧 CHECKBOX_CHANGED: %s = %s", event.checkbox.id, event.value)
+
         # Prevent recursive updates
         if self._updating_checkboxes:
+            logger.info("🔧 SKIP: _updating_checkboxes is True")
             return
 
         checkbox_id = event.checkbox.id
         if checkbox_id and checkbox_id.startswith("tool_"):
             tool_name = checkbox_id[5:]  # Remove "tool_" prefix
             self.tool_selected[tool_name] = event.value
-            logger.debug("Tool %s %s", tool_name, "selected" if event.value else "deselected")
+            logger.info("🔧 TOOL_UPDATE: %s %s", tool_name, "selected" if event.value else "deselected")
+            logger.info("🔧 TOOL_SELECTED_STATE: %s", self.tool_selected)
 
             # If Python was selected/deselected, add/remove pyproject checkbox
             if tool_name == "python":
+                logger.info("🔧 PYTHON_CHECKBOX: Processing Python selection change")
                 self._updating_checkboxes = True
                 try:
                     tools_container = self.query_one("#tools-scroll")
@@ -597,14 +454,17 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     self._updating_checkboxes = False
 
             # Refresh configuration panel for all tool changes
+            logger.info("🔧 CALLING_REFRESH: About to call refresh_configuration")
             self.refresh_configuration()
         elif checkbox_id == "py_repo_enabled":
+            logger.info("🔧 PYREPO_CHECKBOX: pyproject checkbox changed to %s", event.value)
             # Handle pyproject checkbox directly without setting the updating flag
             # since we want refresh_configuration to run
             if self.config.install_python_repository != event.value:
                 self.config.install_python_repository = event.value
                 logger.debug("Python repository configuration %s", "enabled" if event.value else "disabled")
                 # Refresh configuration panel to show/hide pyproject fields
+                logger.info("🔧 CALLING_REFRESH: About to call refresh_configuration from pyrepo")
                 self.refresh_configuration()
 
     def on_input_changed(self, event: Input.Changed) -> None:
@@ -623,6 +483,130 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             # Handle pyproject.toml configuration changes (strip counter suffix)
             base_id = input_id.split("_")[0] + "_" + input_id.split("_")[1]  # Get pyproject_fieldname
             self._handle_pyproject_input_change(base_id, event.value)
+
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        """Handle radio button changes for repository type selection."""
+        if event.radio_set.id == "python_repository_type":
+            logger.debug("Radio button changed - pressed: %s", event.pressed.id)
+
+            # Reset all repository type flags
+            self.config.python_repository_pypi_selected = False
+            self.config.python_repository_artifactory_selected = False
+            self.config.python_repository_other_selected = False
+
+            # Set the selected repository type
+            if event.pressed.id == "repo_pypi":
+                self.config.python_repository_pypi_selected = True
+                self.config.python_repository_type = "PyPI"
+                # Set default URLs for PyPI
+                self.config.python_index_url = "https://pypi.org/simple/"
+                self.config.python_publish_url = "https://upload.pypi.org/legacy/"
+            elif event.pressed.id == "repo_artifactory":
+                self.config.python_repository_artifactory_selected = True
+                self.config.python_repository_type = "Artifactory"
+                # Set default URLs for Artifactory
+                self.config.python_index_url = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-local/simple/"
+                self.config.python_publish_url = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-local/"
+            elif event.pressed.id == "repo_other":
+                self.config.python_repository_other_selected = True
+                self.config.python_repository_type = "Other"
+                # Clear URLs for Other - user will fill them in
+                self.config.python_index_url = ""
+                self.config.python_publish_url = ""
+
+            logger.debug("Repository type selected: %s", self.config.python_repository_type)
+
+            # Instead of refreshing the entire configuration, just update the URL fields
+            self._update_repository_url_fields()
+
+    def _update_repository_url_fields(self) -> None:
+        """Update just the repository URL fields without rebuilding the entire form."""
+        try:
+            logger.debug("Updating repository URL fields")
+
+            # Find the config container
+            config_container = self.query_one("#config-scroll", ScrollableContainer)
+
+            # Try to find existing URL input fields and update them
+            try:
+                index_url_input = self.query_one("#pyproject_index_url", Input)
+                index_url_input.value = self.config.python_index_url
+                logger.debug("Updated index URL input to: %s", self.config.python_index_url)
+            except Exception as e:
+                logger.debug("Could not find index URL input (may not exist yet): %s", e)
+                # Add the URL fields if they don't exist
+                self._add_repository_url_fields(config_container)
+
+            try:
+                publish_url_input = self.query_one("#pyproject_publish_url", Input)
+                publish_url_input.value = self.config.python_publish_url
+                logger.debug("Updated publish URL input to: %s", self.config.python_publish_url)
+            except Exception as e:
+                logger.debug("Could not find publish URL input: %s", e)
+
+        except Exception as e:
+            logger.debug("Error updating repository URL fields: %s", e)
+            # Fall back to full refresh if targeted update fails
+            logger.debug("Falling back to full configuration refresh")
+            self.refresh_configuration()
+
+    def _add_repository_url_fields(self, config_container: ScrollableContainer) -> None:
+        """Add the repository URL fields to the configuration container."""
+        try:
+            logger.debug("Adding repository URL fields")
+
+            # Set default values based on selected repository type
+            if self.config.python_repository_pypi_selected:
+                default_index_url = "https://pypi.org/simple/"
+                default_publish_url = "https://upload.pypi.org/legacy/"
+            elif self.config.python_repository_artifactory_selected:
+                default_index_url = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-local/simple/"
+                default_publish_url = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-local/"
+            else:  # Other
+                default_index_url = self.config.python_index_url or ""
+                default_publish_url = self.config.python_publish_url or ""
+
+            # Package Index URL
+            config_container.mount(Label("Package Index URL:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_index_url or default_index_url,
+                    placeholder="Package index URL",
+                    id="pyproject_index_url",
+                    classes="compact-input",
+                ),
+            )
+
+            # Publishing URL
+            config_container.mount(Label("Publishing URL:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_publish_url or default_publish_url,
+                    placeholder="Publishing URL",
+                    id="pyproject_publish_url",
+                    classes="compact-input",
+                ),
+            )
+
+            # Instructions for environment variables
+            config_container.mount(Label("Publishing Setup:", classes="compact subsection-header"))
+            config_container.mount(
+                Label(
+                    "To enable publishing, set these environment variables on your host:",
+                    classes="compact",
+                ),
+            )
+            config_container.mount(
+                Label("• HATCH_INDEX_USER - Your repository username or token", classes="compact"),
+            )
+            config_container.mount(
+                Label("• HATCH_INDEX_AUTH - Your repository password or API token", classes="compact"),
+            )
+
+            logger.debug("Successfully added repository URL fields")
+
+        except Exception as e:
+            logger.debug("Error adding repository URL fields: %s", e)
 
     def on_focus(self, event: Focus) -> None:
         """Handle focus events to track input focus changes."""
@@ -1056,6 +1040,386 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             package_name_clean = package_name.lower().replace("-", "_").replace(" ", "_")
             return f"src/{package_name_clean}"
         return "src/my_awesome_project"
+
+    def _add_python_configuration(self, config_container: ScrollableContainer) -> None:
+        """Add Python-specific configuration widgets.
+
+        Parameters
+        ----------
+        config_container : ScrollableContainer
+            The container to add Python configuration widgets to
+
+        """
+        logger.info("🔧 PYTHON_CONFIG: Adding Python configuration")
+
+        # Python version section with buttons
+        config_container.mount(Label("Python Version:", classes="compact section-header"))
+
+        # Create version input and buttons container
+        version_container = Horizontal(id=f"python-version-container-{self._widget_counter}")
+
+        # Version input
+        python_version_input = Input(
+            value=self.config.tool_version_value.get("python", "3.13"),
+            placeholder="e.g., 3.11",
+            id=f"python_version-{self._widget_counter}",
+            classes="compact config-input",
+        )
+
+        # First mount the container to its parent
+        config_container.mount(version_container)
+
+        # Then mount children to the container
+        version_container.mount(python_version_input)
+
+        # Add version buttons (limit to 5 most recent versions)
+        self._create_version_buttons("python", version_container, version_limit=5)
+        logger.info("🔧 MOUNT_PYTHON: Mounted Python version input and buttons")
+
+        # Add Python-specific configuration only if pyproject is enabled
+        if self.config.install_python_repository:
+            logger.info("🔧 PYPROJECT_CONFIG: Adding pyproject configuration")
+
+            # Add the description text
+            description_label = Label(
+                "Python tools include Pipenv, Poetry, Pip-tools, and package publishing setup. "
+                "A requirements.txt file will be created for dependency management.",
+                classes="compact help-text",
+            )
+            config_container.mount(description_label)
+            logger.info("🔧 PYPROJECT_DESC: Added Python tools description label")
+
+            config_container.mount(Label("PyProject.toml Configuration:", classes="compact section-header"))            # Project metadata section
+            config_container.mount(Label("Project Metadata:", classes="subsection-header"))
+
+            # Package name
+            config_container.mount(Label("Package Name:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_project_name or "",
+                    placeholder="e.g., my-awesome-package",
+                    id=f"python_package_name-{self._widget_counter}",
+                    classes="compact config-input",
+                ),
+            )
+
+            # Description
+            config_container.mount(Label("Description:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_project_description or "",
+                    placeholder="A brief description of your package",
+                    id=f"python_description-{self._widget_counter}",
+                    classes="compact config-input",
+                ),
+            )
+
+            # Required Python version
+            config_container.mount(Label("Required Python Version:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_requires_python or "",
+                    placeholder="e.g., >=3.8",
+                    id=f"python_requires-{self._widget_counter}",
+                    classes="compact config-input",
+                ),
+            )
+
+            # Author name
+            config_container.mount(Label("Author Name:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_author_name or "",
+                    placeholder="Your Name",
+                    id=f"python_author_name-{self._widget_counter}",
+                    classes="compact config-input",
+                ),
+            )
+
+            # Author email
+            config_container.mount(Label("Author Email:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_author_email or "",
+                    placeholder="your.email@example.com",
+                    id=f"python_author_email-{self._widget_counter}",
+                    classes="compact config-input",
+                ),
+            )
+
+            # Project URLs section
+            config_container.mount(Label("Project URLs:", classes="compact subsection-header"))
+
+            # Homepage URL
+            config_container.mount(Label("Homepage URL:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_homepage_url or self._get_default_homepage_url(),
+                    placeholder="Enter homepage URL",
+                    id="pyproject_homepage",
+                    classes="compact-input",
+                ),
+            )
+
+            # Source URL
+            config_container.mount(Label("Source URL:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_source_url or self._get_default_source_url(),
+                    placeholder="Enter source repository URL",
+                    id="pyproject_source",
+                    classes="compact-input",
+                ),
+            )
+
+            # Documentation URL
+            config_container.mount(Label("Documentation URL:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_documentation_url or self._get_default_documentation_url(),
+                    placeholder="Enter documentation URL",
+                    id="pyproject_documentation",
+                    classes="compact-input",
+                ),
+            )
+
+            # Build configuration section
+            config_container.mount(Label("Build Configuration:", classes="compact subsection-header"))
+
+            # Package path
+            config_container.mount(Label("Package Path:", classes="compact"))
+            config_container.mount(
+                Input(
+                    value=self.config.python_packages_path or self._get_default_package_path(),
+                    placeholder="Enter package path (e.g., src/package_name)",
+                    id="pyproject_packages",
+                    classes="compact-input",
+                ),
+            )
+
+            # Repository publishing section
+            config_container.mount(Label("Repository Publishing:", classes="compact subsection-header"))
+
+            # Repository type radio buttons
+            config_container.mount(Label("Repository Type:", classes="compact"))
+
+            # Create radio buttons with proper structure
+            config_container.mount(
+                RadioSet(
+                    RadioButton("PyPI", id="repo_pypi", value=self.config.python_repository_pypi_selected),
+                    RadioButton(
+                        "Artifactory",
+                        id="repo_artifactory",
+                        value=self.config.python_repository_artifactory_selected,
+                    ),
+                    RadioButton("Other", id="repo_other", value=self.config.python_repository_other_selected),
+                    id="python_repository_type",
+                ),
+            )
+
+            # Show URL fields only if a repository type is selected
+            if (
+                self.config.python_repository_pypi_selected
+                or self.config.python_repository_artifactory_selected
+                or self.config.python_repository_other_selected
+            ):
+                # Package Index URL
+                config_container.mount(Label("Package Index URL:", classes="compact"))
+
+                # Set default values based on selected repository type
+                if self.config.python_repository_pypi_selected:
+                    default_index_url = "https://pypi.org/simple/"
+                elif self.config.python_repository_artifactory_selected:
+                    default_index_url = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-local/simple/"
+                else:  # Other
+                    default_index_url = self.config.python_index_url or ""
+
+                config_container.mount(
+                    Input(
+                        value=self.config.python_index_url or default_index_url,
+                        placeholder="Package index URL",
+                        id="pyproject_index_url",
+                        classes="compact-input",
+                    ),
+                )
+
+                # Publishing URL
+                config_container.mount(Label("Publishing URL:", classes="compact"))
+
+                # Set default values based on selected repository type
+                if self.config.python_repository_pypi_selected:
+                    default_publish_url = "https://upload.pypi.org/legacy/"
+                elif self.config.python_repository_artifactory_selected:
+                    default_publish_url = "https://your-company.jfrog.io/artifactory/api/pypi/pypi-local/"
+                else:  # Other
+                    default_publish_url = self.config.python_publish_url or ""
+
+                config_container.mount(
+                    Input(
+                        value=self.config.python_publish_url or default_publish_url,
+                        placeholder="Publishing URL",
+                        id="pyproject_publish_url",
+                        classes="compact-input",
+                    ),
+                )
+
+                # Instructions for environment variables
+                config_container.mount(Label("Publishing Setup:", classes="compact subsection-header"))
+                config_container.mount(
+                    Label(
+                        "To enable publishing, set these environment variables on your host:",
+                        classes="compact",
+                    ),
+                )
+                config_container.mount(
+                    Label("• HATCH_INDEX_USER - Your repository username or token", classes="compact"),
+                )
+                config_container.mount(
+                    Label("• HATCH_INDEX_AUTH - Your repository password or API token", classes="compact"),
+                )
+
+    def _add_golang_configuration(self, config_container: ScrollableContainer) -> None:
+        """Add Go-specific configuration widgets.
+
+        Parameters
+        ----------
+        config_container : ScrollableContainer
+            The container to add Go configuration widgets to
+
+        """
+        logger.info("🔧 GOLANG_CONFIG: Adding Go configuration")
+
+        # Go version section with buttons
+        config_container.mount(Label("Go Version:", classes="compact section-header"))
+
+        # Create version input and buttons container
+        version_container = Horizontal(id=f"go-version-container-{self._widget_counter}")
+
+        # Version input
+        go_version_input = Input(
+            value=self.config.tool_version_value.get("golang", "1.21"),
+            placeholder="e.g., 1.20",
+            id=f"go_version-{self._widget_counter}",
+            classes="compact config-input",
+        )
+
+        # First mount the container to its parent
+        config_container.mount(version_container)
+
+        # Then mount children to the container
+        version_container.mount(go_version_input)
+
+        # Add version buttons
+        self._create_version_buttons("golang", version_container, version_limit=5)
+        logger.info("🔧 MOUNT_GOLANG: Mounted Go version input and buttons")
+
+    def _add_node_configuration(self, config_container: ScrollableContainer) -> None:
+        """Add Node.js-specific configuration widgets.
+
+        Parameters
+        ----------
+        config_container : ScrollableContainer
+            The container to add Node.js configuration widgets to
+
+        """
+        logger.info("🔧 NODE_CONFIG: Adding Node.js configuration")
+
+        # Node version section with buttons
+        config_container.mount(Label("Node.js Version:", classes="compact section-header"))
+
+        # Create version input and buttons container
+        version_container = Horizontal(id=f"node-version-container-{self._widget_counter}")
+
+        # Version input
+        node_version_input = Input(
+            value=self.config.tool_version_value.get("node", "20"),
+            placeholder="e.g., 18",
+            id=f"node_version-{self._widget_counter}",
+            classes="compact config-input",
+        )
+
+        # First mount the container to its parent
+        config_container.mount(version_container)
+
+        # Then mount children to the container
+        version_container.mount(node_version_input)
+
+        # Add version buttons
+        self._create_version_buttons("node", version_container, version_limit=5)
+        logger.info("🔧 MOUNT_NODE: Mounted Node.js version input and buttons")
+
+    def _add_dotnet_configuration(self, config_container: ScrollableContainer) -> None:
+        """Add .NET-specific configuration widgets.
+
+        Parameters
+        ----------
+        config_container : ScrollableContainer
+            The container to add .NET configuration widgets to
+
+        """
+        logger.info("🔧 DOTNET_CONFIG: Adding .NET configuration")
+
+        # .NET version section with buttons
+        config_container.mount(Label(".NET Version:", classes="compact section-header"))
+
+        # Create version input and buttons container
+        version_container = Horizontal(id=f"dotnet-version-container-{self._widget_counter}")
+
+        # Version input
+        dotnet_version_input = Input(
+            value=self.config.tool_version_value.get("dotnet", "8"),
+            placeholder="e.g., 7",
+            id=f"dotnet_version-{self._widget_counter}",
+            classes="compact config-input",
+        )
+
+        # First mount the container to its parent
+        config_container.mount(version_container)
+
+        # Then mount children to the container
+        version_container.mount(dotnet_version_input)
+
+        # Add version buttons
+        self._create_version_buttons("dotnet", version_container, version_limit=5)
+        logger.info("🔧 MOUNT_DOTNET: Mounted .NET version input and buttons")
+
+    def _add_generic_tool_configuration(self, config_container: ScrollableContainer, tool: str) -> None:
+        """Add generic tool configuration widgets.
+
+        Parameters
+        ----------
+        config_container : ScrollableContainer
+            The container to add tool configuration widgets to
+        tool : str
+            The name of the tool
+
+        """
+        logger.info("🔧 GENERIC_CONFIG: Adding generic configuration for %s", tool)
+
+        # Generic version section with buttons
+        tool_display_name = tool.replace("-", " ").title()
+        config_container.mount(Label(f"{tool_display_name} Version:", classes="compact section-header"))
+
+        # Create version input and buttons container
+        version_container = Horizontal(id=f"{tool}-version-container-{self._widget_counter}")
+
+        # Version input
+        tool_version_input = Input(
+            value=self.config.tool_version_value.get(tool, "latest"),
+            placeholder="e.g., latest",
+            id=f"{tool}_version-{self._widget_counter}",
+            classes="compact config-input",
+        )
+
+        # First mount the container to its parent
+        config_container.mount(version_container)
+
+        # Then mount children to the container
+        version_container.mount(tool_version_input)
+
+        # Add version buttons if available
+        self._create_version_buttons(tool, version_container, version_limit=5)
+        logger.info("🔧 MOUNT_GENERIC: Mounted %s version input and buttons", tool)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""

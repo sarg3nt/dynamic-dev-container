@@ -50,7 +50,10 @@ class ProjectConfig:
         self.python_extra_index_url: str = ""
         self.python_dev_suffix: str = "dev"
         self.python_prod_suffix: str = "prod"
-        self.python_repository_type: str = "PyPI"
+        self.python_repository_type: str = ""  # Empty by default, user must select
+        self.python_repository_pypi_selected: bool = False
+        self.python_repository_artifactory_selected: bool = False
+        self.python_repository_other_selected: bool = False
 
         # Python project metadata
         self.python_project_name: str = ""

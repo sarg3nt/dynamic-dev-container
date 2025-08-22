@@ -2,56 +2,75 @@
 
 /* Title styles */
 .title {
-    text-style: bold;
-    color: $primary;
-    margin: 0 0 1 0;
-    height: auto;
+  text-style: bold;
+  color: $text-primary;
+  margin: 0 0 1 0;
+  height: auto;
+}
+  
+.subtitle {
+  color: $text-muted;
+  margin: 0 0 1 0;
+  height: auto;
+}
+  
+.section-header {
+  text-style: bold;
+  color: $accent;
+  margin: 1 0 0 0;
+  height: auto;
 }
 
-.subtitle {
-    color: $text-muted;
-    margin: 0 0 1 0;
-    height: auto;
+.subsection-header {
+  color: $text-accent;
+  margin: 1 0 0 0;
+  height: auto;
 }
 
 /* Compact element styles */
 .compact {
-    margin: 0;
-    padding: 0 1;
-    height: auto;
-    width: 100%;
+  margin: 0;
+  height: auto;
+  width: 100%;
 }
 
 .compact-input {
-    margin: 0 0 1 0;
-    height: 3;
-    padding: 0 1;
+  margin: 0 0 1 0;
+  height: 3;
+  padding: 0 1;
+}
+
+.config-input {
+  margin: 0 1 1 0;
+  height: 3;
+  width: 15;  /* Reasonable width for version strings */
+  padding: 0 1;
 }
 
 .version-input {
-    margin: 0 0 1 0;
-    height: 3;
-    width: 13; /* Set a fixed width for version inputs */
-    padding: 0 1;
+  margin: 0 0 1 0;
+  height: 3;
+  width: 13; /* Set a fixed width for version inputs */
+  padding: 0 1;
 }
 
 .compact-group {
-    height: auto;
-    margin: 0 0 1 0;
-    padding: 0;
+  height: auto;
+  margin: 0 0 1 0;
+  padding: 0;
 }
 
 /* Section links container specific styling */
 #section-links {
-    height: auto;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    # border: none;
-    align: center bottom;
-    layout: horizontal;
-    overflow-x: auto;
-    scrollbar-size-horizontal: 1;
+  height: auto;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  # border: none;
+  align: center bottom;
+  layout: horizontal;
+  overflow-x: auto;
+  scrollbar-size-horizontal: 1;
 }
 
 .sections-links-label {
@@ -65,16 +84,10 @@
     height: auto;
 }
 
-.section-header {
-    text-style: bold;
-    color: $accent;
-    margin: 1 0 0 0;
-    height: auto;
-}
 
 .column-title {
     text-style: bold;
-    color: $secondary;
+    color: $text-secondary;
     margin: 0 0 1 0;
     height: auto;
 }
@@ -93,6 +106,13 @@
     color: $text;
     text-style: italic;
     margin: 1 0 0 0;
+}
+
+.help-text {
+    color: $text-muted;
+    text-style: italic;
+    margin: 1 0 1 0;
+    height: auto;
 }
 
 /* Container styles */
@@ -190,7 +210,7 @@ Button.-primary {
     padding: 0;
     border: none;
     background: transparent;
-    color: $accent;
+    color: $text-muted;
     text-style: none;
 }
 

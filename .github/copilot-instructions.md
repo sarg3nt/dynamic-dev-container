@@ -2,6 +2,15 @@
 
 This document provides AI coding agents with essential patterns and conventions specific to this dynamic development container installer project.
 
+## ❌ CRITICAL RESTRICTION - DO NOT RUN INSTALL.PY ❌
+
+**AI AGENTS MUST NEVER EXECUTE `install.py` OR `python install.py` COMMANDS**
+
+- ❌ NEVER run `install.py` manually during development
+- ❌ NEVER use `run_in_terminal` to execute `install.py`
+- ✅ ALWAYS ask the user to test `install.py` execution
+- ✅ ALWAYS request user feedback on installation results
+
 ## Project Overview
 
 This is a Python TUI (Terminal User Interface) application built with [Textual](https://textual.textualize.io/) that creates customized development container configurations. The installer guides users through tool selection, configuration, and generates complete `.devcontainer` setups with Docker, VS Code extensions, and mise-managed tooling.
@@ -313,24 +322,38 @@ ruff format installer/
 
 ### Installation Testing
 
-**CRITICAL:** Never manually run `install.py` during development:
+**❌ CRITICAL RESTRICTION ❌ - DO NOT RUN INSTALL.PY:**
 
-- Always ask the user to test `install.py` execution
-- Request user feedback on installation results
-- Do not assume installation success without user confirmation
-- Let users report any installation issues back to you
+**AI AGENTS MUST NEVER EXECUTE `install.py` OR `python install.py` COMMANDS**
+
+- ❌ NEVER run `install.py` manually during development
+- ❌ NEVER use `run_in_terminal` to execute `install.py`
+- ❌ NEVER assume installation works without user testing
+- ✅ ALWAYS ask the user to test `install.py` execution
+- ✅ ALWAYS request user feedback on installation results
+- ✅ ALWAYS let users report installation issues back to you
 
 **Proper Testing Approach:**
 
 ```bash
-# Ask user to run:
+# ALWAYS ask user to run (never run yourself):
 python install.py /tmp/test_project --debug
-# For textual .tcss changes run
+# For textual .tcss changes ask user to run:
 textual run --dev install.py /tmp/test_project --debug
+```
+
+**Why This Restriction Exists:**
+
+- AI agents cannot see TUI interfaces properly
+- Installation process requires user interaction
+- User environment may differ from development environment
+- User feedback is essential for debugging TUI issues
 
 # Then request feedback:
+
 # "Please run the installer and report back any errors or issues you encounter"
-```
+
+````
 
 ## Development Environment
 
@@ -352,7 +375,7 @@ MISE_TRUSTED_CONFIG_PATHS="/workspaces/dynamic-dev-container"
 PYTHON_PATH="/home/vscode/.local/share/mise/installs/python"
 TYPE_CHECKING="true"
 GITHUB_TOKEN="${localEnv:GITHUB_TOKEN}"  # For rate limiting
-```
+````
 
 ### Build and Test Commands
 

@@ -88,6 +88,8 @@
     "TERM": "xterm-256color", // Terminal type
     "TYPE_CHECKING": "true", // Enable type checking for Python
     "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}", // GitHub API token for rate limiting (optional)
+    "HATCH_INDEX_USER": "${localEnv:HATCH_INDEX_USER}", // Hatch repository username for publishing
+    "HATCH_INDEX_AUTH": "${localEnv:HATCH_INDEX_AUTH}", // Hatch repository password/token for publishing
     // CUSTOM USER ENVIRONMENT VARIABLES
     "MY_CUSTOM_VAR_1": "my_custom_value", // Example of a hard coded custom environment variable
     "MY_CUSTOM_VAR_2": "${localEnv:MY_CUSTOM_VAR_2}" // An example of a user defined var being loaded from their local machines env vars.
@@ -595,7 +597,7 @@
             "prefix": "# "
           }
         ],
-         "psi-header.templates":[
+        "psi-header.templates": [
           {
             "language": "go",
             "template": ["Add your template text here"]
