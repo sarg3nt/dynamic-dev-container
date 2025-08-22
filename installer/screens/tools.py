@@ -954,33 +954,26 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
                 # Update the input field - need to find the current input field with dynamic ID
                 try:
-                    # For Python, look for version_python_* pattern using a different approach
-                    if tool == "python":
-                        # Find all Input widgets and filter by ID pattern
-                        all_inputs = self.query(Input)
-                        python_version_input = None
-                        for input_widget in all_inputs:
-                            if input_widget.id and input_widget.id.startswith("version_python_"):
-                                python_version_input = input_widget
-                                break
+                    # Find all Input widgets and filter by ID pattern
+                    all_inputs = self.query(Input)
+                    tool_version_input = None
 
-                        if python_version_input:
-                            python_version_input.value = version
-                        else:
-                            logger.debug("Could not find any Python version input field")
+                    for input_widget in all_inputs:
+                        if input_widget.id and (
+                            input_widget.id.startswith(f"{tool}_version-")
+                            or input_widget.id.startswith(f"version_{tool}_")
+                        ):
+                            tool_version_input = input_widget
+                            break
+
+                    if tool_version_input:
+                        tool_version_input.value = version
+                        logger.debug("Updated %s version input field to: %s", tool, version)
                     else:
-                        # For other tools, find the version input field with the current counter
-                        all_inputs = self.query(Input)
-                        tool_version_input = None
-                        for input_widget in all_inputs:
-                            if input_widget.id and input_widget.id.startswith(f"version_{tool}_"):
-                                tool_version_input = input_widget
-                                break
-
-                        if tool_version_input:
-                            tool_version_input.value = version
-                        else:
-                            logger.debug("Could not find version input field for tool: %s", tool)
+                        logger.debug("Could not find version input field for tool: %s", tool)
+                        # Log all input IDs for debugging
+                        input_ids = [inp.id for inp in all_inputs if inp.id]
+                        logger.debug("Available input IDs: %s", input_ids)
                 except Exception as e:
                     # Input field might not exist yet
                     logger.debug("Could not update input field for %s: %s", tool, e)

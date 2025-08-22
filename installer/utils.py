@@ -189,10 +189,8 @@ def setup_logging(debug_mode: bool = False) -> None:
         # In debug mode, set root logger to DEBUG level for all messages
         root_logger.setLevel(logging.DEBUG)
 
-        # Add console handler for debug output
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG)
-        root_logger.addHandler(console_handler)
+        # DO NOT add console handler in debug mode - it corrupts the TUI interface
+        # Instead, all debug output goes to the TUI debug panel and log file
 
         # Add the TUI handler for capturing all debug messages
         tui_log_handler.setLevel(logging.DEBUG)

@@ -48,7 +48,7 @@ def main() -> None:
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="Enable debug mode with verbose logging and debug panel",
+        help="Enable debug mode with verbose logging in debug panel (Ctrl+D to toggle)",
     )
 
     args = parser.parse_args()
@@ -72,8 +72,9 @@ Arguments:
                   If not provided, you'll be prompted to enter it
 
 Options:
-  --debug         Enable debug mode with verbose logging and debug panel
+  --debug         Enable debug mode with verbose logging in debug panel
                   Press Ctrl+D in the tool selection screen to toggle debug output
+                  Debug messages will only appear in the debug panel, not on console
 
 Examples:
   python install.py ~/my-project
@@ -97,9 +98,11 @@ are located.
         # Check and install dependencies first
         check_and_install_dependencies()
 
-        print("*** DYNAMIC DEV CONTAINER TUI STARTING ***")
-        print(f"*** Debug mode: {utils.DEBUG_MODE} ***")
-        print(f"*** Project path: {project_path} ***")
+        # Only print startup messages before the TUI starts
+        if not args.debug:
+            print("*** DYNAMIC DEV CONTAINER TUI STARTING ***")
+            print(f"*** Debug mode: {utils.DEBUG_MODE} ***")
+            print(f"*** Project path: {project_path} ***")
 
         app = DynamicDevContainerApp(project_path)
         logger.info("🔧 STARTUP: Application starting - Debug functionality available (Ctrl+D)")
