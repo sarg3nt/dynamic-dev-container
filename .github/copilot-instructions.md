@@ -7,6 +7,7 @@ This document provides AI coding agents with essential patterns and conventions 
 **AI AGENTS MUST NEVER EXECUTE `install.py` OR `python install.py` COMMANDS**
 
 - ❌ NEVER run `install.py` manually during development
+- ❌ NEVER run `bash install.py` manually during development
 - ❌ NEVER use `run_in_terminal` to execute `install.py`
 - ✅ ALWAYS ask the user to test `install.py` execution
 - ✅ ALWAYS request user feedback on installation results

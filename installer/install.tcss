@@ -17,13 +17,13 @@
 .section-header {
   text-style: bold;
   color: $accent;
-  margin: 1 0 0 0;
+  margin: 0 0 0 0;  /* Reduced margin to prevent spacing accumulation */
   height: auto;
 }
 
 .subsection-header {
   color: $text-accent;
-  margin: 1 0 0 0;
+  margin: 0 0 0 0;  /* Reduced margin to prevent spacing accumulation */
   height: auto;
 }
 
@@ -31,6 +31,12 @@
 .compact {
   margin: 0;
   height: auto;
+  width: 100%;
+}
+
+.compact-spacing {
+  margin: 0;
+  height: 1;  /* Minimal spacing */
   width: 100%;
 }
 
@@ -48,9 +54,9 @@
 }
 
 .version-input {
-  margin: 0 0 1 0;
-  height: 3;
-  width: 13; /* Set a fixed width for version inputs */
+  margin: 0 1 0 0;  /* Right margin for spacing from buttons */
+  height: auto;
+  width: 12; /* Slightly smaller width to prevent overlap */
   padding: 0 1;
 }
 
@@ -203,11 +209,11 @@ Button.-primary {
 
 /* Version button styling - small, horizontal, text-like */
 .version-btn-small {
-    height: 1;
+    height: 1;  /* Match input height for proper alignment */
     min-width: 0;
     width: auto;
-    margin: 0;
-    padding: 0;
+    margin: 0 0 0 0;  /* Right margin for spacing between buttons */
+    padding: 0 0;
     border: none;
     background: transparent;
     color: $text-muted;
@@ -228,7 +234,7 @@ Button.-primary {
 .tool-version-row {
     layout: horizontal;
     height: auto;
-    margin: 0 0 1 0;
+    margin: 0;
     align: left middle;
 }
 
@@ -294,6 +300,12 @@ Checkbox {
 
 Checkbox:hover {
     background: $surface;
+}
+
+/* Repository checkbox specific styling */
+.repo-checkbox {
+    margin: 1 0 1 0;  /* Add extra top margin to separate from tools */
+    padding-left: 2;  /* Indent slightly to show it's related to Python */
 }
 
 /* Container styling */

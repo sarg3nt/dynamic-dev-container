@@ -249,22 +249,12 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self._widget_counter += 1  # Increment counter for unique IDs
 
         try:
-            # Instead of recreating the entire container, just clear its children
-            config_column = self.query_one("#config-column", Container)
+            # Clear existing config container contents instead of recreating it
+            config_container = self.query_one("#config-scroll", ScrollableContainer)
 
-            # Get or create the config scroll container
-            try:
-                config_container = self.query_one("#config-scroll", ScrollableContainer)
-                # Clear existing content
-                child_count_before = len(config_container.children)
-                config_container.remove_children()
-                child_count_after = len(config_container.children)
-                logger.info("🔧 MOUNT_CLEAR: Cleared existing config container content (%d -> %d children)", child_count_before, child_count_after)
-            except Exception:
-                # Config container doesn't exist, create it
-                config_container = ScrollableContainer(id="config-scroll", classes="config-area")
-                config_column.mount(config_container)
-                logger.info("🔧 MOUNT_CREATE: Created new config container")
+            # Remove all children from the config container
+            config_container.remove_children()
+            logger.info("🔧 MOUNT_CLEAR: Cleared config container contents")
 
             # Check which tools are selected IN THE CURRENT SECTION
             if not self.sections:
@@ -1052,44 +1042,37 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         """
         logger.info("🔧 PYTHON_CONFIG: Adding Python configuration")
 
-        # Python version section with buttons
+        # Python version section with separate label, buttons, and input
         config_container.mount(Label("Python Version:", classes="compact section-header"))
 
-        # Create version input and buttons container
-        version_container = Horizontal(id=f"python-version-container-{self._widget_counter}")
+        # Create horizontal container for tool label and version buttons
+        version_container = Horizontal(
+            id=f"python-version-container-{self._widget_counter}",
+            classes="tool-version-row",
+        )
+        config_container.mount(version_container)
 
-        # Version input
+        # Add tool label and version buttons to the horizontal container
+        version_container.mount(Label("python:", classes="compact tool-label"))
+        self._create_version_buttons("python", version_container, version_limit=5)
+
+        # Add version input field on separate line
         python_version_input = Input(
             value=self.config.tool_version_value.get("python", "3.13"),
             placeholder="e.g., 3.11",
             id=f"python_version-{self._widget_counter}",
-            classes="compact config-input",
+            classes="version-input",
         )
+        config_container.mount(python_version_input)
 
-        # First mount the container to its parent
-        config_container.mount(version_container)
-
-        # Then mount children to the container
-        version_container.mount(python_version_input)
-
-        # Add version buttons (limit to 5 most recent versions)
-        self._create_version_buttons("python", version_container, version_limit=5)
         logger.info("🔧 MOUNT_PYTHON: Mounted Python version input and buttons")
 
         # Add Python-specific configuration only if pyproject is enabled
         if self.config.install_python_repository:
             logger.info("🔧 PYPROJECT_CONFIG: Adding pyproject configuration")
 
-            # Add the description text
-            description_label = Label(
-                "Python tools include Pipenv, Poetry, Pip-tools, and package publishing setup. "
-                "A requirements.txt file will be created for dependency management.",
-                classes="compact help-text",
-            )
-            config_container.mount(description_label)
-            logger.info("🔧 PYPROJECT_DESC: Added Python tools description label")
-
-            config_container.mount(Label("PyProject.toml Configuration:", classes="compact section-header"))            # Project metadata section
+            # Add pyproject section without extra spacing
+            config_container.mount(Label("PyProject.toml Configuration:", classes="compact section-header"))
             config_container.mount(Label("Project Metadata:", classes="subsection-header"))
 
             # Package name
@@ -1099,7 +1082,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     value=self.config.python_project_name or "",
                     placeholder="e.g., my-awesome-package",
                     id=f"python_package_name-{self._widget_counter}",
-                    classes="compact config-input",
+                    classes="compact-input",
                 ),
             )
 
@@ -1110,7 +1093,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     value=self.config.python_project_description or "",
                     placeholder="A brief description of your package",
                     id=f"python_description-{self._widget_counter}",
-                    classes="compact config-input",
+                    classes="compact-input",
                 ),
             )
 
@@ -1121,7 +1104,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     value=self.config.python_requires_python or "",
                     placeholder="e.g., >=3.8",
                     id=f"python_requires-{self._widget_counter}",
-                    classes="compact config-input",
+                    classes="compact-input",
                 ),
             )
 
@@ -1132,7 +1115,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     value=self.config.python_author_name or "",
                     placeholder="Your Name",
                     id=f"python_author_name-{self._widget_counter}",
-                    classes="compact config-input",
+                    classes="compact-input",
                 ),
             )
 
@@ -1143,7 +1126,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     value=self.config.python_author_email or "",
                     placeholder="your.email@example.com",
                     id=f"python_author_email-{self._widget_counter}",
-                    classes="compact config-input",
+                    classes="compact-input",
                 ),
             )
 
@@ -1289,28 +1272,29 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         """
         logger.info("🔧 GOLANG_CONFIG: Adding Go configuration")
 
-        # Go version section with buttons
+        # Go version section with separate label, buttons, and input
         config_container.mount(Label("Go Version:", classes="compact section-header"))
 
-        # Create version input and buttons container
-        version_container = Horizontal(id=f"go-version-container-{self._widget_counter}")
+        # Create horizontal container for tool label and version buttons
+        version_container = Horizontal(
+            id=f"go-version-container-{self._widget_counter}",
+            classes="tool-version-row",
+        )
+        config_container.mount(version_container)
 
-        # Version input
+        # Add tool label and version buttons to the horizontal container
+        version_container.mount(Label("golang:", classes="compact tool-label"))
+        self._create_version_buttons("golang", version_container, version_limit=5)
+
+        # Add version input field on separate line
         go_version_input = Input(
             value=self.config.tool_version_value.get("golang", "1.21"),
             placeholder="e.g., 1.20",
             id=f"go_version-{self._widget_counter}",
-            classes="compact config-input",
+            classes="version-input",
         )
+        config_container.mount(go_version_input)
 
-        # First mount the container to its parent
-        config_container.mount(version_container)
-
-        # Then mount children to the container
-        version_container.mount(go_version_input)
-
-        # Add version buttons
-        self._create_version_buttons("golang", version_container, version_limit=5)
         logger.info("🔧 MOUNT_GOLANG: Mounted Go version input and buttons")
 
     def _add_node_configuration(self, config_container: ScrollableContainer) -> None:
@@ -1324,28 +1308,29 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         """
         logger.info("🔧 NODE_CONFIG: Adding Node.js configuration")
 
-        # Node version section with buttons
+        # Node version section with separate label, buttons, and input
         config_container.mount(Label("Node.js Version:", classes="compact section-header"))
 
-        # Create version input and buttons container
-        version_container = Horizontal(id=f"node-version-container-{self._widget_counter}")
+        # Create horizontal container for tool label and version buttons
+        version_container = Horizontal(
+            id=f"node-version-container-{self._widget_counter}",
+            classes="tool-version-row",
+        )
+        config_container.mount(version_container)
 
-        # Version input
+        # Add tool label and version buttons to the horizontal container
+        version_container.mount(Label("node:", classes="compact tool-label"))
+        self._create_version_buttons("node", version_container, version_limit=5)
+
+        # Add version input field on separate line
         node_version_input = Input(
             value=self.config.tool_version_value.get("node", "20"),
             placeholder="e.g., 18",
             id=f"node_version-{self._widget_counter}",
-            classes="compact config-input",
+            classes="version-input",
         )
+        config_container.mount(node_version_input)
 
-        # First mount the container to its parent
-        config_container.mount(version_container)
-
-        # Then mount children to the container
-        version_container.mount(node_version_input)
-
-        # Add version buttons
-        self._create_version_buttons("node", version_container, version_limit=5)
         logger.info("🔧 MOUNT_NODE: Mounted Node.js version input and buttons")
 
     def _add_dotnet_configuration(self, config_container: ScrollableContainer) -> None:
@@ -1359,28 +1344,29 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         """
         logger.info("🔧 DOTNET_CONFIG: Adding .NET configuration")
 
-        # .NET version section with buttons
+        # .NET version section with separate label, buttons, and input
         config_container.mount(Label(".NET Version:", classes="compact section-header"))
 
-        # Create version input and buttons container
-        version_container = Horizontal(id=f"dotnet-version-container-{self._widget_counter}")
+        # Create horizontal container for tool label and version buttons
+        version_container = Horizontal(
+            id=f"dotnet-version-container-{self._widget_counter}",
+            classes="tool-version-row",
+        )
+        config_container.mount(version_container)
 
-        # Version input
+        # Add tool label and version buttons to the horizontal container
+        version_container.mount(Label("dotnet:", classes="compact tool-label"))
+        self._create_version_buttons("dotnet", version_container, version_limit=5)
+
+        # Add version input field on separate line
         dotnet_version_input = Input(
             value=self.config.tool_version_value.get("dotnet", "8"),
             placeholder="e.g., 7",
             id=f"dotnet_version-{self._widget_counter}",
-            classes="compact config-input",
+            classes="version-input",
         )
+        config_container.mount(dotnet_version_input)
 
-        # First mount the container to its parent
-        config_container.mount(version_container)
-
-        # Then mount children to the container
-        version_container.mount(dotnet_version_input)
-
-        # Add version buttons
-        self._create_version_buttons("dotnet", version_container, version_limit=5)
         logger.info("🔧 MOUNT_DOTNET: Mounted .NET version input and buttons")
 
     def _add_generic_tool_configuration(self, config_container: ScrollableContainer, tool: str) -> None:
@@ -1396,29 +1382,30 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         """
         logger.info("🔧 GENERIC_CONFIG: Adding generic configuration for %s", tool)
 
-        # Generic version section with buttons
+        # Generic version section with separate label, buttons, and input
         tool_display_name = tool.replace("-", " ").title()
         config_container.mount(Label(f"{tool_display_name} Version:", classes="compact section-header"))
 
-        # Create version input and buttons container
-        version_container = Horizontal(id=f"{tool}-version-container-{self._widget_counter}")
+        # Create horizontal container for tool label and version buttons
+        version_container = Horizontal(
+            id=f"{tool}-version-container-{self._widget_counter}",
+            classes="tool-version-row",
+        )
+        config_container.mount(version_container)
 
-        # Version input
+        # Add tool label and version buttons to the horizontal container
+        version_container.mount(Label(f"{tool}:", classes="tool-label"))
+        self._create_version_buttons(tool, version_container, version_limit=5)
+
+        # Add version input field on separate line
         tool_version_input = Input(
             value=self.config.tool_version_value.get(tool, "latest"),
             placeholder="e.g., latest",
             id=f"{tool}_version-{self._widget_counter}",
-            classes="compact config-input",
+            classes="version-input",
         )
+        config_container.mount(tool_version_input)
 
-        # First mount the container to its parent
-        config_container.mount(version_container)
-
-        # Then mount children to the container
-        version_container.mount(tool_version_input)
-
-        # Add version buttons if available
-        self._create_version_buttons(tool, version_container, version_limit=5)
         logger.info("🔧 MOUNT_GENERIC: Mounted %s version input and buttons", tool)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
