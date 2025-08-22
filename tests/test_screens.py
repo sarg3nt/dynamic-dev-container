@@ -9,7 +9,7 @@ import pytest
 # Import the TUI classes we want to test
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from install import (
+from install_new import (
     DynamicDevContainerApp,
     InstallationScreen,
     ProjectConfig,

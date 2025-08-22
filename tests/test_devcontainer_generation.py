@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from install import InstallationScreen, ProjectConfig
+from install_new import InstallationScreen, ProjectConfig
 
 
 class TestDevContainerGeneration:

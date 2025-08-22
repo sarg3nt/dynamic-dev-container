@@ -11,7 +11,7 @@ import pytest
 # Import the main functionality
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from install import (
+from install_new import (
     FileManager,
     ProjectConfig,
     main,
@@ -65,7 +65,7 @@ class TestEndToEndInstallation:
         target_dir.mkdir()
 
         # Mock installation screen behavior
-        from install import InstallationScreen
+        from install_new import InstallationScreen
 
         config = ProjectConfig()
         config.project_path = str(target_dir)
@@ -92,7 +92,7 @@ class TestEndToEndInstallation:
         target_dir = temp_dir / "target_project"
         target_dir.mkdir()
 
-        from install import InstallationScreen
+        from install_new import InstallationScreen
 
         config = ProjectConfig()
         config.project_path = str(target_dir)
@@ -117,7 +117,7 @@ class TestEndToEndInstallation:
         target_dir = temp_dir / "target_project"
         target_dir.mkdir()
 
-        from install import InstallationScreen
+        from install_new import InstallationScreen
 
         config = ProjectConfig()
         config.project_path = str(target_dir)
@@ -148,7 +148,7 @@ class TestEndToEndInstallation:
         target_dir = temp_dir / "target_project"
         target_dir.mkdir()
 
-        from install import InstallationScreen
+        from install_new import InstallationScreen
 
         config = ProjectConfig()
         config.project_path = str(target_dir)
@@ -266,7 +266,7 @@ class TestDependencyManagement:
     @patch("sys.executable", "/usr/bin/python3")
     def test_dependency_installation_success(self, mock_subprocess: Mock) -> None:
         """Test successful dependency installation."""
-        from install import check_and_install_dependencies
+        from install_new import check_and_install_dependencies
 
         # Mock successful installation
         mock_subprocess.return_value = Mock(returncode=0)
@@ -289,7 +289,7 @@ class TestDependencyManagement:
     @patch("builtins.print")
     def test_dependency_installation_failure(self, mock_print: Mock, mock_subprocess: Mock) -> None:
         """Test failed dependency installation."""
-        from install import check_and_install_dependencies
+        from install_new import check_and_install_dependencies
 
         # Mock failed installation
         mock_subprocess.side_effect = subprocess.CalledProcessError(1, "pip")

@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from install import InstallationScreen, ProjectConfig
+from install_new import InstallationScreen, ProjectConfig
 
 
 def test_structure_preservation():

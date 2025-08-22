@@ -1612,11 +1612,20 @@ Press **ENTER** to begin the setup wizard...
         self.app.pop_screen()
 
     def action_quit(self) -> None:
-        """Quit the application."""
+        """Quit the application.
+
+        Exits the Textual application cleanly, terminating the TUI session.
+
+        """
         self.app.exit()
 
     def action_toggle_debug(self) -> None:
-        """Toggle debug mode."""
+        """Toggle debug panel visibility.
+
+        Shows or hides the debug output panel for viewing captured log messages.
+        If the panel exists, it is removed. If it doesn't exist, it is created.
+
+        """
         # Check if debug panel already exists
         try:
             debug_container = self.query_one("#debug_container")
@@ -1752,8 +1761,17 @@ class PythonRepositoryScreen(Screen[None]):
             logger.debug("Could not set focus to project_name input")
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        """Handle checkbox state changes."""
-        """Handle repository type selection - only one can be selected."""
+        """Handle repository type selection.
+
+        Ensures only one repository type can be selected at a time and updates
+        the URL fields based on the selected repository type.
+
+        Parameters
+        ----------
+        event : Checkbox.Changed
+            The checkbox change event containing checkbox information
+
+        """
         if event.value:  # If checking this box
             repo_types = ["repo_pypi", "repo_artifactory", "repo_nexus", "repo_custom"]
             for repo_id in repo_types:
@@ -1827,17 +1845,27 @@ class PythonRepositoryScreen(Screen[None]):
         self.app.pop_screen()
 
     def action_next(self) -> None:
-        """Go to next step."""
-        """Continue to next screen."""
+        """Continue to the next screen.
+
+        Saves the current configuration and proceeds to the next step in the workflow.
+
+        """
         self.save_config()
 
     def action_quit(self) -> None:
-        """Quit the application."""
+        """Quit the application.
+
+        Exits the Textual application cleanly, terminating the TUI session.
+
+        """
         self.app.exit()
 
     def action_back(self) -> None:
-        """Go to previous step."""
-        """Go back to previous screen."""
+        """Return to the previous screen.
+
+        Navigates back to the previous step in the configuration workflow.
+
+        """
         self.app.pop_screen()
 
 
@@ -1913,8 +1941,17 @@ class PythonProjectScreen(Screen[None]):
             logger.debug("Could not set focus to python_project_name input")
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        """Handle checkbox state changes."""
-        """Handle license selection - only one can be selected."""
+        """Handle license selection.
+
+        Ensures only one license type can be selected at a time by deselecting
+        other license checkboxes when one is selected.
+
+        Parameters
+        ----------
+        event : Checkbox.Changed
+            The checkbox change event containing checkbox information
+
+        """
         if event.value:  # If checking this box
             license_types = ["license_mit", "license_apache", "license_gpl", "license_bsd", "license_other"]
             for license_id in license_types:
@@ -1958,17 +1995,27 @@ class PythonProjectScreen(Screen[None]):
         self.app.pop_screen()
 
     def action_next(self) -> None:
-        """Go to next step."""
-        """Continue to next screen."""
+        """Continue to the next screen.
+
+        Saves the current configuration and proceeds to the next step in the workflow.
+
+        """
         self.save_config()
 
     def action_quit(self) -> None:
-        """Quit the application."""
+        """Quit the application.
+
+        Exits the Textual application cleanly, terminating the TUI session.
+
+        """
         self.app.exit()
 
     def action_back(self) -> None:
-        """Go to previous step."""
-        """Go back to previous screen."""
+        """Return to the previous screen.
+
+        Navigates back to the previous step in the configuration workflow.
+
+        """
         self.app.pop_screen()
 
 
@@ -2076,7 +2123,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             Mapping from tool names to language identifiers (e.g., {'python': 'python', 'golang': 'go'})
 
         """
-        mapping = {}
+        mapping: dict[str, str] = {}
 
         try:
             # Look for .mise.toml in current directory or workspace
@@ -2178,22 +2225,38 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         self.app.pop_screen()
 
     def action_next(self) -> None:
-        """Go to next step."""
-        """Continue to next screen."""
+        """Continue to the next screen.
+
+        Saves the current configuration and proceeds to the next step in the workflow.
+
+        """
         self.save_config()
 
     def action_quit(self) -> None:
-        """Quit the application."""
+        """Quit the application.
+
+        Exits the Textual application cleanly, terminating the TUI session.
+
+        """
         self.app.exit()
 
     def action_back(self) -> None:
-        """Go back to tool selection screen."""
+        """Return to the previous screen.
+
+        Navigates back to the tool selection screen in the configuration workflow.
+
+        """
         # Navigate back to tool selection screen
         self.app.pop_screen()
         self.app.show_tool_selection()  # type: ignore[attr-defined]
 
     def action_toggle_debug(self) -> None:
-        """Toggle debug mode."""
+        """Toggle debug panel visibility.
+
+        Shows or hides the debug output panel for viewing captured log messages.
+        If the panel exists, it is removed. If it doesn't exist, it is created.
+
+        """
         # Check if debug panel already exists
         try:
             debug_container = self.query_one("#debug_container")
@@ -2314,17 +2377,27 @@ class ToolVersionScreen(Screen[None], DebugMixin):
         self.app.pop_screen()
 
     def action_next(self) -> None:
-        """Go to next step."""
-        """Continue to next screen."""
+        """Continue to the next screen.
+
+        Saves the current configuration and proceeds to the next step in the workflow.
+
+        """
         self.save_config()
 
     def action_quit(self) -> None:
-        """Quit the application."""
+        """Quit the application.
+
+        Exits the Textual application cleanly, terminating the TUI session.
+
+        """
         self.app.exit()
 
     def action_back(self) -> None:
-        """Go to previous step."""
-        """Go back to previous screen."""
+        """Return to the previous screen.
+
+        Navigates back to the previous step in the configuration workflow.
+
+        """
         self.app.pop_screen()
 
 
@@ -2436,21 +2509,36 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
             self._copy_debug_output()
 
     def action_next(self) -> None:
-        """Go to next step."""
-        """Save configuration and continue."""
+        """Continue to the next screen.
+
+        Saves the current configuration and proceeds to the next step in the workflow.
+
+        """
         self.save_config()
 
     def action_quit(self) -> None:
-        """Quit the application."""
+        """Quit the application.
+
+        Exits the Textual application cleanly, terminating the TUI session.
+
+        """
         self.app.exit()
 
     def action_back(self) -> None:
-        """Go to previous step."""
-        """Go back to previous screen."""
+        """Return to the previous screen.
+
+        Navigates back to the welcome screen.
+
+        """
         self.app.push_screen(WelcomeScreen())
 
     def action_toggle_debug(self) -> None:
-        """Toggle debug mode."""
+        """Toggle debug panel visibility.
+
+        Shows or hides the debug output panel for viewing captured log messages.
+        If the panel exists, it is removed. If it doesn't exist, it is created.
+
+        """
         # Check if debug panel already exists
         try:
             debug_container = self.query_one("#debug_container")

@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from install import (
+from install_new import (
     FileManager,
     MiseParser,
     ProjectConfig,
