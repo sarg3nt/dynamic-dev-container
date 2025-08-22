@@ -219,8 +219,14 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     )
                     tools_container.mount(repo_checkbox)
 
-            # Update configuration panel
-            self.refresh_configuration()
+            # Only refresh configuration if there are actually selected tools in this section
+            # This prevents unnecessary rebuilding when switching between sections
+            section_has_selected_tools = any(self.tool_selected.get(tool, False) for tool in tools)
+            if section_has_selected_tools:
+                self.refresh_configuration()
+            else:
+                # Clear configuration panel when no tools are selected
+                self._clear_configuration_panel()
 
             # Focus the first checkbox for better UX
             if first_checkbox is not None:
@@ -228,6 +234,16 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
         except Exception as e:
             logger.debug("Error refreshing tools: %s", e)
+
+    def _clear_configuration_panel(self) -> None:
+        """Clear the configuration panel and show prompt message."""
+        try:
+            config_container = self.query_one("#config-scroll", ScrollableContainer)
+            config_container.remove_children()
+            config_container.mount(Label("Select tools to see configuration options", classes="compact"))
+            logger.info("🔧 CONFIG_CLEAR: Cleared configuration panel")
+        except Exception as e:
+            logger.debug("Error clearing configuration panel: %s", e)
 
     def refresh_configuration(self) -> None:
         """Refresh the configuration panel based on selected tools."""
@@ -246,20 +262,33 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
 
         logger.info("🔧 REFRESH_PROCEED: Starting refresh process")
         self._refreshing_config = True
+
+        # Only increment counter if we're actually going to rebuild
+        # This helps prevent excessive widget recreation
+        current_section = self.sections[self.current_section] if self.sections else ""
+        tools_in_section = (
+            MiseParser.get_section_tools(self.source_dir / ".mise.toml", current_section) if current_section else []
+        )
+        section_tools_selected = {tool: self.tool_selected.get(tool, False) for tool in tools_in_section}
+        any_tool_selected_in_section = any(section_tools_selected.values())
+
+        # If no tools are selected in this section, just clear the panel
+        if not any_tool_selected_in_section:
+            logger.info("🔧 CONFIG_CLEAR: No tools selected, clearing configuration panel")
+            self._clear_configuration_panel()
+            self._refreshing_config = False
+            return
+
         self._widget_counter += 1  # Increment counter for unique IDs
 
         try:
-            # Clear existing config container contents instead of recreating it
+            # Get the config container
             config_container = self.query_one("#config-scroll", ScrollableContainer)
-
-            # Remove all children from the config container
-            config_container.remove_children()
-            logger.info("🔧 MOUNT_CLEAR: Cleared config container contents")
 
             # Check which tools are selected IN THE CURRENT SECTION
             if not self.sections:
                 logger.debug("No sections available")
-                config_container.mount(Label("No tools available", classes="compact"))
+                self._clear_configuration_panel()
                 return
 
             # Get tools in the current section
@@ -276,12 +305,15 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             logger.info("🔧 CONFIG_CHECK: any_tool_selected_in_section = %s", any_tool_selected_in_section)
 
             if not any_tool_selected_in_section:
-                logger.info("🔧 CONFIG_RESULT: No tools selected in current section - showing prompt")
-                config_container.mount(Label("Select tools to see configuration options", classes="compact"))
-                logger.info("🔧 MOUNT_LABEL: Mounted 'Select tools' label")
+                logger.info("🔧 CONFIG_RESULT: No tools selected in current section - clearing panel")
+                self._clear_configuration_panel()
                 return
 
             logger.info("🔧 CONFIG_RESULT: Adding configuration options for current section...")
+
+            # Clear and rebuild the configuration container only when needed
+            config_container.remove_children()
+            logger.info("🔧 MOUNT_CLEAR: Cleared config container contents")
 
             # Add configuration for each selected tool in the current section
             for tool in tools_in_section:
@@ -443,11 +475,32 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 finally:
                     self._updating_checkboxes = False
 
-            # Refresh configuration panel for all tool changes
-            logger.info("🔧 CALLING_REFRESH: About to call refresh_configuration")
-            self.refresh_configuration()
+            # Only refresh configuration if this actually changes the tool selection in the current section
+            # This prevents unnecessary rebuilds that cause spacing accumulation
+            current_section = self.sections[self.current_section] if self.sections else ""
+            tools_in_section = (
+                MiseParser.get_section_tools(self.source_dir / ".mise.toml", current_section) if current_section else []
+            )
+
+            if tool_name in tools_in_section:
+                # This tool is in the current section, so refresh configuration
+                logger.info("🔧 CALLING_REFRESH: Tool %s in current section, refreshing configuration", tool_name)
+                self.refresh_configuration()
+            else:
+                # This tool is not in the current section, no need to refresh
+                logger.info(
+                    "🔧 SKIP_REFRESH: Tool %s not in current section (%s), skipping refresh",
+                    tool_name,
+                    current_section,
+                )
         elif checkbox_id == "py_repo_enabled":
             logger.info("🔧 PYREPO_CHECKBOX: pyproject checkbox changed to %s", event.value)
+
+            # Skip if we're currently refreshing to prevent cascade
+            if self._refreshing_config:
+                logger.info("🔧 PYREPO_SKIP: Skipping pyproject refresh - already refreshing")
+                return
+
             # Handle pyproject checkbox directly without setting the updating flag
             # since we want refresh_configuration to run
             if self.config.install_python_repository != event.value:

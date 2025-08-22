@@ -7,36 +7,18 @@
   margin: 0 0 1 0;
   height: auto;
 }
-  
+
 .subtitle {
   color: $text-muted;
   margin: 0 0 1 0;
-  height: auto;
-}
-  
-.section-header {
-  text-style: bold;
-  color: $accent;
-  margin: 0 0 0 0;  /* Reduced margin to prevent spacing accumulation */
-  height: auto;
-}
-
-.subsection-header {
-  color: $text-accent;
-  margin: 0 0 0 0;  /* Reduced margin to prevent spacing accumulation */
   height: auto;
 }
 
 /* Compact element styles */
 .compact {
   margin: 0;
+  padding: 0 1;
   height: auto;
-  width: 100%;
-}
-
-.compact-spacing {
-  margin: 0;
-  height: 1;  /* Minimal spacing */
   width: 100%;
 }
 
@@ -46,17 +28,10 @@
   padding: 0 1;
 }
 
-.config-input {
-  margin: 0 1 1 0;
-  height: 3;
-  width: 15;  /* Reasonable width for version strings */
-  padding: 0 1;
-}
-
 .version-input {
-  margin: 0 1 0 0;  /* Right margin for spacing from buttons */
-  height: auto;
-  width: 12; /* Slightly smaller width to prevent overlap */
+  margin: 0 0 1 0;
+  height: 3;
+  width: 13; /* Set a fixed width for version inputs */
   padding: 0 1;
 }
 
@@ -90,6 +65,12 @@
   height: auto;
 }
 
+.section-header {
+  text-style: bold;
+  color: $accent;
+  margin: 1 0 0 0;
+  height: auto;
+}
 
 .column-title {
   text-style: bold;
@@ -114,15 +95,8 @@
   margin: 1 0 0 0;
 }
 
-.help-text {
-  color: $text-muted;
-  text-style: italic;
-  margin: 1 0 1 0;
-  height: auto;
-}
-
 /* Container styles */
-#welcome-container, #project-container, #summary-container, #install-container, #psi-container {
+#welcome-container, #project-container, #summary-container, #install-container {
   padding: 1;
   margin: 0;
   height: auto;
@@ -209,11 +183,11 @@ Button.-primary {
 
 /* Version button styling - small, horizontal, text-like */
 .version-btn-small {
-  height: 1;  /* Match input height for proper alignment */
+  height: 1;
   min-width: 0;
   width: auto;
-  margin: 0 0 0 0;  /* Right margin for spacing between buttons */
-  padding: 0 0;
+  margin: 0;
+  padding: 0;
   border: none;
   background: transparent;
   color: $text-muted;
@@ -241,31 +215,6 @@ Button.-primary {
 .tool-label {
   width: auto;
   margin: 0 1 0 0;
-  height: auto;
-}
-
-/* Tools header horizontal layout */
-#tools-header {
-  height: 1;
-  margin: 0;
-  padding: 0;
-  layout: horizontal;
-  align: left middle;
-}
-
-#tools-header Label.column-title {
-  margin: 0 1 0 0;
-  height: 1;
-}
-
-#tools-header Button {
-  margin: 0;
-  height: 1;
-}
-
-/* Configuration column title - reduce bottom margin */
-#config-column Label.column-title {
-  margin: 0 0 0 0;
   height: auto;
 }
 
@@ -302,12 +251,6 @@ Checkbox:hover {
   background: $surface;
 }
 
-/* Repository checkbox specific styling */
-.repo-checkbox {
-  margin: 1 0 1 0;  /* Add extra top margin to separate from tools */
-  padding-left: 2;  /* Indent slightly to show it's related to Python */
-}
-
 /* Container styling */
 Container {
   height: auto;
@@ -341,7 +284,6 @@ ProgressBar {
   border: solid $accent;
   background: $surface;
   margin: 1 0 0 0;
-  padding: 0;
   dock: bottom;
 }
 
@@ -396,7 +338,7 @@ ProgressBar {
 }
 
 /* Main containers should use full space by default */
-#welcome-container, #project-container, #summary-container, #install-container, #tools-container, #psi-container {
+#welcome-container, #project-container, #summary-container, #install-container, #tools-container {
   height: auto;
 }
 
