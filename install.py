@@ -3254,7 +3254,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             ]
 
             if configurable_tools_in_current_section:
-                config_container.mount(Label("Tool Versions:", classes="compact"))
+                config_container.mount(Label("Tool Versions:", classes="compact section-header"))
                 for tool in configurable_tools_in_current_section:
                     current_version = self.tool_version_value.get(tool, "latest")
 
