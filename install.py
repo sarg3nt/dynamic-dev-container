@@ -2648,6 +2648,18 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             # Create main layout container with debug panel at bottom if enabled
             layout_components = []
 
+            # Check if current section has multiple tools for Select All button
+            current_section = self.sections[self.current_section]
+            tools_in_section = MiseParser.get_section_tools(Path(".mise.toml"), current_section)
+            show_select_all = len(tools_in_section) > 1
+
+            # Create tools header widgets
+            tools_header_widgets = [Label("Available Tools:", classes="column-title")]
+
+            # Only add Select All button if there are multiple tools
+            if show_select_all:
+                tools_header_widgets.append(Button("Select All", id="select_all_tools", classes="version-btn-small"))
+
             # Main content area
             main_content = Container(
                 Label(
@@ -2657,7 +2669,10 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 Horizontal(
                     # Left column for tool selection
                     Container(
-                        Label("Available Tools:", classes="column-title"),
+                        Horizontal(
+                            *tools_header_widgets,
+                            id="tools-header",
+                        ),
                         ScrollableContainer(id="tools-scroll", classes="tools-list"),
                         id="tools-column",
                         classes="left-column",
@@ -2817,6 +2832,48 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         needs_rebuild = True
         current_section = self.sections[self.current_section]
         tools = MiseParser.get_section_tools(Path(".mise.toml"), current_section)
+
+        # Update Select All button visibility based on tool count
+        try:
+            tools_header = self.query_one("#tools-header", Horizontal)
+            current_widgets = list(tools_header.children)
+
+            # Check if Select All button currently exists
+            has_select_all_btn = any(
+                hasattr(widget, "id") and widget.id == "select_all_tools" for widget in current_widgets
+            )
+
+            should_have_select_all = len(tools) > 1
+
+            logger.debug(
+                "SELECT ALL DEBUG: section=%s, tools_count=%d, should_have=%s, has_current=%s",
+                current_section,
+                len(tools),
+                should_have_select_all,
+                has_select_all_btn,
+            )
+            logger.debug("SELECT ALL DEBUG: tools in section: %s", tools)
+
+            if should_have_select_all and not has_select_all_btn:
+                # Need to add Select All button
+                select_all_btn = Button("Select All", id="select_all_tools", classes="version-btn-small")
+                tools_header.mount(select_all_btn)
+                logger.debug("Added Select All button for section %s with %d tools", current_section, len(tools))
+            elif not should_have_select_all and has_select_all_btn:
+                # Need to remove Select All button
+                try:
+                    select_all_btn = self.query_one("#select_all_tools")
+                    select_all_btn.remove()
+                    logger.debug("Removed Select All button for section %s", current_section)
+                except Exception as e:
+                    logger.debug("Could not remove Select All button: %s", e)
+            elif should_have_select_all and has_select_all_btn:
+                logger.debug("Select All button already exists for section %s", current_section)
+            else:
+                logger.debug("No Select All button needed for section %s", current_section)
+
+        except Exception as e:
+            logger.debug("Could not update Select All button: %s", e)
 
         # Check if we can just update existing widgets instead of rebuilding
         try:
@@ -3918,6 +3975,54 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             return f"src/{package_name_clean}"
         return "src/my_awesome_project"
 
+    def _select_all_tools(self) -> None:
+        """Select all available tools in the current section."""
+        try:
+            if not self.sections:
+                return
+
+            current_section = self.sections[self.current_section]
+            tools = MiseParser.get_section_tools(Path(".mise.toml"), current_section)
+
+            if not tools:
+                return
+
+            # Set all tools as selected in the internal state
+            for tool in tools:
+                self.tool_selected[tool] = True
+
+            # Update all tool checkboxes to checked state
+            for tool in tools:
+                checkbox_id = f"tool_{tool}"
+                try:
+                    checkbox = self.query_one(f"#{checkbox_id}", Checkbox)
+                    checkbox.value = True
+                except Exception as e:
+                    logger.debug("Could not find checkbox for tool %s: %s", tool, e)
+
+            # Update Python repository checkbox if Python is selected
+            if "python" in tools:
+                try:
+                    # The checkbox should be created by the Python checkbox selection logic
+                    # but if it doesn't exist yet, we may need to create it here
+                    repo_checkbox = self.query_one("#py_repo_enabled", Checkbox)
+                    # Optionally auto-enable pyproject.toml configuration
+                    repo_checkbox.value = True
+                    self.config.install_python_repository = True
+                except Exception as e:
+                    logger.debug(
+                        "Could not update Python repository checkbox (will be created by checkbox handler): %s",
+                        e,
+                    )
+
+            # Refresh configuration panel to show settings for all selected tools
+            self.refresh_configuration()
+
+            logger.debug("Selected all tools in section %s: %s", current_section, tools)
+
+        except Exception as e:
+            logger.debug("Error selecting all tools: %s", e)
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events.
 
@@ -3960,12 +4065,28 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             # Extract section index from button ID: "section_link_{index}"
             try:
                 section_index = int(button_id.split("_")[-1])
+                logger.debug(
+                    "SECTION CLICK DEBUG: button_id=%s, section_index=%d, current_section=%d",
+                    button_id,
+                    section_index,
+                    self.current_section,
+                )
                 if 0 <= section_index < len(self.sections) and section_index != self.current_section:
+                    section_name = self.sections[section_index]
+                    logger.debug(
+                        "SECTION CLICK DEBUG: Switching from section %d (%s) to section %d (%s)",
+                        self.current_section,
+                        self.sections[self.current_section],
+                        section_index,
+                        section_name,
+                    )
                     self.save_current_section()
                     self.current_section = section_index
                     self.refresh_controls()
                     self.refresh_tools()
                     self.refresh_section_links()
+                else:
+                    logger.debug("SECTION CLICK DEBUG: No section switch needed (same section or invalid index)")
             except (ValueError, IndexError) as e:
                 logger.debug("Invalid section link button ID '%s': %s", button_id, e)
             return
@@ -3985,6 +4106,8 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         elif button_id == "next_btn":
             self.save_current_section()
             self.finalize_selection()
+        elif button_id == "select_all_tools":
+            self._select_all_tools()
         elif button_id == "copy_debug_btn":
             self._copy_debug_output()
 

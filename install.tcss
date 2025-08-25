@@ -205,6 +205,25 @@ Button.-primary {
   color: black;
 }
 
+/* Tools header horizontal layout */
+#tools-header {
+  height: 1;
+  margin: 0 0 0 0;
+  padding: 0;
+  layout: horizontal;
+  align: left middle;
+}
+
+#tools-header Label.column-title {
+  margin: 0 1 0 0;
+  height: 1;
+}
+
+#tools-header Button {
+  margin: 0 0 0 0;
+  height: 1;
+}
+
 .tool-version-row {
   layout: horizontal;
   height: auto;
