@@ -5919,6 +5919,7 @@ class DynamicDevContainerApp(App[None]):
     """Main application class."""
 
     CSS_PATH = "install.tcss"
+    TITLE = "Dynamic Dev Container Setup"
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit"),
