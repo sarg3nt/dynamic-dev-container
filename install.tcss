@@ -96,7 +96,65 @@
 }
 
 /* Container styles */
-#welcome-container, #project-container, #summary-container, #install-container {
+#welcome-container {
+  padding: 1;
+  margin: 0;
+  height: 100%;
+  layout: vertical;
+}
+
+#welcome-scroll {
+  height: 1fr;
+  scrollbar-size: 1 1;
+  scrollbar-background: $surface;
+  scrollbar-color: $primary;
+  margin: 0 0 1 0;
+}
+
+#welcome-container #button-row {
+  height: auto;
+  margin: 0;
+  align: center middle;
+  dock: bottom;
+}
+
+#project-container {
+  padding: 1;
+  margin: 0;
+  height: 100%;
+  layout: vertical;
+}
+
+#project-scroll {
+  height: 1fr;
+  scrollbar-size: 1 1;
+  scrollbar-background: $surface;
+  scrollbar-color: $primary;
+  margin: 0 0 1 0;
+}
+
+#project-container #button-row {
+  height: auto;
+  margin: 0;
+  align: center middle;
+  dock: bottom;
+}
+
+#psi-header-container {
+  padding: 1;
+  margin: 0;
+  height: 100%;
+  layout: vertical;
+}
+
+#psi-header-container #button-row {
+  height: auto;
+  margin: 0;
+  align: center middle;
+  dock: bottom;
+}
+
+#summary-container, #install-container {
   padding: 1;
   margin: 0;
   height: auto;
@@ -163,6 +221,15 @@
   align: center middle;
 }
 
+/* Spacing for button groups in tool selection */
+#button-row .nav-button:first-child {
+  margin-right: 2;
+}
+
+#button-row .nav-button:last-child {
+  margin-left: 2;
+}
+
 Button {
   margin: 0 1;
   height: 3;
@@ -179,6 +246,23 @@ Button:hover {
 
 Button.-primary {
   background: $primary;
+}
+
+/* Main navigation button styling - distinct from section buttons */
+.nav-button {
+  margin: 0 1;
+  height: 3;
+  min-width: 12;
+  color: $background;
+  background: $accent;
+  border: solid $accent;
+  text-style: bold;
+}
+
+.nav-button:hover {
+  background: $primary;
+  color: $text;
+  border: solid $primary;
 }
 
 /* Version button styling - small, horizontal, text-like */

@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 if TYPE_CHECKING:
     from textual.events import Focus, Key  # type: ignore[import,unused-ignore]
     from textual.timer import Timer  # type: ignore[import,unused-ignore]
+    from textual.widget import Widget
 
 # Global debug flag - can be set via environment variable or command line
 DEBUG_MODE = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
@@ -1537,7 +1538,7 @@ class WelcomeScreen(Screen[None], DebugMixin):
     """Welcome screen for the installer."""
 
     BINDINGS = [
-        Binding("enter", "continue", "Continue"),
+        Binding("ctrl+n", "continue", "Next"),
         Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+d", "toggle_debug", "Debug"),
     ]
@@ -1545,8 +1546,11 @@ class WelcomeScreen(Screen[None], DebugMixin):
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
         yield Header()
+
+        # Main content with scrollable markdown and fixed button at bottom
         yield Container(
-            Markdown(f"""
+            ScrollableContainer(
+                Markdown(f"""
 # Dynamic Dev Container Setup
 
 Welcome to the **Dynamic Dev Container TUI Setup**!
@@ -1557,7 +1561,8 @@ This wizard will guide you through configuring your development container with t
 - Debug Mode: {"✅ Enabled" if DEBUG_MODE else "❌ Disabled"}
 
 ## Getting Started:
-- Press **ENTER** to start the configuration wizard
+- Click **Next: Project Configuration** to start the wizard
+- Press **Ctrl+N** to proceed to the next step
 - Press **Ctrl+Q** to quit the application
 - Press **Ctrl+D** to view debug output
 
@@ -1583,9 +1588,13 @@ This wizard will guide you through configuring your development container with t
 ---
 
 **Ready to create your perfect dev environment?**
-
-Press **ENTER** to begin the setup wizard...
-            """),
+                """),
+                id="welcome-scroll",
+            ),
+            Horizontal(
+                Button("Next: Project Configuration", id="next_btn", classes="nav-button"),
+                id="button-row",
+            ),
             id="welcome-container",
         )
         yield Footer()
@@ -1594,11 +1603,20 @@ Press **ENTER** to begin the setup wizard...
         """Called when the screen is mounted.
 
         Sets up debug logging and periodic debug output updates for the welcome screen.
+        Also sets focus on the Next button for immediate navigation.
 
         """
         logger.debug("WelcomeScreen mounted - Debug functionality available (Ctrl+D)")
         # Set up a timer to periodically update debug output
         self.set_interval(1.0, self.update_debug_output)
+
+        # Set focus on the Next button when the screen loads
+        try:
+            next_button = self.query_one("#next_btn")
+            next_button.focus()
+            logger.debug("WelcomeScreen: Set focus on Next button")
+        except Exception as e:
+            logger.debug("WelcomeScreen: Could not set focus on Next button: %s", e)
 
     def action_continue(self) -> None:
         """Continue to the next screen.
@@ -1644,6 +1662,8 @@ Press **ENTER** to begin the setup wizard...
         """Handle button press events."""
         if event.button.id == "copy_debug_btn":
             self._copy_debug_output()
+        elif event.button.id == "next_btn":
+            self.action_continue()
 
 
 class PythonRepositoryScreen(Screen[None]):
@@ -2020,7 +2040,7 @@ class PythonProjectScreen(Screen[None]):
 
 
 class PSIHeaderScreen(Screen[None], DebugMixin):
-    """Screen for PSI Header configuration."""
+    """Screen for Dev Container Extensions configuration."""
 
     BINDINGS = [
         Binding("ctrl+n", "next", "Next"),
@@ -2030,7 +2050,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
     ]
 
     def __init__(self, config: ProjectConfig, source_dir: Path) -> None:
-        """Initialize the PSI Header screen.
+        """Initialize the Dev Container Extensions screen.
 
         Parameters
         ----------
@@ -2055,7 +2075,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
 
         yield Header()
         yield Container(
-            Label("PSI Header Configuration", classes="title"),
+            Label("Dev Container Extensions", classes="title"),
             Label("Configure PSI Header extension for file templates:"),
             Checkbox("Install PSI Header Extension", id="install_psi", value=self.config.install_psi_header),
             Label("Company Name:"),
@@ -2067,8 +2087,8 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
                 id="language-scroll",
             ),
             Horizontal(
-                Button("Back", id="back_btn"),
-                Button("Next", id="next_btn", variant="primary"),
+                Button("Back: Tool Selection", id="back_btn", classes="nav-button"),
+                Button("Next: Configuration Summary", id="next_btn", variant="primary", classes="nav-button"),
                 id="button-row",
             ),
             id="psi-header-container",
@@ -2196,7 +2216,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             self._copy_debug_output()
 
     def save_config(self) -> None:
-        """Save PSI Header configuration."""
+        """Save Dev Container Extensions configuration."""
         self.config.install_psi_header = self.query_one("#install_psi", Checkbox).value
         self.config.psi_header_company = self.query_one("#company_name", Input).value
 
@@ -2446,41 +2466,44 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
         default_exec = "".join(word[0].lower() for word in words if word) if words else "mp"  # fallback
 
         yield Header()
-        yield ScrollableContainer(
-            Label("Project Configuration", classes="title"),
-            Label(
-                "Enter your project configuration details:\n[dim]Configuration that will be injected into the 'devcontainer.json' and 'dev.sh' files.[/dim]",
+        yield Container(
+            ScrollableContainer(
+                Label("Project Configuration", classes="title"),
+                Label(
+                    "Enter your project configuration details:\n[dim]Configuration that will be injected into the 'devcontainer.json' and 'dev.sh' files.[/dim]",
+                ),
+                Horizontal(
+                    # Left column
+                    Container(
+                        Label(
+                            "Project Path:\n[dim]Path to the project source which is usually includes the git repository name.[/dim]",
+                        ),
+                        Input(value=self.config.project_path or str(Path.home() / default_name), id="project_path"),
+                        Label("Project Name:\n[dim]Name of the project, usually the git repository name.[/dim]"),
+                        Input(value=default_name, id="project_name"),
+                        Label("Display Name:\n[dim]Pretty printed project name with spaces and capitalization.[/dim]"),
+                        Input(value=default_display, id="display_name"),
+                        classes="config-column",
+                    ),
+                    # Right column
+                    Container(
+                        Label(
+                            "Container Name:\n[dim]Dev Container name, typically the git repository name plus '-dev'[/dim]",
+                        ),
+                        Input(value=default_container, id="container_name"),
+                        Label(
+                            "Docker Exec Command:\n[dim]Optional command to be injected into users shell init file to exec into running container.[/dim]",
+                        ),
+                        Input(value=default_exec, id="docker_command"),
+                        classes="config-column",
+                    ),
+                    id="config-columns",
+                ),
+                id="project-scroll",
             ),
             Horizontal(
-                # Left column
-                Container(
-                    Label(
-                        "Project Path:\n[dim]Path to the project source which is usually includes the git repository name.[/dim]",
-                    ),
-                    Input(value=self.config.project_path or str(Path.home() / default_name), id="project_path"),
-                    Label("Project Name:\n[dim]Name of the project, usually the git repository name.[/dim]"),
-                    Input(value=default_name, id="project_name"),
-                    Label("Display Name:\n[dim]Pretty printed project name with spaces and capitalization.[/dim]"),
-                    Input(value=default_display, id="display_name"),
-                    classes="config-column",
-                ),
-                # Right column
-                Container(
-                    Label(
-                        "Container Name:\n[dim]Dev Container name, typically the git repository name plus '-dev'[/dim]",
-                    ),
-                    Input(value=default_container, id="container_name"),
-                    Label(
-                        "Docker Exec Command:\n[dim]Optional command to be injected into users shell init file to exec into running container.[/dim]",
-                    ),
-                    Input(value=default_exec, id="docker_command"),
-                    classes="config-column",
-                ),
-                id="config-columns",
-            ),
-            Horizontal(
-                Button("Back", id="back_btn"),
-                Button("Next", id="next_btn", variant="primary"),
+                Button("Back: Welcome", id="back_btn", classes="nav-button"),
+                Button("Next: Tool Selection", id="next_btn", classes="nav-button"),
                 id="button-row",
             ),
             id="project-container",
@@ -2638,8 +2661,8 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             yield Container(
                 Label("No tool sections found in .mise.toml", classes="title"),
                 Horizontal(
-                    Button("Back", id="back_btn"),
-                    Button("Next", id="next_btn", variant="primary"),
+                    Button("Back: Project Description", id="back_btn", classes="nav-button"),
+                    Button("Next: Dev Container Extensions", id="next_btn", classes="nav-button"),
                     id="button-row",
                 ),
                 id="tools-container",
@@ -2654,7 +2677,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             show_select_all = len(tools_in_section) > 1
 
             # Create tools header widgets
-            tools_header_widgets = [Label("Available Tools:", classes="column-title")]
+            tools_header_widgets: list[Widget] = [Label("Available Tools:", classes="column-title")]
 
             # Only add Select All button if there are multiple tools
             if show_select_all:
@@ -2692,14 +2715,14 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     classes="compact-group",
                 ),
                 Horizontal(
-                    Button("Back", id="back_btn"),
-                    Button("Previous Section", id="prev_btn", disabled=self.current_section == 0),
+                    Button("Back: Project Description", id="back_btn", classes="nav-button"),
+                    Button("Previous Tool", id="prev_btn", disabled=self.current_section == 0),
                     Button(
-                        "Next Section",
+                        "Next Tool",
                         id="next_section_btn",
                         disabled=self.current_section >= len(self.sections) - 1,
                     ),
-                    Button("Finish Tool Selection", id="next_btn", variant="primary"),
+                    Button("Next: Dev Container Extensions", id="next_btn", classes="nav-button"),
                     id="button-row",
                 ),
                 id="main-content",
@@ -2862,7 +2885,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             elif not should_have_select_all and has_select_all_btn:
                 # Need to remove Select All button
                 try:
-                    select_all_btn = self.query_one("#select_all_tools")
+                    select_all_btn = self.query_one("#select_all_tools", Button)
                     select_all_btn.remove()
                     logger.debug("Removed Select All button for section %s", current_section)
                 except Exception as e:
@@ -3067,7 +3090,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 logger.debug("No existing buttons found, creating initial set")
 
                 # Add the label only once
-                sections_label = Label("Sections:", classes="sections-links-label")
+                sections_label = Label("Tools:", classes="sections-links-label")
                 section_links_container.mount(sections_label)
                 logger.debug("Mounted sections label")
 
@@ -4477,9 +4500,9 @@ class SummaryScreen(Screen[None], DebugMixin):
                 if self.config.python_keywords:
                     summary += f"- **Keywords:** {self.config.python_keywords}\n"
 
-        # PSI Header Configuration
+        # Dev Container Extensions
         if self.config.install_psi_header:
-            summary += "\n## PSI Header Configuration\n\n"
+            summary += "\n## Dev Container Extensions\n\n"
             if self.config.psi_header_company:
                 summary += f"- **Company:** {self.config.psi_header_company}\n"
             if self.config.psi_header_templates:
@@ -6071,11 +6094,11 @@ class DynamicDevContainerApp(App[None]):
         self.show_psi_header_config()
 
     def show_psi_header_config(self) -> None:
-        """Show PSI Header configuration screen."""
+        """Show Dev Container Extensions configuration screen."""
         self.push_screen(PSIHeaderScreen(self.config, self.source_dir), self.after_psi_header)
 
     def after_psi_header(self, _result: None = None) -> None:
-        """Called after PSI Header configuration."""
+        """Called after Dev Container Extensions configuration."""
         # Now show summary
         self.push_screen(SummaryScreen(self.config), self.after_summary)
 
