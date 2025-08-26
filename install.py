@@ -4976,8 +4976,8 @@ class SummaryScreen(Screen[None], DebugMixin):
                 id="summary-scroll",
             ),
             Horizontal(
-                Button("Back", id="back_btn"),
-                Button("Install", id="install_btn", variant="primary"),
+                Button("Back: Dev Container Extensions", id="back_btn", classes="nav-button"),
+                Button("Install", id="install_btn", variant="primary", classes="nav-button"),
                 id="button-row",
             ),
             id="summary-container",
