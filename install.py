@@ -2257,7 +2257,12 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
                 # Left column - Installation control (matching ToolSelectionScreen structure)
                 Container(
                     Label("Extension Installation:", classes="column-title"),
-                    Checkbox("Install PSI Header Extension", id="install_psi", value=self.config.install_psi_header),
+                    Checkbox(
+                        "Install PSI Header Extension",
+                        id="install_psi",
+                        value=self.config.install_psi_header,
+                        classes="compact",
+                    ),
                     classes="left-column",
                 ),
                 # Right column - Configuration options (matching ToolSelectionScreen structure)
@@ -2307,7 +2312,9 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
             # Extensions are selected by default when section is enabled, but hidden when section is disabled
             is_selected = self.config.selected_extensions.get(extension_id, True)
-            extension_checkboxes.append(Checkbox(f"{description} ({extension_id})", id=checkbox_id, value=is_selected))
+            extension_checkboxes.append(
+                Checkbox(f"{description} ({extension_id})", id=checkbox_id, value=is_selected, classes="compact"),
+            )
             logger.debug("Created checkbox for extension: %s", extension_id)
 
         # Create the extension list container - initially hidden if section not enabled
@@ -2332,6 +2339,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
                 f"Install {section_name} Extensions",
                 id=f"install_{section_id}",
                 value=section_enabled,
+                classes="compact",
             ),
             extension_container,
         )
@@ -2785,7 +2793,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             checkbox_id = f"lang_{lang_id}"
 
             # Create the checkbox
-            checkbox = Checkbox(display_name, id=checkbox_id, value=is_selected)
+            checkbox = Checkbox(display_name, id=checkbox_id, value=is_selected, classes="compact")
             checkboxes.append(checkbox)
 
         return checkboxes
@@ -5010,21 +5018,6 @@ class SummaryScreen(Screen[None], DebugMixin):
                     summary += f"- **{tool}** (latest)\n"
         else:
             summary += "\n## Development Tools\nNone selected\n"
-
-        # Extensions
-        extensions = []
-        if self.config.include_python_extensions:
-            extensions.append("Python")
-        if self.config.include_markdown_extensions:
-            extensions.append("Markdown")
-        if self.config.include_shell_extensions:
-            extensions.append("Shell/Bash")
-        if self.config.include_js_extensions:
-            extensions.append("JavaScript/Node.js")
-        if self.config.install_psi_header:
-            extensions.append("PSI Header")
-
-        summary += f"\n## VS Code Extensions\n\nGitHub + Core + {', '.join(extensions)}\n"
 
         # Python Configuration
         if self.config.install_python_tools:
