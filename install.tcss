@@ -1,5 +1,10 @@
 /* Dynamic Dev Container TUI Stylesheet */
 
+/* Utility classes */
+.hidden {
+  display: none;
+}
+
 /* Title styles */
 .title {
   text-style: bold;

@@ -374,6 +374,10 @@ class ProjectConfig:
         self.psi_header_company: str = ""
         self.psi_header_templates: list[tuple[str, str]] = []
 
+        # Extension configuration
+        self.selected_extension_sections: dict[str, bool] = {}
+        self.selected_extensions: dict[str, bool] = {}
+
 
 class BackgroundDescriptionLoader(threading.Thread):
     """Background thread for loading tool descriptions from .mise.toml comments."""
@@ -1080,6 +1084,85 @@ class DevContainerParser:
                         sections.append(section_name)
 
         return sections
+
+    @staticmethod
+    def parse_extension_sections_with_extensions(devcontainer_file: Path) -> dict[str, list[tuple[str, str]]]:
+        """Parse extension sections from devcontainer.json file with their extensions.
+
+        Parameters
+        ----------
+        devcontainer_file : Path
+            Path to the devcontainer.json file to parse
+
+        Returns
+        -------
+        dict[str, list[tuple[str, str]]]
+            Dictionary mapping section names to lists of (extension_id, description) tuples.
+            Excludes tool-related sections (those matching tools), PSI Header, and Core Extensions.
+
+        """
+        if not devcontainer_file.exists():
+            return {}
+
+        with open(devcontainer_file, encoding="utf-8") as f:
+            content = f.read()
+
+        sections_with_extensions: dict[str, list[tuple[str, str]]] = {}
+        current_section = None
+        in_extensions = False
+        tool_related_sections = {
+            "Go Development",
+            ".NET Development",
+            "Node Development",
+            "Python",
+            "Kubernetes",
+            "HashiCorp Tools",
+            "PowerShell",
+        }
+        excluded_sections = {"Core Extensions", "PSI Header"}
+
+        for line in content.split("\n"):
+            stripped_line = line.strip()
+
+            # Look for the extensions array
+            if '"extensions":' in stripped_line:
+                in_extensions = True
+                continue
+
+            # Stop when we exit the extensions array
+            if in_extensions and stripped_line.startswith('"settings":'):
+                break
+
+            if in_extensions:
+                # Look for section begin markers
+                begin_match = re.match(r"^//\s*#### Begin (.+) ####", stripped_line)
+                if begin_match:
+                    section_name = begin_match.group(1)
+                    # Only include non-tool-related and non-excluded sections
+                    if section_name not in tool_related_sections and section_name not in excluded_sections:
+                        current_section = section_name
+                        if current_section not in sections_with_extensions:
+                            sections_with_extensions[current_section] = []
+                    else:
+                        current_section = None
+                    continue
+
+                # Look for section end markers
+                end_match = re.match(r"^//\s*#### End (.+) ####", stripped_line)
+                if end_match:
+                    current_section = None
+                    continue
+
+                # Parse extension lines when we're in a valid section
+                if current_section and current_section in sections_with_extensions:
+                    # Look for extension IDs with comments
+                    extension_match = re.match(r'^"([^"]+)",\s*//\s*(.+)', stripped_line)
+                    if extension_match:
+                        extension_id = extension_match.group(1)
+                        description = extension_match.group(2)
+                        sections_with_extensions[current_section].append((extension_id, description))
+
+        return sections_with_extensions
 
     @staticmethod
     def parse_settings_sections(devcontainer_file: Path) -> list[str]:
@@ -2064,147 +2147,234 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         self.config = config
         self.source_dir = source_dir
 
+        # Get extension sections from devcontainer.json
+        devcontainer_file = self.source_dir / ".devcontainer" / "devcontainer.json"
+        self.extension_sections = DevContainerParser.parse_extension_sections_with_extensions(devcontainer_file)
+        logger.debug("Parsed extension sections: %s", list(self.extension_sections.keys()))
+        for section_name, extensions in self.extension_sections.items():
+            logger.debug(
+                "Section '%s' has %s extensions: %s",
+                section_name,
+                len(extensions),
+                [ext[0] for ext in extensions],
+            )
+
+        self.section_names = list(self.extension_sections.keys())
+
+        # Insert PSI Header at its correct position (second to last, before Core Extensions)
+        # This matches the order in devcontainer.json where PSI Header comes after HashiCorp Tools
+        self.section_names.append("PSI Header")
+        logger.debug("Final section order: %s", self.section_names)
+
+        self.current_section = 0
+        self.total_sections = len(self.section_names)
+        logger.debug("Total sections: %s", self.total_sections)
+
+    def _sanitize_section_id(self, section_name: str) -> str:
+        """Sanitize section name for use in HTML IDs.
+
+        Replaces invalid characters with underscores to create valid HTML/CSS IDs.
+
+        Parameters
+        ----------
+        section_name : str
+            The section name to sanitize
+
+        Returns
+        -------
+        str
+            Sanitized ID string safe for use in HTML/CSS
+
+        """
+        return section_name.lower().replace(" ", "_").replace("/", "_").replace("-", "_")
+
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
-        # Get available languages from devcontainer.json template
-        devcontainer_file = self.source_dir / ".devcontainer" / "devcontainer.json"
-        available_languages = DevContainerParser.parse_psi_header_languages(devcontainer_file)
-
-        # Determine which languages should be auto-selected based on selected tools
-        auto_selected_languages = self._get_auto_selected_languages()
-
         yield Header()
         yield Container(
-            Label("Dev Container Extensions", classes="title"),
-            Label("Configure PSI Header extension for file templates:"),
-            Checkbox("Install PSI Header Extension", id="install_psi", value=self.config.install_psi_header),
-            Label("Company Name:"),
-            Input(placeholder="Your Company Name", id="company_name", value=self.config.psi_header_company),
-            Label("Language Templates:"),
-            Label("Select languages for custom headers (auto-selected based on your tools):"),
-            ScrollableContainer(
-                *self._create_language_checkboxes(available_languages, auto_selected_languages),
-                id="language-scroll",
-            ),
-            Horizontal(
-                Button("Back: Tool Selection", id="back_btn", classes="nav-button"),
-                Button("Next: Configuration Summary", id="next_btn", variant="primary", classes="nav-button"),
-                id="button-row",
-            ),
+            self._create_main_content(),
+            self._create_button_row(),
             id="psi-header-container",
         )
         yield Footer()
 
+    def _create_main_content(self) -> Container:
+        """Create the main content area for the current section."""
+        current_section_name = self.section_names[self.current_section]
+        logger.debug(
+            "_create_main_content called for section %s (index %s)",
+            current_section_name,
+            self.current_section,
+        )
+
+        try:
+            if current_section_name == "PSI Header":
+                logger.debug("Creating PSI Header content")
+                return self._create_psi_header_content()
+
+            logger.debug("Creating extension section content for: %s", current_section_name)
+            return self._create_extension_section_content(current_section_name)
+        except Exception as e:
+            logger.debug("Error in _create_main_content for section %s: %s", current_section_name, e)
+            # Return a fallback container with error message
+            return Container(
+                Label(f"Error loading section: {current_section_name}", classes="title"),
+                Label(f"Error details: {str(e)}"),
+                Label("Please check the debug log for more information."),
+            )
+
+    def _create_psi_header_content(self) -> Container:
+        """Create the PSI Header configuration content."""
+        logger.debug("Creating PSI Header configuration content")
+
+        # Get available languages from devcontainer.json template
+        devcontainer_file = self.source_dir / ".devcontainer" / "devcontainer.json"
+        available_languages = DevContainerParser.parse_psi_header_languages(devcontainer_file)
+        logger.debug("Available PSI Header languages: %s", available_languages)
+
+        # Determine which languages should be auto-selected based on selected tools
+        auto_selected_languages = self._get_auto_selected_languages()
+        logger.debug("Auto-selected PSI Header languages: %s", auto_selected_languages)
+
+        # Determine if config should be visible based on checkbox state
+        config_classes = "right-column"
+        if not self.config.install_psi_header:
+            config_classes += " hidden"
+            logger.debug("PSI Header config will be hidden (install_psi_header=%s)", self.config.install_psi_header)
+        else:
+            logger.debug("PSI Header config will be visible (install_psi_header=%s)", self.config.install_psi_header)
+
+        # Create language checkboxes
+        language_checkboxes = self._create_language_checkboxes(available_languages, auto_selected_languages)
+        logger.debug("Created %s language checkboxes", len(language_checkboxes))
+
+        container = Container(
+            Label(
+                f"Dev Container Extensions - PSI Header Configuration - Section {self.current_section + 1} of {self.total_sections}",
+                classes="title",
+            ),
+            Horizontal(
+                # Left column - Installation control (matching ToolSelectionScreen structure)
+                Container(
+                    Label("Extension Installation:", classes="column-title"),
+                    Checkbox("Install PSI Header Extension", id="install_psi", value=self.config.install_psi_header),
+                    classes="left-column",
+                ),
+                # Right column - Configuration options (matching ToolSelectionScreen structure)
+                Container(
+                    Label("Configuration:", classes="column-title"),
+                    ScrollableContainer(
+                        Label("Company Name:", classes="compact"),
+                        Input(
+                            placeholder="Your Company Name",
+                            id="company_name",
+                            value=self.config.psi_header_company,
+                            classes="compact-input",
+                        ),
+                        Label("Language Templates:", classes="compact"),
+                        Label(
+                            "Select languages for custom headers (auto-selected based on your tools):",
+                            classes="compact",
+                        ),
+                        *language_checkboxes,
+                        id="config-scroll",
+                        classes="config-area",
+                    ),
+                    classes=config_classes,
+                    id="config-column",
+                ),
+                id="main-layout",
+            ),
+        )
+
+        logger.debug("PSI Header container created with classes: %s", config_classes)
+        return container
+
+    def _create_extension_section_content(self, section_name: str) -> Container:
+        """Create content for a specific extension section."""
+        logger.debug("Creating extension section content for: %s", section_name)
+        extensions = self.extension_sections.get(section_name, [])
+        logger.debug("Found %s extensions for section %s: %s", len(extensions), section_name, extensions)
+        section_index = self.current_section + 1
+
+        # Check if this section should be enabled by default
+        section_enabled = self.config.selected_extension_sections.get(section_name, False)  # Default to disabled
+        logger.debug("Section %s enabled: %s", section_name, section_enabled)
+
+        # Create checkboxes for extensions in this section
+        extension_checkboxes = []
+        for extension_id, description in extensions:
+            checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
+            # Extensions are selected by default when section is enabled, but hidden when section is disabled
+            is_selected = self.config.selected_extensions.get(extension_id, True)
+            extension_checkboxes.append(Checkbox(f"{description} ({extension_id})", id=checkbox_id, value=is_selected))
+            logger.debug("Created checkbox for extension: %s", extension_id)
+
+        # Create the extension list container - initially hidden if section not enabled
+        extension_container = ScrollableContainer(
+            *extension_checkboxes,
+            id="extension-scroll",
+        )
+        if not section_enabled:
+            extension_container.add_class("hidden")
+            logger.debug("Extension container hidden for section: %s", section_name)
+
+        logger.debug("Creating container for section %s with %s checkboxes", section_name, len(extension_checkboxes))
+
+        # Sanitize section name for use in HTML IDs (replace invalid characters)
+        section_id = self._sanitize_section_id(section_name)
+
+        return Container(
+            Label(f"Dev Container Extensions - {section_name}", classes="title"),
+            Label(f"Section {section_index} of {self.total_sections}"),
+            Label(f"Configure {section_name} extensions:"),
+            Checkbox(
+                f"Install {section_name} Extensions",
+                id=f"install_{section_id}",
+                value=section_enabled,
+            ),
+            extension_container,
+        )
+
+    def _create_button_row(self) -> Horizontal:
+        """Create the navigation button row."""
+        logger.debug("Creating button row for section %s/%s", self.current_section, self.total_sections)
+        buttons = []
+
+        # Back button (always nav-button style)
+        buttons.append(Button("Back: Tool Selection", id="back_btn", classes="nav-button"))
+
+        # Previous Extension button (disabled on first section)
+        prev_disabled = self.current_section == 0
+        logger.debug("Previous Extension button - disabled: %s", prev_disabled)
+        buttons.append(Button("Previous Extension", id="prev_section_btn", disabled=prev_disabled))
+
+        # Next Extension button (disabled on last section)
+        next_disabled = self.current_section >= self.total_sections - 1
+        logger.debug("Next Extension button - disabled: %s", next_disabled)
+        buttons.append(
+            Button("Next Extension", id="next_section_btn", disabled=next_disabled),
+        )
+
+        # Next button (always nav-button style)
+        buttons.append(Button("Next: Summary", id="next_btn", variant="primary", classes="nav-button"))
+
+        logger.debug("Created %s buttons", len(buttons))
+        return Horizontal(*buttons, id="button-row")
+
     def on_mount(self) -> None:
         """Called when the screen is mounted."""
-        # Set focus to the first checkbox
+        # Set focus to the first relevant input based on current section
         try:
-            self.query_one("#install_psi", Checkbox).focus()
+            if self.current_section == 0:  # PSI Header section
+                self.query_one("#install_psi", Checkbox).focus()
+            else:
+                # Focus on section install checkbox for extension sections
+                section_name = self.section_names[self.current_section]
+                section_id = f"install_{self._sanitize_section_id(section_name)}"
+                self.query_one(f"#{section_id}", Checkbox).focus()
         except Exception:
-            logger.debug("Could not set focus to install_psi checkbox")
-
-    def _get_auto_selected_languages(self) -> set[str]:
-        """Get languages that should be auto-selected based on selected tools.
-
-        Analyzes the selected development tools and returns a set of language
-        identifiers that should be automatically selected for PSI Header templates.
-
-        Returns
-        -------
-        set[str]
-            Set of language identifiers to auto-select (e.g., 'python', 'go', 'javascript')
-
-        """
-        auto_selected = set()
-
-        # Get language mappings from .mise.toml comments
-        tool_language_mapping = self._get_tool_language_mapping()
-
-        # Add languages for selected tools
-        for tool, selected in self.config.tool_selected.items():
-            if selected and tool in tool_language_mapping:
-                auto_selected.add(tool_language_mapping[tool])
-
-        # Always include common languages if any development tools are selected
-        if any(self.config.tool_selected.values()):
-            auto_selected.update(["shellscript", "markdown"])
-
-        return auto_selected
-
-    def _get_tool_language_mapping(self) -> dict[str, str]:
-        """Get tool to language mappings from .mise.toml comments.
-
-        Parses .mise.toml file to extract #language: suffixes from tool comments
-        and creates a mapping dictionary for PSI Header language selection.
-
-        Returns
-        -------
-        dict[str, str]
-            Mapping from tool names to language identifiers (e.g., {'python': 'python', 'golang': 'go'})
-
-        """
-        mapping: dict[str, str] = {}
-
-        try:
-            # Look for .mise.toml in current directory or workspace
-            mise_file = Path(".mise.toml")
-            if not mise_file.exists():
-                # Try to find it in the workspace directory
-                workspace_paths = [
-                    Path("/workspaces/dynamic-dev-container/.mise.toml"),
-                    Path.cwd() / ".mise.toml",
-                    Path.cwd().parent / ".mise.toml",
-                ]
-                for path in workspace_paths:
-                    if path.exists():
-                        mise_file = path
-                        break
-                else:
-                    return mapping
-
-            with open(mise_file, encoding="utf-8") as f:
-                content = f.read()
-
-            # Look for tools with language mappings
-            lines = content.split("\n")
-            for line in lines:
-                stripped = line.strip()
-                # Look for lines like: tool = 'version' # description #language:python
-                if "=" in stripped and "#language:" in stripped:
-                    parts = stripped.split("=", 1)
-                    if len(parts) == TOOL_ASSIGNMENT_PARTS:
-                        tool_name = parts[0].strip()
-                        # Extract language after #language:
-                        language_part = stripped.split("#language:", 1)[1].strip()
-                        if language_part:
-                            mapping[tool_name] = language_part
-
-        except Exception as e:
-            if DEBUG_MODE:
-                logger.debug("Failed to parse .mise.toml language mappings: %s", e)
-
-        return mapping
-
-    def _create_language_checkboxes(
-        self,
-        available_languages: list[tuple[str, str]],
-        auto_selected: set[str],
-    ) -> list[Checkbox]:
-        """Create checkboxes for available languages with auto-selection."""
-        checkboxes = []
-
-        for lang_id, display_name in available_languages:
-            # Check if this language should be auto-selected
-            is_selected = lang_id in auto_selected
-
-            # Create a checkbox ID
-            checkbox_id = f"lang_{lang_id}"
-
-            # Create the checkbox
-            checkbox = Checkbox(display_name, id=checkbox_id, value=is_selected)
-            checkboxes.append(checkbox)
-
-        return checkboxes
+            logger.debug("Could not set focus to first checkbox")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
@@ -2212,11 +2382,102 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             self.save_config()
         elif event.button.id == "back_btn":
             self.action_back()
+        elif event.button.id == "next_section_btn":
+            self.save_current_section()
+            self.next_section()
+        elif event.button.id == "prev_section_btn":
+            self.save_current_section()
+            self.previous_section()
         elif event.button.id == "copy_debug_btn":
             self._copy_debug_output()
 
-    def save_config(self) -> None:
-        """Save Dev Container Extensions configuration."""
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        """Handle checkbox change events."""
+        checkbox_id = event.checkbox.id or ""
+        logger.debug("Checkbox changed: %s = %s", checkbox_id, event.checkbox.value)
+
+        # Handle PSI Header install checkbox
+        if checkbox_id == "install_psi":
+            logger.debug("PSI Header install checkbox changed to: %s", event.checkbox.value)
+            self._toggle_psi_config_visibility(event.checkbox.value)
+            # Save the configuration immediately
+            self.save_current_section()
+            return
+
+        # Handle section install checkbox changes
+        if checkbox_id.startswith("install_") and checkbox_id != "install_psi":
+            section_name = self.section_names[self.current_section]
+            expected_id = f"install_{self._sanitize_section_id(section_name)}"
+
+            if checkbox_id == expected_id:
+                self._toggle_extension_visibility(event.checkbox.value, section_name)
+                # Save the current section immediately to update config
+                self.save_current_section()
+
+    def _toggle_extension_visibility(self, show_extensions: bool, section_name: str) -> None:
+        """Show or hide extension checkboxes based on section checkbox state."""
+        try:
+            extension_container = self.query_one("#extension-scroll")
+
+            if show_extensions:
+                extension_container.remove_class("hidden")
+                # When enabling, check all extensions by default
+                extensions = self.extension_sections.get(section_name, [])
+                for extension_id, _description in extensions:
+                    checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
+                    try:
+                        checkbox = self.query_one(f"#{checkbox_id}", Checkbox)
+                        checkbox.value = True
+                        self.config.selected_extensions[extension_id] = True
+                    except NoMatches:
+                        continue
+            else:
+                extension_container.add_class("hidden")
+                # When disabling, uncheck all extensions
+                extensions = self.extension_sections.get(section_name, [])
+                for extension_id, _description in extensions:
+                    checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
+                    try:
+                        checkbox = self.query_one(f"#{checkbox_id}", Checkbox)
+                        checkbox.value = False
+                        self.config.selected_extensions[extension_id] = False
+                    except NoMatches:
+                        continue
+
+        except NoMatches:
+            logger.debug("Extension scroll container not found")
+
+    def _toggle_psi_config_visibility(self, show_config: bool) -> None:
+        """Show or hide PSI Header configuration options based on checkbox state.
+
+        Parameters
+        ----------
+        show_config : bool
+            Whether to show or hide the PSI Header configuration options
+
+        """
+        try:
+            config_container = self.query_one("#config-column")
+
+            if show_config:
+                config_container.remove_class("hidden")
+            else:
+                config_container.add_class("hidden")
+
+        except NoMatches:
+            logger.debug("PSI config container not found")
+
+    def save_current_section(self) -> None:
+        """Save the configuration for the current section."""
+        current_section_name = self.section_names[self.current_section]
+
+        if current_section_name == "PSI Header":
+            self._save_psi_header_config()
+        else:
+            self._save_extension_section_config(current_section_name)
+
+    def _save_psi_header_config(self) -> None:
+        """Save PSI Header configuration."""
         self.config.install_psi_header = self.query_one("#install_psi", Checkbox).value
         self.config.psi_header_company = self.query_one("#company_name", Input).value
 
@@ -2240,6 +2501,175 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
                 # Skip if checkbox doesn't exist
                 continue
 
+    def _save_extension_section_config(self, section_name: str) -> None:
+        """Save configuration for an extension section."""
+        # Save section enabled/disabled state
+        section_id = f"install_{self._sanitize_section_id(section_name)}"
+        try:
+            section_checkbox = self.query_one(f"#{section_id}", Checkbox)
+            self.config.selected_extension_sections[section_name] = section_checkbox.value
+        except NoMatches:
+            self.config.selected_extension_sections[section_name] = True
+
+        # Save individual extension selections
+        extensions = self.extension_sections.get(section_name, [])
+        for extension_id, _description in extensions:
+            checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
+            try:
+                checkbox = self.query_one(f"#{checkbox_id}", Checkbox)
+                self.config.selected_extensions[extension_id] = checkbox.value
+            except NoMatches:
+                self.config.selected_extensions[extension_id] = True
+
+    def next_section(self) -> None:
+        """Move to the next section."""
+        if self.current_section < self.total_sections - 1:
+            self.current_section += 1
+            self._refresh_content()
+
+    def previous_section(self) -> None:
+        """Move to the previous section."""
+        if self.current_section > 0:
+            self.current_section -= 1
+            self._refresh_content()
+
+    def _refresh_content(self) -> None:
+        """Refresh the content for the current section."""
+        logger.debug("Refreshing content for section %s", self.current_section)
+        try:
+            # Find the existing main container and replace its contents
+            main_container = self.query_one("#psi-header-container")
+            logger.debug("Found main container, removing children")
+
+            # Remove all children from the container
+            main_container.remove_children()
+
+            # Wait for the removal to complete
+            self.call_after_refresh(self._mount_fresh_content)
+
+        except Exception as e:
+            logger.debug("Error in _refresh_content: %s", e)
+            # Try a fallback approach - recreate the whole screen
+            try:
+                self._recreate_full_container()
+            except Exception as fallback_error:
+                logger.debug("Fallback recreation also failed: %s", fallback_error)
+                # Last resort - show error message
+                self._show_error_screen(f"Failed to refresh content: {e}")
+
+    def _mount_fresh_content(self) -> None:
+        """Mount fresh content after removal is complete."""
+        try:
+            main_container = self.query_one("#psi-header-container")
+
+            # Specifically check for and remove any existing button-row
+            try:
+                existing_button_row = self.query_one("#button-row")
+                logger.debug("Found existing button-row, removing it")
+                existing_button_row.remove()
+            except NoMatches:
+                logger.debug("No existing button-row found")
+
+            # Create new content with fresh widgets
+            main_content = self._create_main_content()
+            button_row = self._create_button_row()
+
+            logger.debug("Mounting new content and button row")
+            main_container.mount(main_content)
+            main_container.mount(button_row)
+
+            # Set focus appropriately
+            self.on_mount()
+            logger.debug("Content refresh completed successfully")
+
+        except Exception as e:
+            logger.debug("Error mounting fresh content: %s", e)
+            # Fallback to full container recreation
+            self._recreate_full_container()
+
+    def _recreate_full_container(self) -> None:
+        """Recreate the entire container to avoid ID conflicts."""
+        logger.debug("Recreating full container due to ID conflict")
+        try:
+            # Remove the existing container completely
+            try:
+                old_container = self.query_one("#psi-header-container")
+                old_container.remove()
+                logger.debug("Removed old container")
+            except NoMatches:
+                logger.debug("No old container to remove")
+
+            # Wait a moment for cleanup
+            self.call_later(self._mount_new_container)
+
+        except Exception as e:
+            logger.debug("Error during full container recreation: %s", e)
+
+    def _mount_new_container(self) -> None:
+        """Mount a completely new container."""
+        try:
+            # Create a completely new container with fresh content
+            new_container = Container(
+                self._create_main_content(),
+                self._create_button_row(),
+                id="psi-header-container",
+            )
+
+            # Mount the new container to the screen
+            self.mount(new_container)
+
+            # Set focus appropriately
+            self.on_mount()
+            logger.debug("New container mounted successfully")
+
+        except Exception as e:
+            logger.debug("Error mounting new container: %s", e)
+
+    def _show_error_screen(self, error_message: str) -> None:
+        """Show an error screen when all else fails."""
+        logger.debug("Showing error screen: %s", error_message)
+        try:
+            # Create a simple error container
+            error_container = Container(
+                Label("Extension Configuration Error", classes="title"),
+                Label(f"Section: {self.current_section + 1} of {self.total_sections}"),
+                Label(f"Error: {error_message}"),
+                Label("Please try navigating to a different section or restart the application."),
+                Horizontal(
+                    Button("Back: Tool Selection", id="back_btn", classes="nav-button"),
+                    Button("Next: Summary", id="next_btn", variant="primary", classes="nav-button"),
+                    id="button-row",
+                ),
+                id="psi-header-container",
+            )
+
+            # Try to mount the error container
+            self.mount(error_container)
+        except Exception as mount_error:
+            logger.debug("Even error screen failed to mount: %s", mount_error)
+
+    def _mount_new_content(self) -> None:
+        """Mount new content after ensuring old content is removed."""
+        try:
+            # Create new container with updated content
+            new_container = Container(
+                self._create_main_content(),
+                self._create_button_row(),
+                id="psi-header-container",
+            )
+            self.mount(new_container)
+
+            # Set focus appropriately
+            self.on_mount()
+        except Exception as e:
+            logger.debug("Error mounting new content: %s", e)
+
+    def save_config(self) -> None:
+        """Save Dev Container Extensions configuration."""
+        # Save current section first
+        self.save_current_section()
+
+        # Continue to next screen
         app = cast("DevContainerApp", self.app)
         self.app.call_later(app.after_psi_header)
         self.app.pop_screen()
@@ -2285,6 +2715,131 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         except Exception:
             # Debug panel doesn't exist, create it
             self._rebuild_with_debug_panel()
+
+    def _get_auto_selected_languages(self) -> set[str]:
+        """Get languages that should be auto-selected based on selected tools.
+
+        Analyzes the selected development tools and returns a set of language
+        identifiers that should be automatically selected for PSI Header templates.
+
+        Returns
+        -------
+        set[str]
+            Set of language identifiers to auto-select (e.g., 'python', 'go', 'javascript')
+
+        """
+        auto_selected = set()
+
+        # Get language mappings from .mise.toml comments
+        tool_language_mapping = self._get_tool_language_mapping()
+
+        # Map selected tools to their corresponding languages
+        for tool_name, is_selected in self.config.tool_selected.items():
+            if is_selected and tool_name in tool_language_mapping:
+                language = tool_language_mapping[tool_name]
+                auto_selected.add(language)
+
+        # Map selected extension sections to their corresponding PSI header languages
+        extension_language_mapping = {
+            "Markdown": "markdown",
+            "Shell/Bash": "shellscript",
+        }
+
+        for section_name, is_selected in self.config.selected_extension_sections.items():
+            if is_selected and section_name in extension_language_mapping:
+                language = extension_language_mapping[section_name]
+                auto_selected.add(language)
+
+        logger.debug("Auto-selected languages for PSI Header: %s", auto_selected)
+        return auto_selected
+
+    def _create_language_checkboxes(
+        self,
+        available_languages: list[tuple[str, str]],
+        auto_selected_languages: set[str],
+    ) -> list[Checkbox]:
+        """Create checkboxes for PSI header language selection.
+
+        Parameters
+        ----------
+        available_languages : list[tuple[str, str]]
+            List of (language_id, display_name) tuples for available languages
+        auto_selected_languages : set[str]
+            Set of language IDs that should be pre-selected
+
+        Returns
+        -------
+        list[Checkbox]
+            List of checkbox widgets for language selection
+
+        """
+        checkboxes = []
+
+        for lang_id, display_name in available_languages:
+            # Check if this language is already configured
+            is_configured = any(template_lang_id == lang_id for template_lang_id, _ in self.config.psi_header_templates)
+
+            # Auto-select if it's in the auto-selected set or already configured
+            is_selected = lang_id in auto_selected_languages or is_configured
+
+            checkbox_id = f"lang_{lang_id}"
+
+            # Create the checkbox
+            checkbox = Checkbox(display_name, id=checkbox_id, value=is_selected)
+            checkboxes.append(checkbox)
+
+        return checkboxes
+
+    def _get_tool_language_mapping(self) -> dict[str, str]:
+        """Get mapping of tools to their primary programming languages.
+
+        Reads the .mise.toml file and extracts language mappings from #language: comments.
+        Falls back to hardcoded mappings for common tools without language comments.
+
+        Returns
+        -------
+        dict[str, str]
+            Dictionary mapping tool names to language identifiers
+
+        """
+        mapping = {}
+
+        # Read language mappings from .mise.toml comments
+        mise_file = self.source_dir / ".mise.toml"
+        if mise_file.exists():
+            with open(mise_file, encoding="utf-8") as f:
+                content = f.read()
+
+            for line in content.split("\n"):
+                # Look for lines with tool definitions and language comments
+                # Expected format: tool_name = 'version' # description #language:language_name
+                if "=" in line and "#language:" in line:
+                    # Extract tool name (before the =)
+                    tool_part = line.split("=")[0].strip()
+                    if tool_part and not tool_part.startswith("#"):
+                        # Extract language from #language: comment
+                        language_match = re.search(r"#language:(\w+)", line)
+                        if language_match:
+                            language = language_match.group(1)
+                            mapping[tool_part] = language
+
+        # Add fallback mappings for common tools that might not have language comments
+        fallback_mapping = {
+            "python": "python",
+            "node": "javascript",
+            "go": "go",
+            "rust": "rust",
+            "java": "java",
+            "dotnet": "csharp",
+        }
+
+        # Use fallback only if not already mapped from comments
+        for tool, language in fallback_mapping.items():
+            if tool not in mapping:
+                mapping[tool] = language
+
+        logger.debug("Tool language mapping: %s", mapping)
+        return mapping
 
 
 class ToolVersionScreen(Screen[None], DebugMixin):
@@ -4501,13 +5056,40 @@ class SummaryScreen(Screen[None], DebugMixin):
                     summary += f"- **Keywords:** {self.config.python_keywords}\n"
 
         # Dev Container Extensions
+        extension_summary_added = False
+
+        # PSI Header
         if self.config.install_psi_header:
-            summary += "\n## Dev Container Extensions\n\n"
+            if not extension_summary_added:
+                summary += "\n## Dev Container Extensions\n\n"
+                extension_summary_added = True
+            summary += "### PSI Header\n"
             if self.config.psi_header_company:
                 summary += f"- **Company:** {self.config.psi_header_company}\n"
             if self.config.psi_header_templates:
                 template_names = [name for _, name in self.config.psi_header_templates]
                 summary += f"- **Language Templates:** {', '.join(template_names)}\n"
+            summary += "\n"
+
+        # Other extension sections
+        for section_name, is_enabled in self.config.selected_extension_sections.items():
+            if is_enabled:
+                if not extension_summary_added:
+                    summary += "\n## Dev Container Extensions\n\n"
+                    extension_summary_added = True
+                summary += f"### {section_name}\n"
+
+                # List selected extensions for this section
+                section_extensions = []
+                for ext_id, is_selected in self.config.selected_extensions.items():
+                    if is_selected:
+                        # This is a simplified check - in a full implementation, we'd need to
+                        # track which extensions belong to which sections
+                        section_extensions.append(ext_id)
+
+                if section_extensions:
+                    summary += f"- **Extensions:** {len(section_extensions)} extensions selected\n"
+                summary += "\n"
 
         summary += "\n---\n\n**Proceed with installation?**"
 
@@ -4534,7 +5116,11 @@ class SummaryScreen(Screen[None], DebugMixin):
 
     def action_back(self) -> None:
         """Go to previous step."""
-        self.app.pop_screen()
+        # Navigate back to PSI Header configuration screen
+        self.app.pop_screen()  # Remove Summary screen
+        # Cast to actual app type to access show_psi_header_config method
+        app = cast("DynamicDevContainerApp", self.app)
+        app.show_psi_header_config()  # Show PSI Header screen
 
     def action_toggle_debug(self) -> None:
         """Toggle debug mode."""
@@ -4848,6 +5434,14 @@ class InstallationScreen(Screen[None]):
             # Remove section if not selected
             if not section_selected:
                 content = self._remove_section(content, section_name, "extensions")
+
+        # Handle user-configurable extension sections (Github, Markdown, Shell/Bash, etc.)
+        # These are sections that are not tied to specific development tools
+        for section_name, is_selected in self.config.selected_extension_sections.items():
+            if not is_selected:
+                content = self._remove_section(content, section_name, "extensions")
+                # Also remove corresponding settings section if it exists
+                content = self._remove_section(content, f"{section_name} Settings", "settings")
 
         # Check settings sections
         for section_name in settings_sections:
