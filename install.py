@@ -1675,7 +1675,7 @@ This wizard will guide you through configuring your development container with t
                 id="welcome-scroll",
             ),
             Horizontal(
-                Button("Next: Project Configuration", id="next_btn", classes="nav-button"),
+                Button("Project Configuration >>", id="next_btn", classes="nav-button"),
                 id="button-row",
             ),
             id="welcome-container",
@@ -2350,7 +2350,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         buttons = []
 
         # Back button (always nav-button style)
-        buttons.append(Button("Back: Tool Selection", id="back_btn", classes="nav-button"))
+        buttons.append(Button("<< Tool Selection", id="back_btn", classes="nav-button"))
 
         # Previous Extension button (disabled on first section)
         prev_disabled = self.current_section == 0
@@ -2365,7 +2365,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         )
 
         # Next button (always nav-button style)
-        buttons.append(Button("Next: Summary", id="next_btn", variant="primary", classes="nav-button"))
+        buttons.append(Button("Summary >>", id="next_btn", variant="primary", classes="nav-button"))
 
         logger.debug("Created %s buttons", len(buttons))
         return Horizontal(*buttons, id="button-row")
@@ -2644,8 +2644,8 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
                 Label(f"Error: {error_message}"),
                 Label("Please try navigating to a different section or restart the application."),
                 Horizontal(
-                    Button("Back: Tool Selection", id="back_btn", classes="nav-button"),
-                    Button("Next: Summary", id="next_btn", variant="primary", classes="nav-button"),
+                    Button("<< Tool Selection", id="back_btn", classes="nav-button"),
+                    Button("Summary >>", id="next_btn", variant="primary", classes="nav-button"),
                     id="button-row",
                 ),
                 id="psi-header-container",
@@ -3065,8 +3065,8 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
                 id="project-scroll",
             ),
             Horizontal(
-                Button("Back: Welcome", id="back_btn", classes="nav-button"),
-                Button("Next: Tool Selection", id="next_btn", classes="nav-button"),
+                Button("<< Welcome", id="back_btn", classes="nav-button"),
+                Button("Tool Selection >>", id="next_btn", classes="nav-button"),
                 id="button-row",
             ),
             id="project-container",
@@ -3224,8 +3224,8 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             yield Container(
                 Label("No tool sections found in .mise.toml", classes="title"),
                 Horizontal(
-                    Button("Back: Project Description", id="back_btn", classes="nav-button"),
-                    Button("Next: Dev Container Extensions", id="next_btn", classes="nav-button"),
+                    Button("<< Project Description", id="back_btn", classes="nav-button"),
+                    Button("Dev Container Extensions >>", id="next_btn", classes="nav-button"),
                     id="button-row",
                 ),
                 id="tools-container",
@@ -3278,14 +3278,14 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     classes="compact-group",
                 ),
                 Horizontal(
-                    Button("Back: Project Description", id="back_btn", classes="nav-button"),
+                    Button("<< Project Description", id="back_btn", classes="nav-button"),
                     Button("Previous Tool", id="prev_btn", disabled=self.current_section == 0),
                     Button(
                         "Next Tool",
                         id="next_section_btn",
                         disabled=self.current_section >= len(self.sections) - 1,
                     ),
-                    Button("Next: Dev Container Extensions", id="next_btn", classes="nav-button"),
+                    Button("Dev Container Extensions >>", id="next_btn", classes="nav-button"),
                     id="button-row",
                 ),
                 id="main-content",
@@ -4976,7 +4976,7 @@ class SummaryScreen(Screen[None], DebugMixin):
                 id="summary-scroll",
             ),
             Horizontal(
-                Button("Back: Dev Container Extensions", id="back_btn", classes="nav-button"),
+                Button("<< Dev Container Extensions", id="back_btn", classes="nav-button"),
                 Button("Install", id="install_btn", variant="primary", classes="nav-button"),
                 id="button-row",
             ),
