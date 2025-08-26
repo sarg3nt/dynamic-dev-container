@@ -23,14 +23,7 @@ This is a Python TUI (Terminal User Interface) application built with [Textual](
 The application follows a multi-screen flow pattern with centralized state management:
 
 ```python
-# Screen flow: Welcome → ProjectConfig → ToolSelection → ToolVersion → PSIHeader → Summary → Installation
-installer/screens/
-├── __init__.py          # Screen exports
-├── basic.py            # Welcome and Summary screens
-├── headers.py          # PSI header configuration
-├── mixins.py           # Shared widget mixins
-├── project.py          # Project metadata configuration
-└── tools.py            # Core tool selection and configuration
+# Screen flow: Welcome → ProjectConfig → ToolSelection → ToolVersion → Extensions → Summary → Installation
 ```
 
 **Key Conventions:**
@@ -40,32 +33,9 @@ installer/screens/
 - Access shared state via `self.app.config` (ProjectConfig instance)
 - Implement `on_mount()` for initialization, `action_*()` for keybindings
 
-### Container Recreation Pattern
-
-**Critical Pattern:** For Textual layout issues (spacing accumulation, widget artifacts), use complete container recreation:
-
-```python
-def refresh_configuration(self):
-    """Recreate entire widget container to prevent layout artifacts"""
-    # Remove existing container completely
-    try:
-        self.query_one("#config_container").remove()
-    except NoMatches:
-        pass
-
-    # Create fresh container with all widgets
-    new_container = ScrollableContainer(
-        # Recreate all widgets here
-        id="config_container"
-    )
-    self.mount(new_container)
-```
-
-This pattern prevents vertical spacing accumulation and widget state pollution that can occur with partial updates.
-
 ### Configuration Management
 
-Centralized state is managed through `ProjectConfig` class in `installer/config.py`:
+Centralized state is managed through `ProjectConfig` class in `install.py`:
 
 ```python
 # Access pattern throughout screens:
@@ -85,7 +55,7 @@ config.tool_versions         # Dict of tool versions
 Tools are managed through the mise integration system:
 
 ```python
-# Located in installer/tools.py
+# Located in install.py
 class MiseParser:
     def get_available_tools(self) -> Dict[str, List[str]]
     def get_tool_versions(self, tool_name: str) -> List[str]
@@ -153,42 +123,6 @@ def on_input_changed(self, event: Input.Changed) -> None:
         # Validate and update config
         if event.value.strip():
             self.app.config.project_name = event.value.strip()
-```
-
-## File Structure Conventions
-
-### Directory Organization
-
-```
-installer/                 # Main package
-├── __init__.py            # Package initialization
-├── app.py                 # Main application class and coordination
-├── config.py              # ProjectConfig class and data structures
-├── main.py                # Entry point and CLI handling
-├── tools.py               # Tool discovery and mise integration
-├── utils.py               # Shared utilities
-└── screens/               # TUI screen implementations
-    ├── __init__.py        # Screen exports
-    ├── basic.py           # Simple screens (Welcome, Summary)
-    ├── headers.py         # PSI header configuration
-    ├── mixins.py          # Shared widget behaviors
-    ├── project.py         # Project metadata screens
-    └── tools.py           # Tool selection and configuration
-```
-
-### Import Conventions
-
-```python
-# Standard imports for screens
-from textual import on
-from textual.app import ComposeResult
-from textual.containers import Container, ScrollableContainer
-from textual.screen import Screen
-from textual.widgets import Button, Input, Label, RadioSet, RadioButton
-
-# Internal imports
-from installer.config import ProjectConfig
-from installer.tools import ToolManager
 ```
 
 ## Python Coding Standards
@@ -315,11 +249,10 @@ ruff format installer/
 **Testing Pattern:**
 
 1. Make Python code changes
-2. Run mypy for type checking compliance
-3. Run ruff for linting compliance
-4. Fix all reported issues
-5. Run ruff format for consistent formatting
-6. Verify changes work as expected
+2. Run mypy and ruff checks all at once, if there are errors, detect if they are mypy or ruff errors and if necessary run the individual linters.
+3. Fix all reported issues
+4. Run ruff format for consistent formatting
+5. Verify changes work as expected
 
 ### Installation Testing
 
@@ -354,8 +287,6 @@ textual run --dev install.py /tmp/test_project --debug
 
 # "Please run the installer and report back any errors or issues you encounter"
 
-````
-
 ## Development Environment
 
 ### Container Configuration
@@ -376,7 +307,7 @@ MISE_TRUSTED_CONFIG_PATHS="/workspaces/dynamic-dev-container"
 PYTHON_PATH="/home/vscode/.local/share/mise/installs/python"
 TYPE_CHECKING="true"
 GITHUB_TOKEN="${localEnv:GITHUB_TOKEN}"  # For rate limiting
-````
+```
 
 ### Build and Test Commands
 
@@ -386,10 +317,6 @@ GITHUB_TOKEN="${localEnv:GITHUB_TOKEN}"  # For rate limiting
 make test         # Run test suite
 make install      # Install in development mode
 make clean        # Clean build artifacts
-
-# Direct Python execution
-python -m installer  # Run TUI installer
-python install.py   # Legacy installer interface
 ```
 
 ## Testing Patterns
@@ -417,23 +344,18 @@ tests/
 
 **MANDATORY WORKFLOW:** Before any Python code changes are considered complete:
 
+**Run All Linters at Once:**
+
 ```bash
-# 1. Type checking with mypy
-mypy installer/
+mypy install.py && ruff check install.py && ruff format install.py
+```
+
+If thee are any errors then run the individaul test that created the error:
+
+```bash
 mypy install.py
-
-# 2. Linting with ruff
-ruff check installer/
 ruff check install.py
-
-# 3. Formatting with ruff
-ruff format installer/
 ruff format install.py
-
-# 4. Run tests
-make test
-
-# 5. Ask user to test install.py
 # Never run install.py manually - always request user testing
 ```
 
@@ -447,11 +369,6 @@ make test
 - Python 3.9 compatibility required for install.py modules
 
 ## Common Pitfalls and Solutions
-
-### Widget Layout Issues
-
-**Problem:** Vertical spacing accumulation, widgets not appearing
-**Solution:** Use container recreation pattern instead of partial updates
 
 ### State Management
 
