@@ -47,7 +47,7 @@
 }
 
 /* Section links container specific styling */
-#section-links {
+#section-links, #extension-links {
   height: auto;
   width: 100%;
   margin: 0;
@@ -60,9 +60,10 @@
 }
 
 .sections-links-label {
-  width: 10;
+  width: 12;
   margin: 0 0 0 0;
   height: auto;
+  text-align: right;
 }
 
 .compact-group Checkbox {

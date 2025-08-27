@@ -318,6 +318,25 @@ VERSION_BUTTON_PARTS = 4
 MAX_DEBUG_MESSAGES = 50  # Maximum number of debug messages to display at once
 
 
+# Screen constants for command line navigation (internal 0-based)
+SCREEN_WELCOME = 0
+SCREEN_CONFIG = 1
+SCREEN_TOOLS = 2
+SCREEN_EXTENSIONS = 3
+SCREEN_SUMMARY = 4
+SCREEN_INSTALL = 5
+MAX_SCREEN = SCREEN_INSTALL
+
+# Extension item constants (internal 0-based)
+MAX_EXTENSION_ITEM = 3  # 0=Github, 1=Markdown, 2=Shell/Bash, 3=PSI Header
+
+# User-facing constants (1-based)
+USER_SCREEN_MIN = 1
+USER_SCREEN_MAX = 6  # 1=Welcome, 2=Config, 3=Tools, 4=Extensions, 5=Summary, 6=Install
+USER_ITEM_MIN = 1
+USER_ITEM_MAX = 4  # 1=Github, 2=Markdown, 3=Shell/Bash, 4=PSI Header
+
+
 class ProjectConfig:
     """Container for project configuration data."""
 
@@ -1457,9 +1476,8 @@ class DebugMixin:
                 "#project-container",
                 "#summary-container",
                 "#install-container",
-                "#tools-container",
+                "#tools-container",  # Used by both ToolSelectionScreen and ExtensionSelectionScreen now
                 "#main-content",
-                "#psi-header-container",
             ]
 
             for container_id in container_ids:
@@ -2122,7 +2140,225 @@ class PythonProjectScreen(Screen[None]):
         self.app.pop_screen()
 
 
-class PSIHeaderScreen(Screen[None], DebugMixin):
+class NavigationScreenBase(Screen[None], DebugMixin):
+    """Base class for screens with navigation links and debug panel support.
+
+    Provides common functionality for screens that need section navigation,
+    debug panel integration, and consistent layout structure.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the navigation screen base."""
+        super().__init__()
+        self.current_section = 0
+        self.total_sections = 0
+        self.section_names: list[str] = []
+
+    def create_navigation_layout(self, main_content: Container, container_id: str) -> ComposeResult:
+        """Create the standard navigation layout with debug panel support.
+
+        Parameters
+        ----------
+        main_content : Container
+            The main content container
+        container_id : str
+            ID for the main container
+
+        Yields
+        ------
+        ComposeResult
+            The layout components
+
+        """
+        yield Header()
+
+        # Create main layout container with debug panel at bottom if enabled - EXACTLY like ToolSelectionScreen
+        layout_components = []
+        layout_components.append(main_content)
+
+        # Create vertical container with all components - EXACTLY like ToolSelectionScreen
+        main_container = Container(*layout_components, id=container_id)
+        yield main_container
+        yield Footer()
+
+    def create_navigation_links_container(self, links_id: str, populate_immediately: bool = False) -> Horizontal:
+        """Create a navigation links container.
+
+        Parameters
+        ----------
+        links_id : str
+            ID for the links container
+        populate_immediately : bool, optional
+            Whether to populate the container with links immediately, by default False
+
+        Returns
+        -------
+        Horizontal
+            Navigation links container (empty or populated)
+
+        """
+        if populate_immediately:
+            # Determine label text and link prefix
+            if "extension" in links_id:
+                label_text = "Extensions"
+                link_id_prefix = "extension_link"
+            else:
+                label_text = "Tools"
+                link_id_prefix = "section_link"
+
+            # Create the label
+            links_label = Label(f"{label_text}:", classes="sections-links-label")
+
+            # Create navigation links
+            navigation_links = self.create_navigation_links(link_id_prefix)
+
+            # Create container with all children in constructor
+            return Horizontal(
+                links_label,
+                *navigation_links,
+                id=links_id,
+                classes="compact-group",
+            )
+
+        # Create empty container
+        return Horizontal(
+            id=links_id,
+            classes="compact-group",
+        )
+
+    def create_navigation_links(self, link_id_prefix: str) -> list[Button]:
+        """Create navigation link buttons for sections.
+
+        Parameters
+        ----------
+        link_id_prefix : str
+            Prefix for button IDs (e.g., "section_link" or "extension_link")
+
+        Returns
+        -------
+        list[Button]
+            List of navigation link buttons
+
+        """
+        logger.debug("Creating navigation links for %d sections: %s", len(self.section_names), self.section_names)
+        navigation_links = []
+
+        for i, section in enumerate(self.section_names):
+            # Create a display name for the section (capitalize and format nicely)
+            display_name = section.replace("_", " ").replace("-", " ").title()
+            logger.debug("Creating button %d: section='%s', display='%s'", i, section, display_name)
+
+            # Create button with version-btn-small styling (like version buttons)
+            if i == self.current_section:
+                # Current section - make it look selected/active
+                button_text = f"[bold]{display_name}[/bold]"
+                section_btn = Button(
+                    button_text,
+                    id=f"{link_id_prefix}_{i}",
+                    classes="version-btn-small",
+                    disabled=True,  # Make current section non-clickable
+                )
+                section_btn.can_focus = False  # Make section buttons not focusable via tab
+                logger.debug("Created CURRENT navigation button: %s (disabled)", section_btn.id)
+            else:
+                section_btn = Button(
+                    display_name,
+                    id=f"{link_id_prefix}_{i}",
+                    classes="version-btn-small",
+                )
+                section_btn.can_focus = False  # Make section buttons not focusable via tab
+                logger.debug("Created regular navigation button: %s", section_btn.id)
+
+            navigation_links.append(section_btn)
+
+        logger.debug("Created %d navigation links total", len(navigation_links))
+        return navigation_links
+
+    def refresh_navigation_links(self, links_container_id: str, link_id_prefix: str, label_text: str) -> None:
+        """Refresh navigation links in the container.
+
+        Parameters
+        ----------
+        links_container_id : str
+            ID of the links container
+        link_id_prefix : str
+            Prefix for button IDs
+        label_text : str
+            Text for the links label
+
+        """
+        try:
+            logger.debug("Refreshing navigation links for %s", links_container_id)
+
+            # Get the navigation links container
+            links_container = self.query_one(f"#{links_container_id}", Horizontal)
+            logger.debug("Found %s container: %s", links_container_id, links_container)
+
+            # Check if we already have buttons
+            existing_buttons = links_container.query("Button")
+            logger.debug("Found %d existing buttons", len(existing_buttons))
+
+            # Always create links if container is empty (happens after navigation)
+            if len(existing_buttons) == 0:
+                logger.debug("Container is empty, creating navigation links")
+
+                # Clear container first to ensure clean state
+                links_container.remove_children()
+
+                # Add the label
+                links_label = Label(f"{label_text}:", classes="sections-links-label")
+                links_container.mount(links_label)
+                logger.debug("Mounted navigation label")
+
+                # Create and mount navigation links
+                navigation_links = self.create_navigation_links(link_id_prefix)
+                logger.debug("Created %d navigation links", len(navigation_links))
+
+                for i, nav_btn in enumerate(navigation_links):
+                    logger.debug("About to mount navigation button %d: %s", i, nav_btn.label)
+                    links_container.mount(nav_btn)
+                    logger.debug("Successfully mounted navigation button %d", i)
+            else:
+                logger.debug("Buttons exist, updating their disabled state")
+
+                # Get the current section name and transform it
+                current_section_raw = self.section_names[self.current_section]
+                current_section_name = current_section_raw.replace("_", " ").replace("-", " ").title()
+                logger.debug("Current section name: %s", current_section_name)
+
+                # Update existing buttons' disabled state
+                for button in existing_buttons:
+                    if hasattr(button, "label") and hasattr(button.label, "plain"):
+                        section_name = button.label.plain
+                        if section_name == current_section_name:
+                            button.disabled = True
+                            logger.debug("Disabled button for current section: %s", section_name)
+                        else:
+                            button.disabled = False
+                            logger.debug("Enabled button for section: %s", section_name)
+
+            # Force multiple layout refreshes to ensure visibility
+            self.refresh()
+            links_container.refresh()
+
+            # Force a parent container refresh as well
+            try:
+                main_container = self.query_one("#main-content")
+                main_container.refresh()
+                logger.debug("Forced main-content container refresh")
+            except Exception as e:
+                logger.debug("Could not refresh main-content: %s", e)
+
+            # Force the entire screen to recalculate layout
+            self.call_later(lambda: self.refresh())
+
+            logger.debug("Navigation links refresh completed")
+
+        except Exception as e:
+            logger.debug("ERROR in refresh_navigation_links: %s", e)
+
+
+class ExtensionSelectionScreen(NavigationScreenBase):
     """Screen for Dev Container Extensions configuration."""
 
     BINDINGS = [
@@ -2161,9 +2397,15 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
 
         self.section_names = list(self.extension_sections.keys())
 
-        # Insert PSI Header at its correct position (second to last, before Core Extensions)
-        # This matches the order in devcontainer.json where PSI Header comes after HashiCorp Tools
-        self.section_names.append("PSI Header")
+        # Insert PSI Header at its correct position (index 3, which is item 4 for users)
+        # This matches the expected order: 0=Github, 1=Markdown, 2=Shell/Bash, 3=PSI Header
+        psi_header_index = 3
+        if len(self.section_names) >= psi_header_index:
+            # Insert PSI Header at index 3
+            self.section_names.insert(psi_header_index, "PSI Header")
+        else:
+            # If fewer than 3 sections, append PSI Header at the end
+            self.section_names.append("PSI Header")
         logger.debug("Final section order: %s", self.section_names)
 
         self.current_section = 0
@@ -2190,42 +2432,123 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
 
     def compose(self) -> ComposeResult:
         """Create the layout for this screen."""
-        yield Header()
-        yield Container(
-            self._create_main_content(),
-            self._create_button_row(),
-            id="psi-header-container",
-        )
-        yield Footer()
-
-    def _create_main_content(self) -> Container:
-        """Create the main content area for the current section."""
+        # Create the EXACT same structure as ToolSelectionScreen using base class
         current_section_name = self.section_names[self.current_section]
-        logger.debug(
-            "_create_main_content called for section %s (index %s)",
-            current_section_name,
-            self.current_section,
-        )
 
-        try:
-            if current_section_name == "PSI Header":
-                logger.debug("Creating PSI Header content")
-                return self._create_psi_header_content()
+        if current_section_name == "PSI Header":
+            # For PSI Header, get components directly to match regular extension structure
+            title_label, main_layout = self._create_psi_header_components()
 
-            logger.debug("Creating extension section content for: %s", current_section_name)
-            return self._create_extension_section_content(current_section_name)
-        except Exception as e:
-            logger.debug("Error in _create_main_content for section %s: %s", current_section_name, e)
-            # Return a fallback container with error message
-            return Container(
-                Label(f"Error loading section: {current_section_name}", classes="title"),
-                Label(f"Error details: {str(e)}"),
-                Label("Please check the debug log for more information."),
+            main_content = Container(
+                title_label,
+                main_layout,
+                # Extension navigation links - using base class method
+                self.create_navigation_links_container("extension-links", populate_immediately=True),
+                # Use direct button creation like ToolSelectionScreen instead of _create_button_row()
+                Horizontal(
+                    Button("<< Tool Selection", id="back_btn", classes="nav-button"),
+                    Button("Previous Extension", id="prev_section_btn", disabled=self.current_section == 0),
+                    Button(
+                        "Next Extension",
+                        id="next_section_btn",
+                        disabled=self.current_section >= self.total_sections - 1,
+                    ),
+                    Button("Summary >>", id="next_btn", variant="primary", classes="nav-button"),
+                    id="button-row",
+                ),
+                id="main-content",
+            )
+        else:
+            # For extension sections, build structure EXACTLY like ToolSelectionScreen
+            extensions = self.extension_sections.get(current_section_name, [])
+            section_index = self.current_section + 1
+            section_enabled = self.config.selected_extension_sections.get(current_section_name, False)
+
+            # Create checkboxes for extensions in this section
+            extension_checkboxes = []
+            for extension_id, description in extensions:
+                checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
+                is_selected = self.config.selected_extensions.get(extension_id, True)
+                # Hide extension checkboxes when section is disabled
+                checkbox_classes = "compact"
+                if not section_enabled:
+                    checkbox_classes += " hidden"
+                extension_checkboxes.append(
+                    Checkbox(
+                        f"{description} ({extension_id})",
+                        id=checkbox_id,
+                        value=is_selected,
+                        classes=checkbox_classes,
+                    ),
+                )
+
+            section_id = self._sanitize_section_id(current_section_name)
+
+            main_content = Container(
+                Label(f"Dev Container Extensions - {current_section_name}", classes="title"),
+                Horizontal(
+                    # Left column for extension selection
+                    Container(
+                        Label("Available Extensions:", classes="column-title"),
+                        ScrollableContainer(
+                            Checkbox(
+                                f"Install {current_section_name} Extensions",
+                                id=f"install_{section_id}",
+                                value=section_enabled,
+                                classes="compact",
+                            ),
+                            *extension_checkboxes,
+                            id="extension-scroll",
+                            classes="tools-list",
+                        ),
+                        id="extension-column",
+                        classes="left-column",
+                    ),
+                    # Right column for configuration
+                    Container(
+                        Label("Configuration:", classes="column-title"),
+                        ScrollableContainer(
+                            Label(f"Section {section_index} of {self.total_sections}", classes="compact"),
+                            Label(f"Configure {current_section_name} extensions:", classes="compact"),
+                            Label("Select extensions to include in your development environment.", classes="compact"),
+                            id="config-scroll",
+                            classes="config-area",
+                        ),
+                        id="config-column",
+                        classes="right-column",
+                    ),
+                    id="main-layout",
+                ),
+                # Extension navigation links - using base class method
+                self.create_navigation_links_container("extension-links", populate_immediately=True),
+                # Use direct button creation like ToolSelectionScreen instead of _create_button_row()
+                Horizontal(
+                    Button("<< Tool Selection", id="back_btn", classes="nav-button"),
+                    Button("Previous Extension", id="prev_section_btn", disabled=self.current_section == 0),
+                    Button(
+                        "Next Extension",
+                        id="next_section_btn",
+                        disabled=self.current_section >= self.total_sections - 1,
+                    ),
+                    Button("Summary >>", id="next_btn", variant="primary", classes="nav-button"),
+                    id="button-row",
+                ),
+                id="main-content",
             )
 
-    def _create_psi_header_content(self) -> Container:
-        """Create the PSI Header configuration content."""
-        logger.debug("Creating PSI Header configuration content")
+        # Use base class method for layout creation - use SAME container ID as tools for identical styling
+        yield from self.create_navigation_layout(main_content, "tools-container")
+
+    def _create_psi_header_components(self) -> tuple[Label, Horizontal]:
+        """Create the PSI Header configuration components (not wrapped in Container).
+
+        Returns
+        -------
+        tuple[Label, Horizontal]
+            Title label and main layout components
+
+        """
+        logger.debug("Creating PSI Header configuration components")
 
         # Get available languages from devcontainer.json template
         devcontainer_file = self.source_dir / ".devcontainer" / "devcontainer.json"
@@ -2236,64 +2559,89 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         auto_selected_languages = self._get_auto_selected_languages()
         logger.debug("Auto-selected PSI Header languages: %s", auto_selected_languages)
 
-        # Determine if config should be visible based on checkbox state
-        config_classes = "right-column"
-        if not self.config.install_psi_header:
-            config_classes += " hidden"
-            logger.debug("PSI Header config will be hidden (install_psi_header=%s)", self.config.install_psi_header)
-        else:
-            logger.debug("PSI Header config will be visible (install_psi_header=%s)", self.config.install_psi_header)
-
         # Create language checkboxes
         language_checkboxes = self._create_language_checkboxes(available_languages, auto_selected_languages)
         logger.debug("Created %s language checkboxes", len(language_checkboxes))
 
-        container = Container(
-            Label(
-                f"Dev Container Extensions - PSI Header Configuration - Section {self.current_section + 1} of {self.total_sections}",
-                classes="title",
-            ),
-            Horizontal(
-                # Left column - Installation control (matching ToolSelectionScreen structure)
-                Container(
-                    Label("Extension Installation:", classes="column-title"),
+        title_label = Label(
+            f"Dev Container Extensions - PSI Header Configuration - Section {self.current_section + 1} of {self.total_sections}",
+            classes="title",
+        )
+
+        # Apply visibility logic for PSI Header config items
+        config_classes = "compact"
+        config_input_classes = "compact-input"
+        if not self.config.install_psi_header:
+            config_classes += " hidden"
+            config_input_classes += " hidden"
+
+        # Apply hidden class to language checkboxes if PSI Header is disabled
+        if not self.config.install_psi_header:
+            for checkbox in language_checkboxes:
+                checkbox.add_class("hidden")
+
+        # Create informational text (visible when PSI Header is disabled)
+        info_classes = "compact"
+        if self.config.install_psi_header:
+            info_classes += " hidden"
+
+        main_layout = Horizontal(
+            # Left column for extension selection (matching ToolSelectionScreen structure)
+            Container(
+                Label("Extension Installation:", classes="column-title"),
+                ScrollableContainer(
                     Checkbox(
                         "Install PSI Header Extension",
                         id="install_psi",
                         value=self.config.install_psi_header,
                         classes="compact",
                     ),
-                    classes="left-column",
+                    id="extension-scroll",
+                    classes="tools-list",
                 ),
-                # Right column - Configuration options (matching ToolSelectionScreen structure)
-                Container(
-                    Label("Configuration:", classes="column-title"),
-                    ScrollableContainer(
-                        Label("Company Name:", classes="compact"),
-                        Input(
-                            placeholder="Your Company Name",
-                            id="company_name",
-                            value=self.config.psi_header_company,
-                            classes="compact-input",
-                        ),
-                        Label("Language Templates:", classes="compact"),
-                        Label(
-                            "Select languages for custom headers (auto-selected based on your tools):",
-                            classes="compact",
-                        ),
-                        *language_checkboxes,
-                        id="config-scroll",
-                        classes="config-area",
-                    ),
-                    classes=config_classes,
-                    id="config-column",
-                ),
-                id="main-layout",
+                id="extension-column",
+                classes="left-column",
             ),
+            # Right column for configuration (matching ToolSelectionScreen structure)
+            Container(
+                Label("Configuration:", classes="column-title"),
+                ScrollableContainer(
+                    # Informational text (shown when PSI Header is disabled)
+                    Label(
+                        f"Section {self.current_section + 1} of {self.total_sections}",
+                        classes=info_classes,
+                        id="psi_info_section",
+                    ),
+                    Label("Configure PSI Header extension:", classes=info_classes, id="psi_info_configure"),
+                    Label(
+                        "Select extensions to include in your development environment.",
+                        classes=info_classes,
+                        id="psi_info_select",
+                    ),
+                    # Actual configuration (shown when PSI Header is enabled)
+                    Label("Company Name:", classes=config_classes),
+                    Input(
+                        placeholder="Your Company Name",
+                        id="company_name",
+                        value=self.config.psi_header_company,
+                        classes=config_input_classes,
+                    ),
+                    Label("Language Templates:", classes=config_classes),
+                    Label(
+                        "Select languages for custom headers (auto-selected based on your tools):",
+                        classes=config_classes,
+                    ),
+                    *language_checkboxes,
+                    id="config-scroll",
+                    classes="config-area",
+                ),
+                id="config-column",
+                classes="right-column",
+            ),
+            id="main-layout",
         )
 
-        logger.debug("PSI Header container created with classes: %s", config_classes)
-        return container
+        return title_label, main_layout
 
     def _create_extension_section_content(self, section_name: str) -> Container:
         """Create content for a specific extension section."""
@@ -2312,66 +2660,71 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
             # Extensions are selected by default when section is enabled, but hidden when section is disabled
             is_selected = self.config.selected_extensions.get(extension_id, True)
+            # Hide extension checkboxes when section is disabled
+            checkbox_classes = "compact"
+            if not section_enabled:
+                checkbox_classes += " hidden"
             extension_checkboxes.append(
-                Checkbox(f"{description} ({extension_id})", id=checkbox_id, value=is_selected, classes="compact"),
+                Checkbox(
+                    f"{description} ({extension_id})",
+                    id=checkbox_id,
+                    value=is_selected,
+                    classes=checkbox_classes,
+                ),
             )
             logger.debug("Created checkbox for extension: %s", extension_id)
-
-        # Create the extension list container - initially hidden if section not enabled
-        extension_container = ScrollableContainer(
-            *extension_checkboxes,
-            id="extension-scroll",
-        )
-        if not section_enabled:
-            extension_container.add_class("hidden")
-            logger.debug("Extension container hidden for section: %s", section_name)
-
-        logger.debug("Creating container for section %s with %s checkboxes", section_name, len(extension_checkboxes))
 
         # Sanitize section name for use in HTML IDs (replace invalid characters)
         section_id = self._sanitize_section_id(section_name)
 
-        return Container(
+        # Create the exact same structure as ToolSelectionScreen
+        container = Container(
             Label(f"Dev Container Extensions - {section_name}", classes="title"),
-            Label(f"Section {section_index} of {self.total_sections}"),
-            Label(f"Configure {section_name} extensions:"),
-            Checkbox(
-                f"Install {section_name} Extensions",
-                id=f"install_{section_id}",
-                value=section_enabled,
-                classes="compact",
+            Horizontal(
+                # Left column for extension selection (matching ToolSelectionScreen structure)
+                Container(
+                    Label("Available Extensions:", classes="column-title"),
+                    ScrollableContainer(
+                        Checkbox(
+                            f"Install {section_name} Extensions",
+                            id=f"install_{section_id}",
+                            value=section_enabled,
+                            classes="compact",
+                        ),
+                        *extension_checkboxes,
+                        id="extension-scroll",
+                        classes="tools-list",
+                    ),
+                    id="extension-column",
+                    classes="left-column",
+                ),
+                # Right column for configuration (matching ToolSelectionScreen structure)
+                Container(
+                    Label("Configuration:", classes="column-title"),
+                    ScrollableContainer(
+                        Label(f"Section {section_index} of {self.total_sections}", classes="compact"),
+                        Label(f"Configure {section_name} extensions:", classes="compact"),
+                        Label("Select extensions to include in your development environment.", classes="compact"),
+                        id="config-scroll",
+                        classes="config-area",
+                    ),
+                    id="config-column",
+                    classes="right-column",
+                ),
+                id="main-layout",
             ),
-            extension_container,
         )
 
-    def _create_button_row(self) -> Horizontal:
-        """Create the navigation button row."""
-        logger.debug("Creating button row for section %s/%s", self.current_section, self.total_sections)
-        buttons = []
-
-        # Back button (always nav-button style)
-        buttons.append(Button("<< Tool Selection", id="back_btn", classes="nav-button"))
-
-        # Previous Extension button (disabled on first section)
-        prev_disabled = self.current_section == 0
-        logger.debug("Previous Extension button - disabled: %s", prev_disabled)
-        buttons.append(Button("Previous Extension", id="prev_section_btn", disabled=prev_disabled))
-
-        # Next Extension button (disabled on last section)
-        next_disabled = self.current_section >= self.total_sections - 1
-        logger.debug("Next Extension button - disabled: %s", next_disabled)
-        buttons.append(
-            Button("Next Extension", id="next_section_btn", disabled=next_disabled),
-        )
-
-        # Next button (always nav-button style)
-        buttons.append(Button("Summary >>", id="next_btn", variant="primary", classes="nav-button"))
-
-        logger.debug("Created %s buttons", len(buttons))
-        return Horizontal(*buttons, id="button-row")
+        logger.debug("Creating container for section %s with %s checkboxes", section_name, len(extension_checkboxes))
+        return container
 
     def on_mount(self) -> None:
         """Called when the screen is mounted."""
+        logger.debug("ExtensionSelectionScreen mounted - Debug functionality available (Ctrl+D)")
+
+        # Set up a timer to periodically update debug output
+        self.set_interval(1.0, self.update_debug_output)
+
         # Set focus to the first relevant input based on current section
         try:
             if self.current_section == 0:  # PSI Header section
@@ -2398,6 +2751,35 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
             self.previous_section()
         elif event.button.id == "copy_debug_btn":
             self._copy_debug_output()
+        # Handle extension link clicks
+        elif event.button.id and event.button.id.startswith("extension_link_"):
+            # Extract section index from button ID: "extension_link_{index}"
+            try:
+                section_index = int(event.button.id.split("_")[-1])
+                logger.debug(
+                    "EXTENSION CLICK DEBUG: button_id=%s, section_index=%d, current_section=%d",
+                    event.button.id,
+                    section_index,
+                    self.current_section,
+                )
+                if 0 <= section_index < len(self.section_names) and section_index != self.current_section:
+                    section_name = self.section_names[section_index]
+                    logger.debug(
+                        "EXTENSION CLICK DEBUG: Switching from section %d (%s) to section %d (%s)",
+                        self.current_section,
+                        self.section_names[self.current_section],
+                        section_index,
+                        section_name,
+                    )
+                    self.save_current_section()
+                    self.current_section = section_index
+                    self._refresh_content()
+                    # Navigation links will be refreshed automatically in _complete_content_refresh
+                else:
+                    logger.debug("EXTENSION CLICK DEBUG: No section switch needed (same section or invalid index)")
+            except (ValueError, IndexError) as e:
+                logger.debug("Invalid extension link button ID '%s': %s", event.button.id, e)
+            return
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         """Handle checkbox change events."""
@@ -2425,35 +2807,27 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
     def _toggle_extension_visibility(self, show_extensions: bool, section_name: str) -> None:
         """Show or hide extension checkboxes based on section checkbox state."""
         try:
-            extension_container = self.query_one("#extension-scroll")
-
-            if show_extensions:
-                extension_container.remove_class("hidden")
-                # When enabling, check all extensions by default
-                extensions = self.extension_sections.get(section_name, [])
-                for extension_id, _description in extensions:
-                    checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
-                    try:
-                        checkbox = self.query_one(f"#{checkbox_id}", Checkbox)
+            # Toggle visibility and state of individual extension checkboxes
+            extensions = self.extension_sections.get(section_name, [])
+            for extension_id, _description in extensions:
+                checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
+                try:
+                    checkbox = self.query_one(f"#{checkbox_id}", Checkbox)
+                    if show_extensions:
+                        # When enabling, show checkbox and check it by default
+                        checkbox.remove_class("hidden")
                         checkbox.value = True
                         self.config.selected_extensions[extension_id] = True
-                    except NoMatches:
-                        continue
-            else:
-                extension_container.add_class("hidden")
-                # When disabling, uncheck all extensions
-                extensions = self.extension_sections.get(section_name, [])
-                for extension_id, _description in extensions:
-                    checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
-                    try:
-                        checkbox = self.query_one(f"#{checkbox_id}", Checkbox)
+                    else:
+                        # When disabling, hide checkbox and uncheck it
+                        checkbox.add_class("hidden")
                         checkbox.value = False
                         self.config.selected_extensions[extension_id] = False
-                    except NoMatches:
-                        continue
+                except NoMatches:
+                    continue
 
-        except NoMatches:
-            logger.debug("Extension scroll container not found")
+        except Exception as e:
+            logger.debug("Error toggling extension visibility: %s", e)
 
     def _toggle_psi_config_visibility(self, show_config: bool) -> None:
         """Show or hide PSI Header configuration options based on checkbox state.
@@ -2465,12 +2839,60 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
 
         """
         try:
-            config_container = self.query_one("#config-column")
+            # Toggle informational text (opposite of config)
+            info_items = ["#psi_info_section", "#psi_info_configure", "#psi_info_select"]
+            for item_id in info_items:
+                try:
+                    item = self.query_one(item_id)
+                    if show_config:
+                        item.add_class("hidden")  # Hide info when showing config
+                    else:
+                        item.remove_class("hidden")  # Show info when hiding config
+                except NoMatches:
+                    continue
 
-            if show_config:
-                config_container.remove_class("hidden")
-            else:
-                config_container.add_class("hidden")
+            # Toggle individual config items
+            config_items = [
+                "#company_name",  # Input field
+            ]
+
+            # Toggle config labels and input
+            for item_id in config_items:
+                try:
+                    item = self.query_one(item_id)
+                    if show_config:
+                        item.remove_class("hidden")
+                    else:
+                        item.add_class("hidden")
+                except NoMatches:
+                    continue
+
+            # Toggle all labels with "compact" class in the config scroll area (except info labels)
+            try:
+                config_scroll = self.query_one("#config-scroll")
+                for label in config_scroll.query("Label.compact"):
+                    # Skip the informational labels
+                    if label.id and label.id.startswith("psi_info_"):
+                        continue
+                    if show_config:
+                        label.remove_class("hidden")
+                    else:
+                        label.add_class("hidden")
+            except NoMatches:
+                pass
+
+            # Toggle language checkboxes
+            try:
+                config_scroll = self.query_one("#config-scroll")
+                for checkbox in config_scroll.query("Checkbox"):
+                    # Skip the main install checkbox
+                    if checkbox.id != "install_psi":
+                        if show_config:
+                            checkbox.remove_class("hidden")
+                        else:
+                            checkbox.add_class("hidden")
+            except NoMatches:
+                pass
 
         except NoMatches:
             logger.debug("PSI config container not found")
@@ -2544,94 +2966,157 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
     def _refresh_content(self) -> None:
         """Refresh the content for the current section."""
         logger.debug("Refreshing content for section %s", self.current_section)
-        try:
-            # Find the existing main container and replace its contents
-            main_container = self.query_one("#psi-header-container")
-            logger.debug("Found main container, removing children")
 
-            # Remove all children from the container
-            main_container.remove_children()
+        # Find the existing main-content container and replace its contents - EXACTLY like ToolSelectionScreen
+        main_container = self.query_one("#main-content")
+        logger.debug("Found main-content container, removing children")
 
-            # Wait for the removal to complete
-            self.call_after_refresh(self._mount_fresh_content)
+        # Remove all children from the container
+        main_container.remove_children()
 
-        except Exception as e:
-            logger.debug("Error in _refresh_content: %s", e)
-            # Try a fallback approach - recreate the whole screen
-            try:
-                self._recreate_full_container()
-            except Exception as fallback_error:
-                logger.debug("Fallback recreation also failed: %s", fallback_error)
-                # Last resort - show error message
-                self._show_error_screen(f"Failed to refresh content: {e}")
+        # Wait for the removal to complete
+        self.call_after_refresh(self._mount_fresh_content)
 
     def _mount_fresh_content(self) -> None:
-        """Mount fresh content after removal is complete."""
-        try:
-            main_container = self.query_one("#psi-header-container")
+        """Mount fresh content after removal is complete - EXACTLY like compose method."""
+        main_container = self.query_one("#main-content")
 
-            # Specifically check for and remove any existing button-row
-            try:
-                existing_button_row = self.query_one("#button-row")
-                logger.debug("Found existing button-row, removing it")
-                existing_button_row.remove()
-            except NoMatches:
-                logger.debug("No existing button-row found")
+        # Remove all children from the main-content container - FORCE COMPLETE REMOVAL
+        main_container.remove_children()
 
-            # Create new content with fresh widgets
-            main_content = self._create_main_content()
-            button_row = self._create_button_row()
+        # Use call_later instead of call_after_refresh to ensure callback is executed
+        self.call_later(self._complete_content_refresh)
 
-            logger.debug("Mounting new content and button row")
-            main_container.mount(main_content)
-            main_container.mount(button_row)
+    def _complete_content_refresh(self) -> None:
+        """Complete the content refresh after removal is done."""
+        main_container = self.query_one("#main-content")
 
-            # Set focus appropriately
-            self.on_mount()
-            logger.debug("Content refresh completed successfully")
-
-        except Exception as e:
-            logger.debug("Error mounting fresh content: %s", e)
-            # Fallback to full container recreation
-            self._recreate_full_container()
-
-    def _recreate_full_container(self) -> None:
-        """Recreate the entire container to avoid ID conflicts."""
-        logger.debug("Recreating full container due to ID conflict")
-        try:
-            # Remove the existing container completely
-            try:
-                old_container = self.query_one("#psi-header-container")
-                old_container.remove()
-                logger.debug("Removed old container")
-            except NoMatches:
-                logger.debug("No old container to remove")
-
-            # Wait a moment for cleanup
-            self.call_later(self._mount_new_container)
-
-        except Exception as e:
-            logger.debug("Error during full container recreation: %s", e)
-
-    def _mount_new_container(self) -> None:
-        """Mount a completely new container."""
-        try:
-            # Create a completely new container with fresh content
-            new_container = Container(
-                self._create_main_content(),
-                self._create_button_row(),
-                id="psi-header-container",
+        # Verify container is actually empty
+        existing_children = main_container.children
+        if existing_children:
+            logger.debug(
+                "WARNING: Container still has %d children after removal: %s",
+                len(existing_children),
+                [child.id for child in existing_children],
             )
+            # Force remove any remaining children
+            for child in list(existing_children):
+                try:
+                    child.remove()
+                except Exception as e:
+                    logger.debug("Error removing child %s: %s", child.id, e)
 
-            # Mount the new container to the screen
-            self.mount(new_container)
+        # Recreate the EXACT same structure as compose method
+        current_section_name = self.section_names[self.current_section]
 
-            # Set focus appropriately
-            self.on_mount()
-            logger.debug("New container mounted successfully")
+        if current_section_name == "PSI Header":
+            # For PSI Header, get components directly to match regular extension structure
+            title_label, main_layout = self._create_psi_header_components()
 
-        except Exception as e:
-            logger.debug("Error mounting new container: %s", e)
+            # Create structure EXACTLY like regular extensions (no extra Container wrapper)
+            content_widget = Container(
+                title_label,
+                main_layout,
+                # Extension navigation links - create with immediate population
+                self.create_navigation_links_container("extension-links", populate_immediately=True),
+                # Use direct button creation like ToolSelectionScreen
+                Horizontal(
+                    Button("<< Tool Selection", id="back_btn", classes="nav-button"),
+                    Button("Previous Extension", id="prev_section_btn", disabled=self.current_section == 0),
+                    Button(
+                        "Next Extension",
+                        id="next_section_btn",
+                        disabled=self.current_section >= self.total_sections - 1,
+                    ),
+                    Button("Summary >>", id="next_btn", variant="primary", classes="nav-button"),
+                    id="button-row",
+                ),
+            )
+            main_container.mount(content_widget)
+        else:
+            # For extension sections, build structure EXACTLY like compose method
+            extensions = self.extension_sections.get(current_section_name, [])
+            section_index = self.current_section + 1
+            section_enabled = self.config.selected_extension_sections.get(current_section_name, False)
+
+            # Create checkboxes for extensions in this section
+            extension_checkboxes = []
+            for extension_id, description in extensions:
+                checkbox_id = f"ext_{extension_id.replace('.', '_').replace('-', '_')}"
+                is_selected = self.config.selected_extensions.get(extension_id, True)
+                # Hide extension checkboxes when section is disabled
+                checkbox_classes = "compact"
+                if not section_enabled:
+                    checkbox_classes += " hidden"
+                extension_checkboxes.append(
+                    Checkbox(
+                        f"{description} ({extension_id})",
+                        id=checkbox_id,
+                        value=is_selected,
+                        classes=checkbox_classes,
+                    ),
+                )
+
+            section_id = self._sanitize_section_id(current_section_name)
+
+            # Create the full layout structure - same as compose method
+            content_widget = Container(
+                Label(f"Dev Container Extensions - {current_section_name}", classes="title"),
+                Horizontal(
+                    # Left column for extension selection
+                    Container(
+                        Label("Available Extensions:", classes="column-title"),
+                        ScrollableContainer(
+                            Checkbox(
+                                f"Install {current_section_name} Extensions",
+                                id=f"install_{section_id}",
+                                value=section_enabled,
+                                classes="compact",
+                            ),
+                            *extension_checkboxes,
+                            id="extension-scroll",
+                            classes="tools-list",
+                        ),
+                        id="extension-column",
+                        classes="left-column",
+                    ),
+                    # Right column for configuration
+                    Container(
+                        Label("Configuration:", classes="column-title"),
+                        ScrollableContainer(
+                            Label(f"Section {section_index} of {self.total_sections}", classes="compact"),
+                            Label(f"Configure {current_section_name} extensions:", classes="compact"),
+                            Label(
+                                "Select extensions to include in your development environment.",
+                                classes="compact",
+                            ),
+                            id="config-scroll",
+                            classes="config-area",
+                        ),
+                        id="config-column",
+                        classes="right-column",
+                    ),
+                    id="main-layout",
+                ),
+                # Extension navigation links - create with immediate population
+                self.create_navigation_links_container("extension-links", populate_immediately=True),
+                # Use direct button creation like ToolSelectionScreen
+                Horizontal(
+                    Button("<< Tool Selection", id="back_btn", classes="nav-button"),
+                    Button("Previous Extension", id="prev_section_btn", disabled=self.current_section == 0),
+                    Button(
+                        "Next Extension",
+                        id="next_section_btn",
+                        disabled=self.current_section >= self.total_sections - 1,
+                    ),
+                    Button("Summary >>", id="next_btn", variant="primary", classes="nav-button"),
+                    id="button-row",
+                ),
+            )
+            main_container.mount(content_widget)
+
+        # Navigation links are already populated during container creation
+        logger.debug("Content refresh completed successfully")
 
     def _show_error_screen(self, error_message: str) -> None:
         """Show an error screen when all else fails."""
@@ -2648,7 +3133,7 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
                     Button("Summary >>", id="next_btn", variant="primary", classes="nav-button"),
                     id="button-row",
                 ),
-                id="psi-header-container",
+                id="tools-container",
             )
 
             # Try to mount the error container
@@ -2656,30 +3141,14 @@ class PSIHeaderScreen(Screen[None], DebugMixin):
         except Exception as mount_error:
             logger.debug("Even error screen failed to mount: %s", mount_error)
 
-    def _mount_new_content(self) -> None:
-        """Mount new content after ensuring old content is removed."""
-        try:
-            # Create new container with updated content
-            new_container = Container(
-                self._create_main_content(),
-                self._create_button_row(),
-                id="psi-header-container",
-            )
-            self.mount(new_container)
-
-            # Set focus appropriately
-            self.on_mount()
-        except Exception as e:
-            logger.debug("Error mounting new content: %s", e)
-
     def save_config(self) -> None:
         """Save Dev Container Extensions configuration."""
         # Save current section first
         self.save_current_section()
 
         # Continue to next screen
-        app = cast("DevContainerApp", self.app)
-        self.app.call_later(app.after_psi_header)
+        app = cast("DynamicDevContainerApp", self.app)
+        self.app.call_later(app.after_extensions)
         self.app.pop_screen()
 
     def action_next(self) -> None:
@@ -2905,8 +3374,8 @@ class ToolVersionScreen(Screen[None], DebugMixin):
 
     def on_mount(self) -> None:
         """Initialize the screen when mounted."""
-        """Populate version inputs when screen mounts."""
-        logger.debug("PSIHeaderScreen mounted - Debug functionality available (Ctrl+D)")
+        logger.debug("ToolVersionScreen mounted - Debug functionality available (Ctrl+D)")
+
         # Set up a timer to periodically update debug output
         self.set_interval(1.0, self.update_debug_output)
 
@@ -3166,7 +3635,7 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
         self.app.pop_screen()
 
 
-class ToolSelectionScreen(Screen[None], DebugMixin):
+class ToolSelectionScreen(NavigationScreenBase):
     """Screen for selecting development tools."""
 
     BINDINGS = [
@@ -3206,6 +3675,11 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         self.tool_selected = tool_selected
         self.tool_version_configurable = tool_version_configurable
         self.tool_version_value = tool_version_value
+
+        # Initialize base class properties
+        self.section_names = sections
+        self.current_section = 0
+        self.total_sections = len(sections)
         self.current_section = 0
         self.show_python_config = False
         self.show_other_config: dict[str, Any] = {}  # Track which tools are being configured
@@ -3231,9 +3705,6 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 id="tools-container",
             )
         else:
-            # Create main layout container with debug panel at bottom if enabled
-            layout_components = []
-
             # Check if current section has multiple tools for Select All button
             current_section = self.sections[self.current_section]
             tools_in_section = MiseParser.get_section_tools(Path(".mise.toml"), current_section)
@@ -3272,11 +3743,8 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     ),
                     id="main-layout",
                 ),
-                # Section navigation links
-                Horizontal(
-                    id="section-links",
-                    classes="compact-group",
-                ),
+                # Section navigation links - use base class method
+                self.create_navigation_links_container("section-links", populate_immediately=True),
                 Horizontal(
                     Button("<< Project Description", id="back_btn", classes="nav-button"),
                     Button("Previous Tool", id="prev_btn", disabled=self.current_section == 0),
@@ -3290,19 +3758,13 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                 ),
                 id="main-content",
             )
-            layout_components.append(main_content)
 
-            # Create vertical container with all components
-            main_container = Container(*layout_components, id="tools-container")
-            yield main_container
-
-        yield Footer()
+            # Use base class method for layout creation
+            yield from self.create_navigation_layout(main_content, "tools-container")
 
     def on_mount(self) -> None:
         """Initialize the screen when mounted."""
         """Called when the screen is mounted."""
-        print("=== DEBUG: ToolSelectionScreen.on_mount() called ===")
-        print(f"Sections: {self.sections}")
         logger.debug("ToolSelectionScreen mounted - Debug functionality available (Ctrl+D)")
 
         # Check if background loading is complete
@@ -3373,9 +3835,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
         """
         self.refresh_tools()
         # Initialize section navigation links
-        print("About to call refresh_section_links()")
-        self.refresh_section_links()
-        print("Called refresh_section_links()")
+        self.refresh_navigation_links("section-links", "section_link", "Tools")
         # Set up a timer to periodically update debug output
         self.set_interval(1.0, self.update_debug_output)
 
@@ -3562,150 +4022,6 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             )
             version_btn.can_focus = False  # Make version buttons not focusable via tab
             parent_container.mount(version_btn)
-
-    def _create_section_links(self) -> list[Button]:
-        """Create section navigation links styled like version buttons.
-
-        Returns
-        -------
-        list[Button]
-            List of section link buttons
-
-        """
-        logger.debug("=== CREATE SECTION LINKS DEBUG START ===")
-        logger.debug("Creating section links for %d sections: %s", len(self.sections), self.sections)
-        logger.debug("=== BUTTON TEXT DEBUG: Creating %d section buttons ===", len(self.sections))
-        section_links = []
-
-        for i, section in enumerate(self.sections):
-            # Create a display name for the section (capitalize and format nicely)
-            display_name = section.replace("_", " ").replace("-", " ").title()
-            logger.debug("Creating button %d: section='%s', display='%s'", i, section, display_name)
-
-            # Create button with version-btn-small styling (like version buttons)
-            if i == self.current_section:
-                # Current section - make it look selected/active
-                button_text = f"[bold]{display_name}[/bold]"
-                section_btn = Button(
-                    button_text,
-                    id=f"section_link_{i}",
-                    classes="version-btn-small",
-                    disabled=True,  # Make current section non-clickable
-                )
-                section_btn.can_focus = False  # Make section buttons not focusable via tab
-                logger.debug(
-                    "BUTTON %d: CURRENT - Text='%s' ID='%s' Disabled=True",
-                    i,
-                    button_text,
-                    f"section_link_{i}",
-                )
-                logger.debug("Created CURRENT section button: %s (disabled)", section_btn.id)
-            else:
-                section_btn = Button(
-                    display_name,
-                    id=f"section_link_{i}",
-                    classes="version-btn-small",
-                )
-                section_btn.can_focus = False  # Make section buttons not focusable via tab
-                logger.debug(
-                    "BUTTON %d: REGULAR - Text='%s' ID='%s' Disabled=False",
-                    i,
-                    display_name,
-                    f"section_link_{i}",
-                )
-                logger.debug("Created regular section button: %s", section_btn.id)
-
-            # Debug button properties
-            logger.debug(
-                "BUTTON %d PROPS: label='%s', classes=%s, disabled=%s",
-                i,
-                section_btn.label,
-                section_btn.classes,
-                section_btn.disabled,
-            )
-            section_links.append(section_btn)
-
-        logger.debug("Created %d section buttons total", len(section_links))
-        print(f"=== BUTTON TEXT DEBUG: Created {len(section_links)} total buttons ===")
-        logger.debug("=== CREATE SECTION LINKS DEBUG END ===")
-        return section_links
-
-    def refresh_section_links(self) -> None:
-        """Refresh the section navigation links to reflect current section.
-
-        Updates the section navigation buttons to show the current section as active
-        and allows navigation between different tool sections.
-
-        """
-        try:
-            logger.debug("=== SECTION LINKS DEBUG START ===")
-            logger.debug("Refreshing section links. Sections: %s, Current: %s", self.sections, self.current_section)
-
-            # Get the section links container
-            section_links_container = self.query_one("#section-links", Horizontal)
-            logger.debug("Found section-links container: %s", section_links_container)
-
-            # Check if we already have buttons - if not, create them once
-            existing_buttons = section_links_container.query("Button")
-            logger.debug("Found %d existing buttons", len(existing_buttons))
-
-            if len(existing_buttons) == 0:
-                logger.debug("No existing buttons found, creating initial set")
-
-                # Add the label only once
-                sections_label = Label("Tools:", classes="sections-links-label")
-                section_links_container.mount(sections_label)
-                logger.debug("Mounted sections label")
-
-                # Create and mount section links once
-                section_links = self._create_section_links()
-                logger.debug("Created %d section links", len(section_links))
-
-                for i, section_btn in enumerate(section_links):
-                    logger.debug("About to mount section button %d: %s", i, section_btn.label)
-                    section_links_container.mount(section_btn)
-                    logger.debug("Successfully mounted section button %d", i)
-            else:
-                logger.debug("Buttons already exist, just updating their disabled state")
-                # Get the current section name from the index and transform it the same way as button labels
-                current_section_raw = self.sections[self.current_section]
-                current_section_name = current_section_raw.replace("_", " ").replace("-", " ").title()
-                logger.debug(
-                    "Current section name: %s (raw: %s, index: %d)",
-                    current_section_name,
-                    current_section_raw,
-                    self.current_section,
-                )
-
-                # Update existing buttons' disabled state
-                for button in existing_buttons:
-                    if hasattr(button, "label") and hasattr(button.label, "plain"):
-                        section_name = button.label.plain
-                        if section_name == current_section_name:
-                            button.disabled = True
-                            logger.debug("Disabled button for current section: %s", section_name)
-                        else:
-                            button.disabled = False
-                            logger.debug("Enabled button for section: %s", section_name)
-
-            logger.debug("Final container children count: %d", len(list(section_links_container.children)))
-            logger.debug(
-                "Final container children IDs: %s",
-                [getattr(child, "id", None) for child in section_links_container.children],
-            )
-
-            # Force a screen refresh to make sure everything is visible
-            self.refresh()
-            print("Forced screen refresh")
-            logger.debug("Forced screen refresh")
-
-            logger.debug("=== SECTION LINKS DEBUG END ===")
-
-        except Exception as e:
-            print(f"ERROR in refresh_section_links: {e}")
-            print(f"Traceback: {traceback.format_exc()}")
-            logger.debug("Failed to refresh section links: %s", e)
-            logger.debug("Traceback: %s", traceback.format_exc())
 
     def _refresh_python_repository_settings(self) -> None:
         """Refresh just the Python repository settings in the left column.
@@ -4670,7 +4986,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
                     self.current_section = section_index
                     self.refresh_controls()
                     self.refresh_tools()
-                    self.refresh_section_links()
+                    self.refresh_navigation_links("section-links", "section_link", "Tools")
                 else:
                     logger.debug("SECTION CLICK DEBUG: No section switch needed (same section or invalid index)")
             except (ValueError, IndexError) as e:
@@ -4724,7 +5040,7 @@ class ToolSelectionScreen(Screen[None], DebugMixin):
             logger.debug("Subtitle label not found during section update: %s", e)
 
         # Refresh section links to show current selection
-        self.refresh_section_links()
+        self.refresh_navigation_links("section-links", "section_link", "Tools")
 
     def save_current_section(self) -> None:
         """Save tool selections and configuration values for the current section.
@@ -5111,9 +5427,9 @@ class SummaryScreen(Screen[None], DebugMixin):
         """Go to previous step."""
         # Navigate back to PSI Header configuration screen
         self.app.pop_screen()  # Remove Summary screen
-        # Cast to actual app type to access show_psi_header_config method
+        # Cast to actual app type to access show_extension_config method
         app = cast("DynamicDevContainerApp", self.app)
-        app.show_psi_header_config()  # Show PSI Header screen
+        app.show_extension_config()  # Show Extensions screen
 
     def action_toggle_debug(self) -> None:
         """Toggle debug mode."""
@@ -6535,13 +6851,17 @@ class DynamicDevContainerApp(App[None]):
         Binding("ctrl+q", "quit", "Quit"),
     ]
 
-    def __init__(self, project_path: str = "") -> None:
+    def __init__(self, project_path: str = "", start_screen: int | None = None, start_item: int | None = None) -> None:
         """Initialize the Dynamic Dev Container application.
 
         Parameters
         ----------
         project_path : str, optional
             Path where the dev container will be created, by default ""
+        start_screen : int | None, optional
+            Screen number to start at (0=Welcome, 1=Config, 2=Tools, 3=Extensions, 4=Summary, 5=Install), by default None
+        start_item : int | None, optional
+            Extension section item to start at (only valid with start_screen=3), by default None
 
         Raises
         ------
@@ -6553,6 +6873,10 @@ class DynamicDevContainerApp(App[None]):
         self.config = ProjectConfig()
         self.config.project_path = project_path
         self.source_dir = Path.cwd()  # Assume running from source directory
+
+        # Store startup navigation parameters
+        self.start_screen = start_screen
+        self.start_item = start_item
 
         # Verify required files exist
         if not (self.source_dir / ".devcontainer" / "devcontainer.json").exists():
@@ -6590,7 +6914,69 @@ class DynamicDevContainerApp(App[None]):
     def on_mount(self) -> None:
         """Initialize the screen when mounted."""
         """Called when app is mounted."""
-        self.push_screen(WelcomeScreen(), self.after_welcome)
+        if self.start_screen is not None:
+            # Jump directly to specified screen
+            self._jump_to_screen(self.start_screen, self.start_item)
+        else:
+            # Normal flow: start with welcome screen
+            self.push_screen(WelcomeScreen(), self.after_welcome)
+
+    def _jump_to_screen(self, screen: int, item: int | None = None) -> None:
+        """Jump directly to a specific screen, bypassing earlier screens.
+
+        Parameters
+        ----------
+        screen : int
+            Screen number to jump to (0-5)
+        item : int | None, optional
+            Extension section item to start at (only valid with screen=3), by default None
+
+        """
+        # Set default project path for development convenience
+        if not self.config.project_path:
+            self.config.project_path = str(Path.home() / "my-project")
+
+        # Set default project name based on path
+        if not self.config.project_name:
+            self.config.project_name = Path(self.config.project_path).name
+
+        logger.debug("Jumping to screen %d, item %s", screen, item)
+
+        if screen == SCREEN_WELCOME:  # Welcome
+            self.push_screen(WelcomeScreen(), self.after_welcome)
+        elif screen == SCREEN_CONFIG:  # Config
+            self.push_screen(ProjectConfigScreen(self.config), self.after_project_config)
+        elif screen == SCREEN_TOOLS:  # Tools
+            self.push_screen(
+                ToolSelectionScreen(
+                    self.config,
+                    self.sections,
+                    self.tool_selected,
+                    self.tool_version_configurable,
+                    self.tool_version_value,
+                ),
+                self.after_tool_selection,
+            )
+        elif screen == SCREEN_EXTENSIONS:  # Extensions
+            # Create PSI Header screen with custom starting item
+            psi_screen = ExtensionSelectionScreen(self.config, self.source_dir)
+            if item is not None:
+                # Set the starting section for the extensions screen
+                if 0 <= item < len(psi_screen.section_names):
+                    psi_screen.current_section = item
+                    logger.debug("Set starting extension section to %d (%s)", item, psi_screen.section_names[item])
+                else:
+                    logger.warning("Invalid item %d for extensions screen, using 0", item)
+                    psi_screen.current_section = 0
+            self.push_screen(psi_screen, self.after_extensions)
+        elif screen == SCREEN_SUMMARY:  # Summary
+            self.push_screen(SummaryScreen(self.config), lambda _: None)
+        elif screen == SCREEN_INSTALL:  # Install
+            self.push_screen(InstallationScreen(self.config, self.source_dir), lambda _: None)
+        else:
+            logger.error("Invalid screen number: %d", screen)
+            # Fallback to welcome screen
+            self.push_screen(WelcomeScreen(), self.after_welcome)
 
     def after_welcome(self, _result: None = None) -> None:
         """Called after welcome screen."""
@@ -6643,13 +7029,13 @@ class DynamicDevContainerApp(App[None]):
 
         # Python repository configuration is now handled inline in ToolSelectionScreen
         # Version configuration is also handled inline in ToolSelectionScreen
-        # Skip the separate screens and go directly to PSI Header configuration
-        self.show_psi_header_config()
+        # Skip the separate screens and go directly to Extension configuration
+        self.show_extension_config()
 
     def after_python_repository(self, _result: None = None) -> None:
         """Called after Python repository configuration."""
-        # Continue to PSI Header configuration
-        self.show_psi_header_config()
+        # Continue to Extension configuration
+        self.show_extension_config()
 
     def after_python_project(self, _result: None = None) -> None:
         """Called after Python project metadata configuration."""
@@ -6672,19 +7058,19 @@ class DynamicDevContainerApp(App[None]):
         if configurable_tools:
             self.push_screen(ToolVersionScreen(self.config), self.after_tool_versions)
         else:
-            # Show PSI Header configuration
-            self.show_psi_header_config()
+            # Show Extensions configuration
+            self.show_extension_config()
 
     def after_tool_versions(self, _result: None = None) -> None:
         """Called after tool version configuration."""
-        # Show PSI Header configuration
-        self.show_psi_header_config()
+        # Show Extensions configuration
+        self.show_extension_config()
 
-    def show_psi_header_config(self) -> None:
+    def show_extension_config(self) -> None:
         """Show Dev Container Extensions configuration screen."""
-        self.push_screen(PSIHeaderScreen(self.config, self.source_dir), self.after_psi_header)
+        self.push_screen(ExtensionSelectionScreen(self.config, self.source_dir), self.after_extensions)
 
-    def after_psi_header(self, _result: None = None) -> None:
+    def after_extensions(self, _result: None = None) -> None:
         """Called after Dev Container Extensions configuration."""
         # Now show summary
         self.push_screen(SummaryScreen(self.config), self.after_summary)
@@ -6726,8 +7112,37 @@ def main() -> None:
         action="store_true",
         help="Enable debug mode with verbose logging and debug panel",
     )
+    parser.add_argument(
+        "--screen",
+        type=int,
+        metavar="N",
+        help="Start at specific screen (0=Welcome, 1=Config, 2=Tools, 3=Extensions, 4=Summary, 5=Install)",
+    )
+    parser.add_argument(
+        "--item",
+        type=int,
+        metavar="N",
+        help="Start at specific extension section item (only valid with --screen 3)",
+    )
 
     args = parser.parse_args()
+
+    # Validate screen and item parameters
+    if args.screen is not None:
+        if args.screen < USER_SCREEN_MIN or args.screen > USER_SCREEN_MAX:
+            parser.error(
+                f"--screen must be between {USER_SCREEN_MIN} and {USER_SCREEN_MAX} (1=Welcome, 2=Config, 3=Tools, 4=Extensions, 5=Summary, 6=Install)",
+            )
+
+        if args.item is not None:
+            if args.screen != (SCREEN_EXTENSIONS + 1):  # Convert to 1-based for comparison
+                parser.error("--item can only be used with --screen 4 (Extensions screen)")
+            if args.item < USER_ITEM_MIN or args.item > USER_ITEM_MAX:
+                parser.error(
+                    f"--item must be between {USER_ITEM_MIN} and {USER_ITEM_MAX} (1=Github, 2=Markdown, 3=Shell/Bash, 4=PSI Header)",
+                )
+    elif args.item is not None:
+        parser.error("--item requires --screen 4 to be specified")
 
     # Update debug mode based on command line argument
     if args.debug:
@@ -6770,7 +7185,11 @@ are located.
     project_path = args.project_path or ""
 
     try:
-        app = DynamicDevContainerApp(project_path)
+        # Convert 1-based user input to 0-based internal values
+        start_screen = args.screen - 1 if args.screen is not None else None
+        start_item = args.item - 1 if args.item is not None else None
+
+        app = DynamicDevContainerApp(project_path, start_screen, start_item)
         logger.debug("Application starting - Debug functionality available (Ctrl+D)")
         app.run()
     except KeyboardInterrupt:
