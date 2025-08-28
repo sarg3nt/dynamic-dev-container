@@ -114,17 +114,6 @@ class DevContainerApp(Protocol):
         """
         ...
 
-    def after_psi_header(self, result: None = None) -> None:
-        """Called after PSI header screen completes.
-
-        Parameters
-        ----------
-        result : None, optional
-            Unused parameter for callback compatibility, by default None
-
-        """
-        ...
-
     def after_summary(self, result: None = None) -> None:
         """Called after summary screen completes.
 
@@ -533,21 +522,6 @@ class BackgroundDescriptionLoader(threading.Thread):
 
         """
         return self._completion_event.wait(timeout)
-
-    def get_elapsed_time(self) -> float:
-        """Get elapsed time since loading started.
-
-        Returns
-        -------
-        float
-            Elapsed time in seconds since loading started, or 0.0 if not started
-
-        """
-        if self.start_time == 0:
-            return 0.0
-        if self._complete:
-            return self.end_time - self.start_time
-        return time.time() - self.start_time
 
 
 class ToolManager:
