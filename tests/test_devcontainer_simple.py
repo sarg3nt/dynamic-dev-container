@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from install_new import InstallationScreen, ProjectConfig
+from install import InstallationScreen, ProjectConfig
 
 
 class TestDevcontainerBasics:

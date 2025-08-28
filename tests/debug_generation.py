@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from install_new import InstallationScreen, ProjectConfig
+from install import InstallationScreen, ProjectConfig
 
 
 def debug_generation():
