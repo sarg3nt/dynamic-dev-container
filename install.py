@@ -12,12 +12,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 import os
 import re
 import subprocess
 import sys
-import tempfile
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,7 +30,6 @@ from installer.config import ProjectConfig
 from installer.constants import (
     DEBUG_MODE,
     DEFAULT_WORKER_COUNT,
-    MAX_DEBUG_MESSAGES,
     SCREEN_CONFIG,
     SCREEN_EXTENSIONS,
     SCREEN_INSTALL,
@@ -45,10 +42,16 @@ from installer.constants import (
     USER_SCREEN_MIN,
     VERSION_BUTTON_PARTS,
 )
+
+# Import debug utilities
+from installer.debug_utils import DebugMixin
 from installer.devcontainer_parser import DevContainerParser
 
 # Import file management utilities
 from installer.file_manager import FileManager
+
+# Import logging utilities
+from installer.logging_utils import get_logger, setup_logging
 
 # Import parser utilities
 from installer.mise_parser import MiseParser
@@ -144,103 +147,8 @@ class DevContainerApp(Protocol):
         ...
 
 
-class TUILogHandler(logging.Handler):
-    """Custom logging handler that captures messages for TUI display."""
-
-    def __init__(self) -> None:
-        """Initialize the TUI log handler.
-
-        Initializes the logging handler with an empty message list and sets
-        the maximum number of stored messages to prevent memory growth.
-
-        """
-        super().__init__()
-        self.messages: list[str] = []
-        self.max_messages = 100  # Keep only the last 100 messages
-
-    def emit(self, record: logging.LogRecord) -> None:
-        """Emit a log record by storing it for TUI display.
-
-        Parameters
-        ----------
-        record : logging.LogRecord
-            The log record to emit
-
-        """
-        try:
-            msg = self.format(record)
-            self.messages.append(msg)
-            # Keep only the most recent messages
-            if len(self.messages) > self.max_messages:
-                self.messages.pop(0)
-        except Exception:
-            self.handleError(record)
-
-    def get_messages(self) -> list[str]:
-        """Get all captured log messages.
-
-        Returns
-        -------
-        list[str]
-            A copy of all captured log messages
-
-        """
-        return self.messages.copy()
-
-    def clear_messages(self) -> None:
-        """Clear all captured messages.
-
-        Removes all stored log messages from the handler's message list.
-
-        """
-        self.messages.clear()
-
-
-# Global TUI log handler for debug output
-tui_log_handler = TUILogHandler()
-
-
-# Configure logging for debugging
-def setup_logging(debug_mode: bool = False) -> None:
-    """Set up logging configuration based on debug mode.
-
-    Parameters
-    ----------
-    debug_mode : bool, optional
-        Whether to enable debug mode with file logging, by default False
-
-    """
-    # Clear any existing handlers to prevent duplicates
-    root_logger = logging.getLogger()
-    root_logger.handlers.clear()
-
-    # Always set root logger to DEBUG level so TUI handler can capture all messages
-    root_logger.setLevel(logging.DEBUG)
-
-    # Always add the TUI handler for capturing debug messages (even if not displayed)
-    tui_log_handler.setLevel(logging.DEBUG)
-    root_logger.addHandler(tui_log_handler)
-
-    if debug_mode:
-        # In debug mode, also log to file
-        file_handler = logging.FileHandler(tempfile.gettempdir() + "/install_debug.log")
-        file_handler.setLevel(logging.DEBUG)
-        root_logger.addHandler(file_handler)
-    else:
-        # In normal mode, only log warnings/errors to file
-        file_handler = logging.FileHandler(tempfile.gettempdir() + "/install_debug.log")
-        file_handler.setLevel(logging.WARNING)
-        root_logger.addHandler(file_handler)
-
-    # Set format for all handlers
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    for handler in root_logger.handlers:
-        handler.setFormatter(formatter)
-
-
-# Initialize logging based on debug mode
-setup_logging(DEBUG_MODE)
-logger = logging.getLogger(__name__)
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 
 # Check if required dependencies are available
@@ -291,13 +199,12 @@ check_and_install_dependencies()
 
 # Now import the required packages
 try:
-    import pyperclip
     from rich.console import Console
     from textual.app import App, ComposeResult
     from textual.binding import Binding
     from textual.containers import Container, Horizontal, ScrollableContainer
     from textual.css.query import NoMatches
-    from textual.screen import ModalScreen, Screen
+    from textual.screen import Screen
     from textual.widgets import (
         Button,
         Checkbox,
@@ -310,269 +217,12 @@ try:
         ProgressBar,
         RadioButton,
         RadioSet,
-        RichLog,
         Static,
     )
 except ImportError as e:
     print(f"Error importing required packages: {e}")
     print("Please ensure all dependencies are installed correctly.")
     sys.exit(1)
-
-
-class DebugMixin:
-    """Mixin class to add debug functionality to screens.
-
-    This mixin should be used with classes that inherit from Screen.
-    """
-
-    def get_debug_widget(self) -> Container:
-        """Create a debug output widget for the screen.
-
-        Returns
-        -------
-        Container
-            A container widget with debug log display
-
-        """
-        debug_log = RichLog(
-            max_lines=50,
-            wrap=True,
-            highlight=True,
-            markup=True,
-            id="debug_log",
-        )
-
-        # Populate with existing debug messages immediately
-        self.__populate_debug_log(debug_log)
-
-        return Container(
-            Label("Debug Output:", classes="debug-title"),
-            debug_log,
-            id="debug_container",
-            classes="debug-panel",
-        )
-
-    def __populate_debug_log(self, debug_log: RichLog) -> None:
-        """Populate debug log with current messages.
-
-        Parameters
-        ----------
-        debug_log : RichLog
-            The RichLog widget to populate with debug messages
-
-        """
-        messages = tui_log_handler.get_messages()
-
-        if not messages:
-            debug_log.write("[dim]No debug messages available yet. Perform some operations to see debug output.[/dim]")
-        else:
-            # Show recent messages (last MAX_DEBUG_MESSAGES or all if fewer)
-            recent_messages = messages[-MAX_DEBUG_MESSAGES:] if len(messages) > MAX_DEBUG_MESSAGES else messages
-            for msg in recent_messages:
-                # Ensure message is properly formatted for display
-                try:
-                    debug_log.write(msg)
-                except Exception as e:
-                    # If there's an issue with the message, show a safe version
-                    debug_log.write(f"[red]Error displaying message: {e}[/red]")
-
-    def update_debug_output(self) -> None:
-        """Update the debug output with new messages.
-
-        Refreshes the debug log widget with the latest captured log messages.
-
-        """
-        try:
-            # Use cast to tell mypy this mixin is used with Screen classes
-            screen = cast("Screen[None]", self)
-            debug_log = screen.query_one("#debug_log", RichLog)
-
-            # Clear and repopulate to ensure fresh content
-            debug_log.clear()
-            self.__populate_debug_log(debug_log)
-
-            # Force a refresh to ensure content is displayed
-            debug_log.refresh()
-
-        except NoMatches:
-            # Debug widget not found - this is normal when debug panel isn't shown
-            pass
-        except Exception as e:
-            # Log any other errors for debugging
-            logger.debug("Failed to update debug output: %s", e)
-
-    def __rebuild_with_debug_panel(self) -> None:
-        """Standard debug panel creation for all screens.
-
-        Attempts to add a debug panel to the current screen by finding
-        the main container and mounting a debug widget.
-
-        """
-        try:
-            # Try to find a main container with common IDs
-            main_container = None
-            container_ids = [
-                "#welcome-container",
-                "#project-container",
-                "#summary-container",
-                "#install-container",
-                "#tools-container",  # Used by both ToolSelectionScreen and ExtensionSelectionScreen now
-                "#main-content",
-            ]
-
-            for container_id in container_ids:
-                try:
-                    screen = cast("Screen[None]", self)
-                    main_container = screen.query_one(container_id)
-                    break
-                except NoMatches:
-                    continue
-
-            if not main_container:
-                logger.debug("DebugMixin: Could not find any main container for debug panel")
-                return
-
-            # Remove any existing debug container first
-            try:
-                screen = cast("Screen[None]", self)
-                existing_debug = screen.query_one("#debug_container")
-                existing_debug.remove()
-                logger.debug("DebugMixin: Removed existing debug container")
-            except NoMatches:
-                pass  # No existing debug container, which is fine
-
-            # Create the standardized debug panel
-            debug_log = RichLog(
-                max_lines=50,
-                wrap=True,
-                highlight=True,
-                markup=True,
-                id="debug_log",
-            )
-
-            # Populate immediately with current messages
-            self.__populate_debug_log(debug_log)
-
-            debug_container = Container(
-                Horizontal(
-                    Label("Debug Output (Ctrl+D to toggle):", classes="debug-title"),
-                    Button("Copy Debug", id="copy_debug_btn", classes="debug-copy-btn"),
-                    id="debug-header",
-                ),
-                debug_log,
-                id="debug_container",
-                classes="debug-panel",
-            )
-
-            # Mount the debug container
-            main_container.mount(debug_container)
-            logger.debug("DebugMixin: Debug panel created and mounted successfully")
-
-        except Exception as e:
-            logger.debug("DebugMixin: Error creating debug panel: %s", e)
-
-    def __copy_debug_output(self) -> None:
-        """Standard debug copy functionality for all screens.
-
-        Copies all captured debug messages to the system clipboard and
-        displays a notification to the user.
-
-        """
-        try:
-            messages = tui_log_handler.get_messages()
-            debug_text = "\n".join(messages)
-            pyperclip.copy(debug_text)
-            screen = cast("Screen[None]", self)
-            screen.notify("Debug output copied to clipboard!", timeout=2, severity="information")
-        except Exception as e:
-            screen = cast("Screen[None]", self)
-            screen.notify(f"Failed to copy debug output: {e}", timeout=3, severity="error")
-
-
-class DebugModal(ModalScreen[None]):
-    """Modal screen for showing debug output."""
-
-    BINDINGS = [
-        Binding("escape", "dismiss", "Close"),
-        Binding("ctrl+d", "dismiss", "Close"),
-        Binding("ctrl+c", "copy_debug", "Copy"),
-    ]
-
-    def compose(self) -> ComposeResult:
-        """Create the debug modal layout."""
-        debug_log = RichLog(
-            max_lines=100,
-            wrap=True,
-            highlight=True,
-            markup=True,
-            id="modal_debug_log",  # Different ID to avoid conflicts
-        )
-
-        # Populate with existing debug messages
-        messages = tui_log_handler.get_messages()
-        for msg in messages[-50:]:  # Show last 50 messages
-            debug_log.write(msg)
-
-        yield Container(
-            Container(
-                Horizontal(
-                    Label("Debug Output (Ctrl+D to close, Ctrl+C to copy)", classes="debug-title"),
-                    Button("Copy", id="copy_debug_btn", classes="debug-copy-btn"),
-                    Button("Close", id="close_debug_btn", variant="primary"),
-                    id="debug-header",
-                ),
-                debug_log,
-                id="debug_content",
-                classes="debug-modal-content",
-            ),
-            id="debug_modal",
-            classes="debug-modal",
-        )
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button presses in the debug modal.
-
-        Parameters
-        ----------
-        event : Button.Pressed
-            The button press event containing button information
-
-        """
-        if event.button.id == "copy_debug_btn":
-            self.action_copy_debug()
-        elif event.button.id == "close_debug_btn":
-            self.dismiss()
-
-    def action_copy_debug(self) -> None:
-        """Copy debug output to clipboard.
-
-        Attempts to copy all captured debug messages to the system clipboard
-        and displays a notification to the user.
-
-        """
-        try:
-            # Get all debug messages
-            messages = tui_log_handler.get_messages()
-            debug_text = "\n".join(messages)
-
-            # Try to copy to clipboard
-            pyperclip.copy(debug_text)
-            self.notify("Debug output copied to clipboard!", timeout=2, severity="information")
-        except ImportError:
-            self.notify("pyperclip not available - cannot copy to clipboard", timeout=3, severity="warning")
-        except Exception as e:
-            self.notify(f"Failed to copy debug output: {e}", timeout=3, severity="error")
-
-    async def action_dismiss(self, result: None = None) -> None:
-        """Close the debug modal.
-
-        Parameters
-        ----------
-        result : None, optional
-            Result value to pass when dismissing, by default None
-
-        """
-        self.dismiss(result)
 
 
 class WelcomeScreen(Screen[None], DebugMixin):
