@@ -426,7 +426,7 @@ class BackgroundDescriptionLoader(threading.Thread):
         # Use ThreadPoolExecutor for parallel processing
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submit all tasks
-            future_to_tool = {executor.submit(self._load_tool_description, tool): tool for tool in self.tools}
+            future_to_tool = {executor.submit(self.__load_tool_description, tool): tool for tool in self.tools}
 
             # Process completed tasks as they finish
             for future in as_completed(future_to_tool):
@@ -456,7 +456,7 @@ class BackgroundDescriptionLoader(threading.Thread):
                 self.total,
             )
 
-    def _load_tool_description(self, tool: str) -> str | None:
+    def __load_tool_description(self, tool: str) -> str | None:
         """Load description for a single tool using .mise.toml comments.
 
         Parameters
@@ -475,7 +475,7 @@ class BackgroundDescriptionLoader(threading.Thread):
             return ToolManager._description_cache[tool]  # noqa: SLF001
 
         # Get description from .mise.toml comments
-        description = ToolManager._get_mise_description(tool)  # noqa: SLF001
+        description = ToolManager.__get_mise_description(tool)  # noqa: SLF001
 
         # Use generic fallback if not found
         if not description:
@@ -806,23 +806,23 @@ class ToolManager:
 
         """
         # Try to get description from cache first
-        cached_desc = ToolManager._get_cached_description(tool)
+        cached_desc = ToolManager.__get_cached_description(tool)
         if cached_desc:
             return cached_desc
 
         # Get description from .mise.toml comments
-        description = ToolManager._get_mise_description(tool)
+        description = ToolManager.__get_mise_description(tool)
 
         # Use generic fallback if not found
         if not description:
             description = f"{tool} - Development tool"
 
         # Cache the result
-        ToolManager._cache_description(tool, description)
+        ToolManager.__cache_description(tool, description)
         return description
 
     @staticmethod
-    def _get_cached_description(tool: str) -> str | None:
+    def __get_cached_description(tool: str) -> str | None:
         """Get cached description for a tool.
 
         Parameters
@@ -839,7 +839,7 @@ class ToolManager:
         return ToolManager._description_cache.get(tool)
 
     @staticmethod
-    def _cache_description(tool: str, description: str) -> None:
+    def __cache_description(tool: str, description: str) -> None:
         """Cache description for a tool.
 
         Parameters
@@ -853,7 +853,7 @@ class ToolManager:
         ToolManager._description_cache[tool] = description
 
     @staticmethod
-    def _get_mise_description(tool: str) -> str | None:
+    def __get_mise_description(tool: str) -> str | None:
         """Get tool description from .mise.toml comments.
 
         Parameters
@@ -1377,7 +1377,7 @@ class DebugMixin:
         )
 
         # Populate with existing debug messages immediately
-        self._populate_debug_log(debug_log)
+        self.__populate_debug_log(debug_log)
 
         return Container(
             Label("Debug Output:", classes="debug-title"),
@@ -1386,7 +1386,7 @@ class DebugMixin:
             classes="debug-panel",
         )
 
-    def _populate_debug_log(self, debug_log: RichLog) -> None:
+    def __populate_debug_log(self, debug_log: RichLog) -> None:
         """Populate debug log with current messages.
 
         Parameters
@@ -1423,7 +1423,7 @@ class DebugMixin:
 
             # Clear and repopulate to ensure fresh content
             debug_log.clear()
-            self._populate_debug_log(debug_log)
+            self.__populate_debug_log(debug_log)
 
             # Force a refresh to ensure content is displayed
             debug_log.refresh()
@@ -1435,7 +1435,7 @@ class DebugMixin:
             # Log any other errors for debugging
             logger.debug("Failed to update debug output: %s", e)
 
-    def _rebuild_with_debug_panel(self) -> None:
+    def __rebuild_with_debug_panel(self) -> None:
         """Standard debug panel creation for all screens.
 
         Attempts to add a debug panel to the current screen by finding
@@ -1485,7 +1485,7 @@ class DebugMixin:
             )
 
             # Populate immediately with current messages
-            self._populate_debug_log(debug_log)
+            self.__populate_debug_log(debug_log)
 
             debug_container = Container(
                 Horizontal(
@@ -1505,7 +1505,7 @@ class DebugMixin:
         except Exception as e:
             logger.debug("DebugMixin: Error creating debug panel: %s", e)
 
-    def _copy_debug_output(self) -> None:
+    def __copy_debug_output(self) -> None:
         """Standard debug copy functionality for all screens.
 
         Copies all captured debug messages to the system clipboard and
@@ -1728,15 +1728,15 @@ This wizard will guide you through configuring your development container with t
         except NoMatches:
             # Debug panel doesn't exist, create it
             logger.debug("WelcomeScreen: Creating new debug panel")
-            self._rebuild_with_debug_panel()
+            self.__rebuild_with_debug_panel()
         except Exception as e:
             logger.debug("WelcomeScreen: Error toggling debug panel: %s", e)
-            self._rebuild_with_debug_panel()
+            self.__rebuild_with_debug_panel()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press events."""
         if event.button.id == "copy_debug_btn":
-            self._copy_debug_output()
+            self.__copy_debug_output()
         elif event.button.id == "next_btn":
             self.action_continue()
 
@@ -2386,7 +2386,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         self.total_sections = len(self.section_names)
         logger.debug("Total sections: %s", self.total_sections)
 
-    def _sanitize_section_id(self, section_name: str) -> str:
+    def __sanitize_section_id(self, section_name: str) -> str:
         """Sanitize section name for use in HTML IDs.
 
         Replaces invalid characters with underscores to create valid HTML/CSS IDs.
@@ -2411,7 +2411,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
 
         if current_section_name == "PSI Header":
             # For PSI Header, get components directly to match regular extension structure
-            title_label, main_layout = self._create_psi_header_components()
+            title_label, main_layout = self.__create_psi_header_components()
 
             main_content = Container(
                 title_label,
@@ -2456,7 +2456,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
                     ),
                 )
 
-            section_id = self._sanitize_section_id(current_section_name)
+            section_id = self.__sanitize_section_id(current_section_name)
 
             main_content = Container(
                 Label(f"Dev Container Extensions - {current_section_name}", classes="title"),
@@ -2513,7 +2513,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         # Use base class method for layout creation - use SAME container ID as tools for identical styling
         yield from self.create_navigation_layout(main_content, "tools-container")
 
-    def _create_psi_header_components(self) -> tuple[Label, Horizontal]:
+    def __create_psi_header_components(self) -> tuple[Label, Horizontal]:
         """Create the PSI Header configuration components (not wrapped in Container).
 
         Returns
@@ -2530,11 +2530,11 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         logger.debug("Available PSI Header languages: %s", available_languages)
 
         # Determine which languages should be auto-selected based on selected tools
-        auto_selected_languages = self._get_auto_selected_languages()
+        auto_selected_languages = self.__get_auto_selected_languages()
         logger.debug("Auto-selected PSI Header languages: %s", auto_selected_languages)
 
         # Create language checkboxes
-        language_checkboxes = self._create_language_checkboxes(available_languages, auto_selected_languages)
+        language_checkboxes = self.__create_language_checkboxes(available_languages, auto_selected_languages)
         logger.debug("Created %s language checkboxes", len(language_checkboxes))
 
         title_label = Label(
@@ -2617,7 +2617,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
 
         return title_label, main_layout
 
-    def _create_extension_section_content(self, section_name: str) -> Container:
+    def __create_extension_section_content(self, section_name: str) -> Container:
         """Create content for a specific extension section."""
         logger.debug("Creating extension section content for: %s", section_name)
         extensions = self.extension_sections.get(section_name, [])
@@ -2649,7 +2649,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
             logger.debug("Created checkbox for extension: %s", extension_id)
 
         # Sanitize section name for use in HTML IDs (replace invalid characters)
-        section_id = self._sanitize_section_id(section_name)
+        section_id = self.__sanitize_section_id(section_name)
 
         # Create the exact same structure as ToolSelectionScreen
         container = Container(
@@ -2706,7 +2706,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
             else:
                 # Focus on section install checkbox for extension sections
                 section_name = self.section_names[self.current_section]
-                section_id = f"install_{self._sanitize_section_id(section_name)}"
+                section_id = f"install_{self.__sanitize_section_id(section_name)}"
                 self.query_one(f"#{section_id}", Checkbox).focus()
         except Exception:
             logger.debug("Could not set focus to first checkbox")
@@ -2724,7 +2724,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
             self.save_current_section()
             self.previous_section()
         elif event.button.id == "copy_debug_btn":
-            self._copy_debug_output()
+            self.__copy_debug_output()
         # Handle extension link clicks
         elif event.button.id and event.button.id.startswith("extension_link_"):
             # Extract section index from button ID: "extension_link_{index}"
@@ -2747,7 +2747,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
                     )
                     self.save_current_section()
                     self.current_section = section_index
-                    self._refresh_content()
+                    self.__refresh_content()
                     # Navigation links will be refreshed automatically in _complete_content_refresh
                 else:
                     logger.debug("EXTENSION CLICK DEBUG: No section switch needed (same section or invalid index)")
@@ -2763,7 +2763,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         # Handle PSI Header install checkbox
         if checkbox_id == "install_psi":
             logger.debug("PSI Header install checkbox changed to: %s", event.checkbox.value)
-            self._toggle_psi_config_visibility(event.checkbox.value)
+            self.__toggle_psi_config_visibility(event.checkbox.value)
             # Save the configuration immediately
             self.save_current_section()
             return
@@ -2771,14 +2771,14 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         # Handle section install checkbox changes
         if checkbox_id.startswith("install_") and checkbox_id != "install_psi":
             section_name = self.section_names[self.current_section]
-            expected_id = f"install_{self._sanitize_section_id(section_name)}"
+            expected_id = f"install_{self.__sanitize_section_id(section_name)}"
 
             if checkbox_id == expected_id:
-                self._toggle_extension_visibility(event.checkbox.value, section_name)
+                self.__toggle_extension_visibility(event.checkbox.value, section_name)
                 # Save the current section immediately to update config
                 self.save_current_section()
 
-    def _toggle_extension_visibility(self, show_extensions: bool, section_name: str) -> None:
+    def __toggle_extension_visibility(self, show_extensions: bool, section_name: str) -> None:
         """Show or hide extension checkboxes based on section checkbox state."""
         try:
             # Toggle visibility and state of individual extension checkboxes
@@ -2803,7 +2803,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         except Exception as e:
             logger.debug("Error toggling extension visibility: %s", e)
 
-    def _toggle_psi_config_visibility(self, show_config: bool) -> None:
+    def __toggle_psi_config_visibility(self, show_config: bool) -> None:
         """Show or hide PSI Header configuration options based on checkbox state.
 
         Parameters
@@ -2876,11 +2876,11 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         current_section_name = self.section_names[self.current_section]
 
         if current_section_name == "PSI Header":
-            self._save_psi_header_config()
+            self.__save_psi_header_config()
         else:
-            self._save_extension_section_config(current_section_name)
+            self.__save_extension_section_config(current_section_name)
 
-    def _save_psi_header_config(self) -> None:
+    def __save_psi_header_config(self) -> None:
         """Save PSI Header configuration."""
         self.config.install_psi_header = self.query_one("#install_psi", Checkbox).value
         self.config.psi_header_company = self.query_one("#company_name", Input).value
@@ -2905,10 +2905,10 @@ class ExtensionSelectionScreen(NavigationScreenBase):
                 # Skip if checkbox doesn't exist
                 continue
 
-    def _save_extension_section_config(self, section_name: str) -> None:
+    def __save_extension_section_config(self, section_name: str) -> None:
         """Save configuration for an extension section."""
         # Save section enabled/disabled state
-        section_id = f"install_{self._sanitize_section_id(section_name)}"
+        section_id = f"install_{self.__sanitize_section_id(section_name)}"
         try:
             section_checkbox = self.query_one(f"#{section_id}", Checkbox)
             self.config.selected_extension_sections[section_name] = section_checkbox.value
@@ -2929,15 +2929,15 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         """Move to the next section."""
         if self.current_section < self.total_sections - 1:
             self.current_section += 1
-            self._refresh_content()
+            self.__refresh_content()
 
     def previous_section(self) -> None:
         """Move to the previous section."""
         if self.current_section > 0:
             self.current_section -= 1
-            self._refresh_content()
+            self.__refresh_content()
 
-    def _refresh_content(self) -> None:
+    def __refresh_content(self) -> None:
         """Refresh the content for the current section."""
         logger.debug("Refreshing content for section %s", self.current_section)
 
@@ -2949,9 +2949,9 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         main_container.remove_children()
 
         # Wait for the removal to complete
-        self.call_after_refresh(self._mount_fresh_content)
+        self.call_after_refresh(self.__mount_fresh_content)
 
-    def _mount_fresh_content(self) -> None:
+    def __mount_fresh_content(self) -> None:
         """Mount fresh content after removal is complete - EXACTLY like compose method."""
         main_container = self.query_one("#main-content")
 
@@ -2959,9 +2959,9 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         main_container.remove_children()
 
         # Use call_later instead of call_after_refresh to ensure callback is executed
-        self.call_later(self._complete_content_refresh)
+        self.call_later(self.__complete_content_refresh)
 
-    def _complete_content_refresh(self) -> None:
+    def __complete_content_refresh(self) -> None:
         """Complete the content refresh after removal is done."""
         main_container = self.query_one("#main-content")
 
@@ -2985,7 +2985,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
 
         if current_section_name == "PSI Header":
             # For PSI Header, get components directly to match regular extension structure
-            title_label, main_layout = self._create_psi_header_components()
+            title_label, main_layout = self.__create_psi_header_components()
 
             # Create structure EXACTLY like regular extensions (no extra Container wrapper)
             content_widget = Container(
@@ -3031,7 +3031,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
                     ),
                 )
 
-            section_id = self._sanitize_section_id(current_section_name)
+            section_id = self.__sanitize_section_id(current_section_name)
 
             # Create the full layout structure - same as compose method
             content_widget = Container(
@@ -3092,7 +3092,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         # Navigation links are already populated during container creation
         logger.debug("Content refresh completed successfully")
 
-    def _show_error_screen(self, error_message: str) -> None:
+    def __show_error_screen(self, error_message: str) -> None:
         """Show an error screen when all else fails."""
         logger.debug("Showing error screen: %s", error_message)
         try:
@@ -3165,9 +3165,9 @@ class ExtensionSelectionScreen(NavigationScreenBase):
             debug_container.remove()
         except Exception:
             # Debug panel doesn't exist, create it
-            self._rebuild_with_debug_panel()
+            self.__rebuild_with_debug_panel()
 
-    def _get_auto_selected_languages(self) -> set[str]:
+    def __get_auto_selected_languages(self) -> set[str]:
         """Get languages that should be auto-selected based on selected tools.
 
         Analyzes the selected development tools and returns a set of language
@@ -3182,7 +3182,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         auto_selected = set()
 
         # Get language mappings from .mise.toml comments
-        tool_language_mapping = self._get_tool_language_mapping()
+        tool_language_mapping = self.__get_tool_language_mapping()
 
         # Map selected tools to their corresponding languages
         for tool_name, is_selected in self.config.tool_selected.items():
@@ -3204,7 +3204,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
         logger.debug("Auto-selected languages for PSI Header: %s", auto_selected)
         return auto_selected
 
-    def _create_language_checkboxes(
+    def __create_language_checkboxes(
         self,
         available_languages: list[tuple[str, str]],
         auto_selected_languages: set[str],
@@ -3241,7 +3241,7 @@ class ExtensionSelectionScreen(NavigationScreenBase):
 
         return checkboxes
 
-    def _get_tool_language_mapping(self) -> dict[str, str]:
+    def __get_tool_language_mapping(self) -> dict[str, str]:
         """Get mapping of tools to their primary programming languages.
 
         Reads the .mise.toml file and extracts language mappings from #language: comments.
@@ -3535,7 +3535,7 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
         elif event.button.id == "back_btn":
             self.action_back()
         elif event.button.id == "copy_debug_btn":
-            self._copy_debug_output()
+            self.__copy_debug_output()
 
     def action_next(self) -> None:
         """Continue to the next screen.
@@ -3575,7 +3575,7 @@ class ProjectConfigScreen(Screen[None], DebugMixin):
             debug_container.remove()
         except Exception:
             # Debug panel doesn't exist, create it
-            self._rebuild_with_debug_panel()
+            self.__rebuild_with_debug_panel()
 
     def save_config(self) -> None:
         """Save current configuration."""
@@ -3743,11 +3743,11 @@ class ToolSelectionScreen(NavigationScreenBase):
 
         # Check if background loading is complete
         if not ToolManager.is_loading_complete():
-            self._show_loading_screen()
+            self.__show_loading_screen()
         else:
-            self._show_tools_screen()
+            self.__show_tools_screen()
 
-    def _show_loading_screen(self) -> None:
+    def __show_loading_screen(self) -> None:
         """Show loading screen while background description loading completes.
 
         Displays a loading indicator and progress text while tool descriptions
@@ -3768,12 +3768,12 @@ class ToolSelectionScreen(NavigationScreenBase):
         )
 
         # Set up a timer to check for completion
-        self._loading_timer = self.set_interval(0.5, self._check_loading_complete)
+        self._loading_timer = self.set_interval(0.5, self.__check_loading_complete)
 
         if DEBUG_MODE:
             logger.debug("Showing loading screen for tool descriptions")
 
-    def _check_loading_complete(self) -> None:
+    def __check_loading_complete(self) -> None:
         """Check if loading is complete and update display.
 
         Called periodically by a timer to check if background loading has completed.
@@ -3782,7 +3782,7 @@ class ToolSelectionScreen(NavigationScreenBase):
         """
         if ToolManager.is_loading_complete():
             # Loading complete, show the tools
-            self._show_tools_screen()
+            self.__show_tools_screen()
             # Stop the checking timer
             if self._loading_timer is not None:
                 self._loading_timer.stop()
@@ -3800,7 +3800,7 @@ class ToolSelectionScreen(NavigationScreenBase):
                 if DEBUG_MODE:
                     logger.debug("Failed to update loading text widget: %s", e)
 
-    def _show_tools_screen(self) -> None:
+    def __show_tools_screen(self) -> None:
         """Show the actual tools screen after loading is complete.
 
         Transitions from the loading screen to the main tools selection interface.
@@ -3814,9 +3814,9 @@ class ToolSelectionScreen(NavigationScreenBase):
         self.set_interval(1.0, self.update_debug_output)
 
         # Set focus to the first tool checkbox
-        self._set_focus_to_first_tool()
+        self.__set_focus_to_first_tool()
 
-    def _set_focus_to_first_tool(self) -> None:
+    def __set_focus_to_first_tool(self) -> None:
         """Set focus to the first tool checkbox."""
         try:
             # Get the current section's tools
@@ -3964,7 +3964,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             except Exception:
                 logger.debug("Could not set focus to first tool checkbox in refresh_tools")
 
-    def _create_version_buttons(
+    def __create_version_buttons(
         self,
         tool: str,
         parent_container: Horizontal,
@@ -3997,7 +3997,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             version_btn.can_focus = False  # Make version buttons not focusable via tab
             parent_container.mount(version_btn)
 
-    def _refresh_python_repository_settings(self) -> None:
+    def __refresh_python_repository_settings(self) -> None:
         """Refresh just the Python repository settings in the left column.
 
         Updates the Python repository configuration display without rebuilding
@@ -4032,12 +4032,12 @@ class ToolSelectionScreen(NavigationScreenBase):
             config_container.remove_children()
 
             # Force a refresh cycle to ensure widgets are completely removed
-            self.call_after_refresh(self._complete_refresh_configuration)
+            self.call_after_refresh(self.__complete_refresh_configuration)
         except Exception as e:
             logger.error("Error in refresh_configuration: %s", e)
             self._refreshing_config = False
 
-    def _complete_refresh_configuration(self) -> None:
+    def __complete_refresh_configuration(self) -> None:
         """Complete the configuration refresh after widgets are cleared."""
         try:
             config_container = self.query_one("#config-scroll", ScrollableContainer)
@@ -4076,7 +4076,7 @@ class ToolSelectionScreen(NavigationScreenBase):
                 python_version_container.mount(Label("python:", classes="compact tool-label"))
 
                 # Version buttons for Python
-                self._create_version_buttons("python", python_version_container, 4)
+                self.__create_version_buttons("python", python_version_container, 4)
 
                 # Version input field
                 version_id = f"version_python_gen_{self._widget_generation}"
@@ -4159,7 +4159,7 @@ class ToolSelectionScreen(NavigationScreenBase):
                     config_container.mount(Label("Homepage URL:", classes="compact"))
                     config_container.mount(
                         Input(
-                            value=self.config.python_homepage_url or self._get_default_homepage_url(),
+                            value=self.config.python_homepage_url or self.__get_default_homepage_url(),
                             placeholder="Enter homepage URL",
                             id="pyproject_homepage",
                             classes="compact-input",
@@ -4170,7 +4170,7 @@ class ToolSelectionScreen(NavigationScreenBase):
                     config_container.mount(Label("Source URL:", classes="compact"))
                     config_container.mount(
                         Input(
-                            value=self.config.python_source_url or self._get_default_source_url(),
+                            value=self.config.python_source_url or self.__get_default_source_url(),
                             placeholder="Enter source repository URL",
                             id="pyproject_source",
                             classes="compact-input",
@@ -4181,7 +4181,7 @@ class ToolSelectionScreen(NavigationScreenBase):
                     config_container.mount(Label("Documentation URL:", classes="compact"))
                     config_container.mount(
                         Input(
-                            value=self.config.python_documentation_url or self._get_default_documentation_url(),
+                            value=self.config.python_documentation_url or self.__get_default_documentation_url(),
                             placeholder="Enter documentation URL",
                             id="pyproject_documentation",
                             classes="compact-input",
@@ -4195,7 +4195,7 @@ class ToolSelectionScreen(NavigationScreenBase):
                     config_container.mount(Label("Package Path:", classes="compact"))
                     config_container.mount(
                         Input(
-                            value=self.config.python_packages_path or self._get_default_package_path(),
+                            value=self.config.python_packages_path or self.__get_default_package_path(),
                             placeholder="Enter package path (e.g., src/package_name)",
                             id="pyproject_packages",
                             classes="compact-input",
@@ -4263,7 +4263,7 @@ class ToolSelectionScreen(NavigationScreenBase):
                     )
 
             # Clean up any existing version inputs before creating new ones
-            self._cleanup_version_inputs()
+            self.__cleanup_version_inputs()
 
             # Show version configuration ONLY for configurable tools selected in the CURRENT section
             # (not all sections) to keep the interface section-specific
@@ -4290,7 +4290,7 @@ class ToolSelectionScreen(NavigationScreenBase):
                     tool_version_container.mount(Label(f"{tool}:", classes="compact tool-label"))
 
                     # Version buttons - get available versions for this tool dynamically
-                    self._create_version_buttons(tool, tool_version_container)
+                    self.__create_version_buttons(tool, tool_version_container)
 
                     # Use generation-based ID to ensure uniqueness
                     version_id = f"version_{tool}_gen_{self._widget_generation}"
@@ -4336,7 +4336,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             # Handle Python repository configuration enable/disable
             self.config.install_python_repository = event.value
             # Refresh repository settings without recreating all tools
-            self._refresh_python_repository_settings()
+            self.__refresh_python_repository_settings()
         elif event.checkbox.id.startswith("py_repo_"):
             # Handle Python repository type selection
             if event.value:
@@ -4410,7 +4410,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             except Exception as e:
                 logger.debug("Could not update Python URL fields: %s", e)
 
-    def _cleanup_version_inputs(self) -> None:
+    def __cleanup_version_inputs(self) -> None:
         """Remove any existing version input widgets to prevent duplicates."""
         # Silently clean up version inputs - only log if in debug mode
         if DEBUG_MODE:
@@ -4459,13 +4459,13 @@ class ToolSelectionScreen(NavigationScreenBase):
             logger.debug("Package name input changed to: %s", event.value)
             self.config.python_project_name = event.value
             # Use call_later to ensure all widgets are mounted before updating
-            self.call_later(self._update_package_related_fields, event.value)
+            self.call_later(self.__update_package_related_fields, event.value)
         elif event.input.id == "github_username":
             # Handle GitHub username changes - update URL fields immediately on focus loss
             logger.debug("GitHub username input changed to: %s", event.value)
             self.config.python_github_username = event.value
             # Update related URL fields immediately when GitHub username changes
-            self.call_later(self._update_github_related_fields, event.value)
+            self.call_later(self.__update_github_related_fields, event.value)
         elif event.input.id == "pyproject_homepage":
             # Handle Homepage URL changes - rely on focus-loss detection for immediate processing
             # Store the value but don't set timer - let focus loss handle the propagation
@@ -4488,13 +4488,13 @@ class ToolSelectionScreen(NavigationScreenBase):
 
             # If focus moved from a tracked input to something else, process the previous input
             if previous_input_id and previous_input_id != current_input_id:
-                self._process_input_on_focus_loss(previous_input_id)
+                self.__process_input_on_focus_loss(previous_input_id)
 
             # Update tracked input
             if current_input_id:
                 self._last_focused_input = current_input_id
 
-    def _process_input_on_focus_loss(self, input_id: str) -> None:
+    def __process_input_on_focus_loss(self, input_id: str) -> None:
         """Process specific inputs when they lose focus.
 
         Parameters
@@ -4511,7 +4511,7 @@ class ToolSelectionScreen(NavigationScreenBase):
                 if github_value:
                     logger.debug("Processing GitHub username on focus loss: %s", github_value)
                     self.config.python_github_username = github_value
-                    self._update_github_related_fields(github_value)
+                    self.__update_github_related_fields(github_value)
 
             elif input_id == "pyproject_homepage":
                 # Process homepage URL immediately on focus loss (instead of timer)
@@ -4523,7 +4523,7 @@ class ToolSelectionScreen(NavigationScreenBase):
                         # Cancel any existing timer since we're processing immediately
                         if hasattr(self, "_username_timer"):
                             self._username_timer.stop()
-                        self._check_and_propagate_username(homepage_value)
+                        self.__check_and_propagate_username(homepage_value)
 
         except Exception as e:
             logger.debug("Error processing input on focus loss (%s): %s", input_id, e)
@@ -4544,11 +4544,11 @@ class ToolSelectionScreen(NavigationScreenBase):
                 homepage_value = homepage_input.value.strip()
                 if homepage_value and not self._username_propagated:
                     logger.debug("Processing homepage URL on Enter key: %s", homepage_value)
-                    self._check_and_propagate_username(homepage_value)
+                    self.__check_and_propagate_username(homepage_value)
             except Exception as e:
                 logger.debug("Error processing homepage URL on Enter: %s", e)
 
-    def _check_and_propagate_username(self, homepage_url: str) -> None:
+    def __check_and_propagate_username(self, homepage_url: str) -> None:
         """Check if homepage URL contains a valid username and propagate it.
 
         Extracts username from a GitHub URL and automatically populates
@@ -4570,7 +4570,7 @@ class ToolSelectionScreen(NavigationScreenBase):
 
         try:
             # Extract username from the homepage URL
-            username = self._extract_username_from_url(homepage_url)
+            username = self.__extract_username_from_url(homepage_url)
             if not username or username == "yourusername":
                 # No valid username found or still using template
                 logger.debug("No valid username found or still using template: %s", username)
@@ -4599,7 +4599,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             if (
                 not documentation_input.value.strip()
                 or "yourusername" in documentation_input.value
-                or documentation_input.value == self._get_default_documentation_url()
+                or documentation_input.value == self.__get_default_documentation_url()
             ):
                 repo_name = url_match.group(2)
                 new_documentation = f"https://github.com/{username}/{repo_name}/README.md"
@@ -4614,7 +4614,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             logger.debug("Could not check/propagate username: %s", e)
             logger.debug("Traceback: %s", traceback.format_exc())
 
-    def _update_package_related_fields(self, package_name: str) -> None:
+    def __update_package_related_fields(self, package_name: str) -> None:
         """Update fields that depend on the package name.
 
         Parameters
@@ -4712,7 +4712,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             logger.debug("Could not update package-related fields: %s", e)
             logger.debug("Traceback: %s", traceback.format_exc())
 
-    def _get_default_homepage_url(self) -> str:
+    def __get_default_homepage_url(self) -> str:
         """Get default homepage URL based on current package name."""
         package_name = self.config.python_project_name
         if package_name and package_name != "my-awesome-project":
@@ -4720,7 +4720,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             return f"https://github.com/yourusername/{package_name_url}"
         return "https://github.com/yourusername/my-awesome-project"
 
-    def _get_default_source_url(self) -> str:
+    def __get_default_source_url(self) -> str:
         """Get default source URL based on current package name."""
         package_name = self.config.python_project_name
         if package_name and package_name != "my-awesome-project":
@@ -4728,7 +4728,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             return f"https://github.com/yourusername/{package_name_url}"
         return "https://github.com/yourusername/my-awesome-project"
 
-    def _get_default_documentation_url(self) -> str:
+    def __get_default_documentation_url(self) -> str:
         """Get default documentation URL based on current package name."""
         package_name = self.config.python_project_name
         if package_name and package_name != "my-awesome-project":
@@ -4736,7 +4736,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             return f"https://github.com/yourusername/{package_name_url}/README.md"
         return "https://github.com/yourusername/my-awesome-project/README.md"
 
-    def _update_github_related_fields(self, github_username: str) -> None:
+    def __update_github_related_fields(self, github_username: str) -> None:
         """Update URL fields when GitHub username changes.
 
         Parameters
@@ -4819,7 +4819,7 @@ class ToolSelectionScreen(NavigationScreenBase):
         except Exception as e:
             logger.debug("Error updating GitHub-related fields: %s", e)
 
-    def _extract_username_from_url(self, url: str) -> str:
+    def __extract_username_from_url(self, url: str) -> str:
         """Extract username from a GitHub URL.
 
         Parameters
@@ -4843,7 +4843,7 @@ class ToolSelectionScreen(NavigationScreenBase):
 
         return ""
 
-    def _get_default_package_path(self) -> str:
+    def __get_default_package_path(self) -> str:
         """Get default package path based on current package name."""
         package_name = self.config.python_project_name
         if package_name and package_name != "my-awesome-project":
@@ -4851,7 +4851,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             return f"src/{package_name_clean}"
         return "src/my_awesome_project"
 
-    def _select_all_tools(self) -> None:
+    def __select_all_tools(self) -> None:
         """Select all available tools in the current section."""
         try:
             if not self.sections:
@@ -4983,9 +4983,9 @@ class ToolSelectionScreen(NavigationScreenBase):
             self.save_current_section()
             self.finalize_selection()
         elif button_id == "select_all_tools":
-            self._select_all_tools()
+            self.__select_all_tools()
         elif button_id == "copy_debug_btn":
-            self._copy_debug_output()
+            self.__copy_debug_output()
 
     def refresh_controls(self) -> None:
         """Refresh button states.
@@ -5197,7 +5197,7 @@ class ToolSelectionScreen(NavigationScreenBase):
             debug_container.remove()
         except Exception:
             # Debug panel doesn't exist, create it
-            self._rebuild_with_debug_panel()
+            self.__rebuild_with_debug_panel()
 
     def action_next(self) -> None:
         """Go to next step.
@@ -5385,7 +5385,7 @@ class SummaryScreen(Screen[None], DebugMixin):
         elif event.button.id == "back_btn":
             self.action_back()
         elif event.button.id == "copy_debug_btn":
-            self._copy_debug_output()
+            self.__copy_debug_output()
 
     def action_install(self) -> None:
         """Start the installation process."""
@@ -5414,7 +5414,7 @@ class SummaryScreen(Screen[None], DebugMixin):
             debug_container.remove()
         except Exception:
             # Debug panel doesn't exist, create it
-            self._rebuild_with_debug_panel()
+            self.__rebuild_with_debug_panel()
 
 
 class InstallationScreen(Screen[None]):
@@ -5635,26 +5635,26 @@ class InstallationScreen(Screen[None]):
             content = f.read()
 
         # Step 1: Update container references (name, runArgs, mounts) ONLY
-        content = self._update_container_references_only(content)
+        content = self.__update_container_references_only(content)
 
         # Step 2: Remove sections for tools that are NOT selected
-        content = self._remove_unselected_tool_sections(content)
+        content = self.__remove_unselected_tool_sections(content)
 
         # Step 3: Add PSI Header extension if selected
         if self.config.install_psi_header:
-            content = self._ensure_psi_header_section(content)
+            content = self.__ensure_psi_header_section(content)
         else:
-            content = self._remove_psi_header_section(content)
+            content = self.__remove_psi_header_section(content)
 
         # Step 4: Update containerEnv with Hatch environment variables if Python repository is configured
         if self.config.install_python_repository:
-            content = self._update_container_env_hatch_vars(content)
+            content = self.__update_container_env_hatch_vars(content)
 
         # Write the result
         with open(target_file, "w", encoding="utf-8") as f:
             f.write(content)
 
-    def _update_container_references_only(self, content: str) -> str:
+    def __update_container_references_only(self, content: str) -> str:
         """Update ONLY container references, preserving everything else exactly."""
 
         # Update display name
@@ -5683,7 +5683,7 @@ class InstallationScreen(Screen[None]):
             content,
         )
 
-    def _remove_unselected_tool_sections(self, content: str) -> str:
+    def __remove_unselected_tool_sections(self, content: str) -> str:
         """Remove entire sections for tools that are NOT selected."""
 
         # Create dynamic section-tool mapping
@@ -5716,15 +5716,15 @@ class InstallationScreen(Screen[None]):
 
             # Remove section if not selected
             if not section_selected:
-                content = self._remove_section(content, section_name, "extensions")
+                content = self.__remove_section(content, section_name, "extensions")
 
         # Handle user-configurable extension sections (Github, Markdown, Shell/Bash, etc.)
         # These are sections that are not tied to specific development tools
         for section_name, is_selected in self.config.selected_extension_sections.items():
             if not is_selected:
-                content = self._remove_section(content, section_name, "extensions")
+                content = self.__remove_section(content, section_name, "extensions")
                 # Also remove corresponding settings section if it exists
-                content = self._remove_section(content, f"{section_name} Settings", "settings")
+                content = self.__remove_section(content, f"{section_name} Settings", "settings")
 
         # Check settings sections
         for section_name in settings_sections:
@@ -5747,11 +5747,11 @@ class InstallationScreen(Screen[None]):
 
             # Remove settings section if not selected
             if not section_selected:
-                content = self._remove_section(content, f"{section_name} Settings", "settings")
+                content = self.__remove_section(content, f"{section_name} Settings", "settings")
 
         return content
 
-    def _remove_section(self, content: str, section_name: str, _section_type: str) -> str:
+    def __remove_section(self, content: str, section_name: str, _section_type: str) -> str:
         """Remove a section between begin/end markers and fix trailing commas."""
         begin_pattern = f"// #### Begin {section_name} ####"
         end_pattern = f"// #### End {section_name} ####"
@@ -5773,9 +5773,9 @@ class InstallationScreen(Screen[None]):
 
         # Fix trailing commas after section removal
         content = "\n".join(result_lines)
-        return self._fix_trailing_commas(content)
+        return self.__fix_trailing_commas(content)
 
-    def _fix_trailing_commas(self, content: str) -> str:
+    def __fix_trailing_commas(self, content: str) -> str:
         """Fix trailing commas in JSON that would be invalid after section removal."""
         lines = content.split("\n")
         result_lines = []
@@ -5825,14 +5825,14 @@ class InstallationScreen(Screen[None]):
 
         return "\n".join(final_lines)
 
-    def _ensure_psi_header_section(self, content: str) -> str:
+    def __ensure_psi_header_section(self, content: str) -> str:
         """Ensure PSI Header section is present and update templates with actual content."""
         # If PSI Header is configured, replace template placeholders with actual content
         if self.config.psi_header_templates:
-            content = self._update_psi_header_templates(content)
+            content = self.__update_psi_header_templates(content)
         return content
 
-    def _get_psi_languages_for_selected_tools(self) -> list[tuple[str, str]]:
+    def __get_psi_languages_for_selected_tools(self) -> list[tuple[str, str]]:
         """Get PSI header languages that should be included based on selected tools."""
         # Base languages to include if PSI header is enabled
         base_languages = [("*", "Default")]
@@ -5890,14 +5890,14 @@ class InstallationScreen(Screen[None]):
 
         return languages_to_include
 
-    def _update_psi_header_templates(self, content: str) -> str:
+    def __update_psi_header_templates(self, content: str) -> str:
         """Update PSI header templates with actual template content from user configuration."""
 
         # Generate the template content for each configured language
         template_entries = []
 
         # Get all languages that should have templates based on selected tools
-        languages_to_include = self._get_psi_languages_for_selected_tools()
+        languages_to_include = self.__get_psi_languages_for_selected_tools()
 
         for lang_id, _lang_name in languages_to_include:
             # Create the default template content similar to bash script
@@ -5997,12 +5997,12 @@ class InstallationScreen(Screen[None]):
 
         return "\n".join(result_lines)
 
-    def _remove_psi_header_section(self, content: str) -> str:
+    def __remove_psi_header_section(self, content: str) -> str:
         """Remove PSI Header section if not selected."""
-        content = self._remove_section(content, "PSI Header", "extensions")
-        return self._remove_section(content, "PSI Header Settings", "settings")
+        content = self.__remove_section(content, "PSI Header", "extensions")
+        return self.__remove_section(content, "PSI Header Settings", "settings")
 
-    def _update_container_env_hatch_vars(self, content: str) -> str:
+    def __update_container_env_hatch_vars(self, content: str) -> str:
         """Update containerEnv section to include Hatch environment variables."""
         if not self.config.install_python_repository:
             return content
@@ -6078,7 +6078,7 @@ class InstallationScreen(Screen[None]):
 
         return "\n".join(result_lines)
 
-    def _update_container_references_in_content(self, content: str) -> str:
+    def __update_container_references_in_content(self, content: str) -> str:
         """Update container name references in the content using regex."""
 
         # Update name
@@ -6107,7 +6107,7 @@ class InstallationScreen(Screen[None]):
             content,
         )
 
-    def _update_container_references(self, file_path: Path) -> None:
+    def __update_container_references(self, file_path: Path) -> None:
         """Update container name references in the file using sed-like replacements."""
         with open(file_path) as f:
             content = f.read()
@@ -6141,7 +6141,7 @@ class InstallationScreen(Screen[None]):
         with open(file_path, "w") as f:
             f.write(content)
 
-    def _append_remaining_devcontainer_content(self, temp_file: Path, source_file: Path) -> None:
+    def __append_remaining_devcontainer_content(self, temp_file: Path, source_file: Path) -> None:
         """Append the remaining content after extensions array from source file."""
         with open(source_file) as f:
             lines = f.readlines()
@@ -6167,7 +6167,7 @@ class InstallationScreen(Screen[None]):
         with open(temp_file, "a") as f:
             f.writelines(remaining_lines)
 
-    def _extract_devcontainer_section(self, start_marker: str, end_marker: str) -> list[str]:
+    def __extract_devcontainer_section(self, start_marker: str, end_marker: str) -> list[str]:
         """Extract a section from the devcontainer.json file."""
         source_file = self.source_dir / ".devcontainer" / "devcontainer.json"
 
@@ -6201,7 +6201,7 @@ class InstallationScreen(Screen[None]):
 
         return result
 
-    def _generate_psi_header_settings(self) -> dict[str, Any]:
+    def __generate_psi_header_settings(self) -> dict[str, Any]:
         """Generate PSI Header specific settings."""
         if not self.config.install_psi_header:
             return {}
@@ -6471,7 +6471,7 @@ class InstallationScreen(Screen[None]):
             )
 
         # Configure Hatch publishing based on repository settings
-        content = self._update_hatch_publish_config(content)
+        content = self.__update_hatch_publish_config(content)
 
         with open(target_file, "w") as f:
             f.write(content)
@@ -6494,16 +6494,16 @@ class InstallationScreen(Screen[None]):
             )
 
         # Configure Hatch publishing based on repository settings
-        content = self._update_hatch_publish_config(content)
+        content = self.__update_hatch_publish_config(content)
 
         with open(target_file, "w") as f:
             f.write(content)
 
         # Create environment variables example file if repository is configured
         if self.config.install_python_repository:
-            self._create_environment_variables_example()
+            self.__create_environment_variables_example()
 
-    def _create_environment_variables_example(self) -> None:
+    def __create_environment_variables_example(self) -> None:
         """Create an example .env file with the required environment variables for publishing."""
         env_file = Path(self.config.project_path) / ".env.example"
 
@@ -6572,7 +6572,7 @@ HATCH_INDEX_REPO={publish_url}
         with open(env_file, "w") as f:
             f.write(env_content)
 
-    def _update_hatch_publish_config(self, content: str) -> str:
+    def __update_hatch_publish_config(self, content: str) -> str:
         """Update the [tool.hatch.publish.index] section based on repository configuration."""
         if not self.config.install_python_repository:
             # If repository publishing is disabled, set disable = true
@@ -6863,11 +6863,11 @@ class DynamicDevContainerApp(App[None]):
         )
 
         # Start background loading of tool descriptions
-        self._start_background_description_loading()
+        self.__start_background_description_loading()
 
         logger.debug("DynamicDevContainerApp initialized successfully")
 
-    def _start_background_description_loading(self) -> None:
+    def __start_background_description_loading(self) -> None:
         """Start background loading of tool descriptions for all available tools."""
         all_tools = set()
 
@@ -6890,12 +6890,12 @@ class DynamicDevContainerApp(App[None]):
         """Called when app is mounted."""
         if self.start_screen is not None:
             # Jump directly to specified screen
-            self._jump_to_screen(self.start_screen, self.start_item)
+            self.__jump_to_screen(self.start_screen, self.start_item)
         else:
             # Normal flow: start with welcome screen
             self.push_screen(WelcomeScreen(), self.after_welcome)
 
-    def _jump_to_screen(self, screen: int, item: int | None = None) -> None:
+    def __jump_to_screen(self, screen: int, item: int | None = None) -> None:
         """Jump directly to a specific screen, bypassing earlier screens.
 
         Parameters
