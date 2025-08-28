@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 # Add missing imports for type checking and protocol
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, cast
 
 # Import configuration classes
 from installer.config import ProjectConfig
@@ -59,92 +59,14 @@ from installer.mise_parser import MiseParser
 # Import tool management utilities
 from installer.tool_manager import ToolManager
 
+# Import protocol definitions
+if TYPE_CHECKING:
+    from installer.protocols import DevContainerApp
+
 if TYPE_CHECKING:
     from textual.events import Focus, Key  # type: ignore[import,unused-ignore]
     from textual.timer import Timer  # type: ignore[import,unused-ignore]
     from textual.widget import Widget
-
-
-# Define a protocol for our app interface
-class DevContainerApp(Protocol):
-    """Protocol defining the interface needed by screens."""
-
-    def after_welcome(self, result: None = None) -> None:
-        """Called after welcome screen completes.
-
-        Parameters
-        ----------
-        result : None, optional
-            Unused parameter for callback compatibility, by default None
-
-        """
-        ...
-
-    def after_project_config(self, result: None = None) -> None:
-        """Called after project config screen completes.
-
-        Parameters
-        ----------
-        result : None, optional
-            Unused parameter for callback compatibility, by default None
-
-        """
-        ...
-
-    def after_tool_selection(self, result: None = None) -> None:
-        """Called after tool selection screen completes.
-
-        Parameters
-        ----------
-        result : None, optional
-            Unused parameter for callback compatibility, by default None
-
-        """
-        ...
-
-    def after_python_repository(self, result: None = None) -> None:
-        """Called after Python repository screen completes.
-
-        Parameters
-        ----------
-        result : None, optional
-            Unused parameter for callback compatibility, by default None
-
-        """
-        ...
-
-    def after_python_project(self, result: None = None) -> None:
-        """Called after Python project screen completes.
-
-        Parameters
-        ----------
-        result : None, optional
-            Unused parameter for callback compatibility, by default None
-
-        """
-        ...
-
-    def after_tool_versions(self, result: None = None) -> None:
-        """Called after tool versions screen completes.
-
-        Parameters
-        ----------
-        result : None, optional
-            Unused parameter for callback compatibility, by default None
-
-        """
-        ...
-
-    def after_summary(self, result: None = None) -> None:
-        """Called after summary screen completes.
-
-        Parameters
-        ----------
-        result : None, optional
-            Unused parameter for callback compatibility, by default None
-
-        """
-        ...
 
 
 # Initialize logger for this module
