@@ -46,7 +46,7 @@ jobs:
           fetch-tags: true
 
       - name: Log Into Registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -55,7 +55,7 @@ jobs:
       # During a release workflow the new git tag is provided and is automatically used by this step to generate the new image tags.
       - name: Extract Docker Metadata
         id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804
+        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f
         with:
           images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
           tags: |
