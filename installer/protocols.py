@@ -79,6 +79,17 @@ class DevContainerApp(Protocol):
         """
         ...
 
+    def after_extensions(self, result: None = None) -> None:
+        """Called after extension selection screen completes.
+
+        Parameters
+        ----------
+        result : None, optional
+            Unused parameter for callback compatibility, by default None
+
+        """
+        ...
+
     def after_summary(self, result: None = None) -> None:
         """Called after summary screen completes.
 
