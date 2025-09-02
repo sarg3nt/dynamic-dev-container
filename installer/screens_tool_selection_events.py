@@ -311,7 +311,7 @@ class ToolSelectionEventMixin:
 
             # Refresh display
             self.refresh_tools()  # type: ignore[attr-defined]
-            self.refresh_controls()  # type: ignore[attr-defined]
+            self.refresh_configuration()  # type: ignore[attr-defined]
 
     def __navigate_to_previous_section(self) -> None:
         """Navigate to the previous tool section."""
