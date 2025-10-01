@@ -26,7 +26,7 @@ jobs:
             security.ubuntu.com:80
 
       - name: Checkout Repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
 
       - name: Install ShellCheck
         run: |
@@ -78,7 +78,7 @@ jobs:
             github.com:443
 
       - name: Checkout Repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
 
       - name: Run Hadolint
         uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
@@ -101,7 +101,7 @@ jobs:
             pypi.org:443
 
       - name: Checkout Repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
 
       - name: Install Python YAML Parser
         run: |
