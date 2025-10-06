@@ -26,7 +26,7 @@ mypy~=1.18.2
 # https://pypi.org/project/watchdog/#description
 watchdog~=6.0
 # https://pypi.org/project/pylint/
-pylint~=3.3.8
+pylint~=3.3.9
 # https://pypi.org/project/python-dotenv/
 python-dotenv~=1.1.1
 
