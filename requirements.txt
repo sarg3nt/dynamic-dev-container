@@ -6,7 +6,7 @@
 ### Pytest for testing, loguru for advanced logging, requests for HTTP requests, and ruff for linting.
 ### Watchdog is used for our custom pybuild.sh file to make building Python packages easier.
 # https://pypi.org/project/hatch/
-hatch~=1.14.2
+hatch~=1.15.1
 # https://pypi.org/project/pytest/
 pytest~=8.4.2
 # https://pypi.org/project/pytest-mock/
