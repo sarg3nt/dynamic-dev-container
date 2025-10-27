@@ -11,7 +11,7 @@
 
 # Use mise from package manager or smaller binary
 # https://github.com/jdx/mise/pkgs/container/mise/versions
-FROM jdxcode/mise:2025.10.11@sha256:9933ecc55a5f17bfb8e68f258da4f642da642ce263f9805677439138699b96ae AS mise
+FROM jdxcode/mise:2025.10.18@sha256:f6310033f2c576769d28beb860c627b211ca88c84014f7e850e0bc1b67b86d61 AS mise
 
 # Extract only the mise binary and strip it
 RUN strip /usr/local/bin/mise || true
