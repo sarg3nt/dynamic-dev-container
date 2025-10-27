@@ -28,7 +28,7 @@ watchdog~=6.0
 # https://pypi.org/project/pylint/
 pylint~=3.3.8
 # https://pypi.org/project/python-dotenv/
-python-dotenv~=1.1.1
+python-dotenv~=1.2.1
 
 
 # https://pypi.org/project/fabric/
