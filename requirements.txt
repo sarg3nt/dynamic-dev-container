@@ -20,7 +20,7 @@ requests~=2.32
 # https://pypi.org/project/types-requests/
 types-requests~=2.32
 # https://pypi.org/project/ruff/
-ruff~=0.14.3
+ruff~=0.14.4
 # https://pypi.org/project/mypy/
 mypy~=1.18.2
 # https://pypi.org/project/watchdog/#description
