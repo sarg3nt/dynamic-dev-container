@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2
         with:
           disable-sudo: true
           egress-policy: block
@@ -55,7 +55,7 @@ jobs:
       # During a release workflow the new git tag is provided and is automatically used by this step to generate the new image tags.
       - name: Extract Docker Metadata
         id: meta
-        uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051
         with:
           images: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
           tags: |
