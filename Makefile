@@ -1,7 +1,8 @@
 IMAGE_NAME := ghcr.io/sarg3nt/dynamic-dev-container
 IMAGE_TAG := 1.0.4
 GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD | sed 's/[\/_]/-/g')
-CURRENT_DIR := $(shell pwd)
+# Get absolute path - works on both Linux and macOS
+CURRENT_DIR := $(shell cd "$(shell pwd)" && pwd)
 
 .PHONY: build
 build:

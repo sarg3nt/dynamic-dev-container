@@ -50,13 +50,18 @@ EOF
 
 # Check for required dependencies
 check_dependencies() {
+  # Skip xxd check on macOS - not needed for native Docker
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    return 0
+  fi
+
   if ! command -v xxd >/dev/null 2>&1; then
     echo "xxd command not found."
-    
+
     # Detect OS type
     local os_type=""
     local install_cmd=""
-    
+
     if command -v apt >/dev/null 2>&1; then
       os_type="debian"
       install_cmd="sudo apt update && sudo apt install -y xxd"
@@ -71,11 +76,11 @@ check_dependencies() {
       echo "Please install xxd manually and try again."
       exit 1
     fi
-    
+
     echo "Detected ${os_type}-based system."
     read -r -p "Would you like to install xxd now? [Y/n]: " response
     response=${response:-Y}  # Default to Y if empty
-    
+
     case "$response" in
       [yY]|[yY][eE][sS])
         echo "Installing xxd..."
@@ -120,7 +125,16 @@ open_vs_code() {
 
   # Open devcontainer
   local host_path workspace uri_type uri_suffix uri uri_hex
-  host_path=$(wslpath -w "$PWD" | sed 's,\\,\\\\,g')
+
+  # Convert path based on OS
+  if command -v wslpath >/dev/null 2>&1; then
+    # WSL environment - convert to Windows path
+    host_path=$(wslpath -w "$PWD" | sed 's,\\,\\\\,g')
+  else
+    # macOS/Linux - use path as-is
+    host_path="$PWD"
+  fi
+
   workspace="/workspaces/$(basename "$PWD")"
 
   if [[ -f "$code_ws_file" ]]; then

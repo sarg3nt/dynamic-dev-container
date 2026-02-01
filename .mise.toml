@@ -9,7 +9,7 @@ MISE_PYTHON_COMPILE = false
 [tools]
 #### Begin Python
 #version#
-python = '3.13'
+python = "3.13.11"
 #### End Python
 
 #### Begin HashiCorp Tools

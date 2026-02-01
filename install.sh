@@ -1,8 +1,26 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # TUI version of install.sh using dialog for a better user experience.
 # Installs .devcontainer and other files into a project directory to use the dev container in a new project.
 # cspell:ignore openbao myapp sudermanjr kubens DIALOGRC defaultno noconfirm pyproject sles
+
+# Check bash version (requires 4.0+ for associative arrays)
+if ((BASH_VERSINFO[0] < 4)); then
+  echo "Error: This script requires Bash 4.0 or later."
+  echo "Current version: ${BASH_VERSION}"
+  echo ""
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    echo "On macOS, install a newer bash with Homebrew:"
+    echo "  brew install bash"
+    echo ""
+    echo "Then run this script with the new bash:"
+    echo "  /opt/homebrew/bin/bash install.sh"
+    echo "Or add Homebrew bash to your PATH and re-run."
+  else
+    echo "Please install bash 4.0 or later and try again."
+  fi
+  exit 1
+fi
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -122,6 +140,16 @@ EOF
 
 # Detect OS and package manager
 detect_os_and_package_manager() {
+  # Check for macOS first
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    if command -v brew >/dev/null 2>&1; then
+      echo "brew"
+    else
+      echo "unknown"
+    fi
+    return
+  fi
+
   if [[ -f /etc/os-release ]]; then
     # shellcheck disable=SC1091
     source /etc/os-release
@@ -177,6 +205,17 @@ detect_os_and_package_manager() {
     fi
   else
     echo "unknown"
+  fi
+}
+
+# Portable sed -i function that works on both macOS and Linux
+sed_inplace() {
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    # macOS requires a backup extension (use empty string with -i '')
+    sed -i '' "$@"
+  else
+    # Linux sed doesn't need the extension argument
+    sed_inplace "$@"
   fi
 }
 
@@ -1327,9 +1366,9 @@ update_dev_sh() {
   cp "dev.sh" "$temp_file"
   
   # Update the variables at the top of the file
-  sed -i "s/docker_exec_command=\"[^\"]*\"/docker_exec_command=\"${docker_exec_command}\"/" "$temp_file"
-  sed -i "s/project_name=\"[^\"]*\"/project_name=\"${project_name}\"/" "$temp_file"
-  sed -i "s/container_name=\"[^\"]*\"/container_name=\"${container_name}\"/" "$temp_file"
+  sed_inplace "s/docker_exec_command=\"[^\"]*\"/docker_exec_command=\"${docker_exec_command}\"/" "$temp_file"
+  sed_inplace "s/project_name=\"[^\"]*\"/project_name=\"${project_name}\"/" "$temp_file"
+  sed_inplace "s/container_name=\"[^\"]*\"/container_name=\"${container_name}\"/" "$temp_file"
   
   mv "$temp_file" "${project_path}/dev.sh"
   chmod +x "${project_path}/dev.sh"
@@ -1753,8 +1792,8 @@ update_pyproject_toml() {
     fi
     
     # Update project name and package references
-    sed -i "s|name = \"my-awesome-project\"|name = \"$PYTHON_PROJECT_NAME\"|" "$pyproject_file"
-    sed -i "s|my_awesome_project|$package_name|g" "$pyproject_file"
+    sed_inplace "s|name = \"my-awesome-project\"|name = \"$PYTHON_PROJECT_NAME\"|" "$pyproject_file"
+    sed_inplace "s|my_awesome_project|$package_name|g" "$pyproject_file"
     
     # Create the package directory structure
     mkdir -p "${project_path}/src/${package_name}"
@@ -1764,12 +1803,12 @@ update_pyproject_toml() {
 
   # Update project description
   if [[ -n "$PYTHON_PROJECT_DESCRIPTION" ]]; then
-    sed -i "s|description = \"A brief description of your project\"|description = \"$PYTHON_PROJECT_DESCRIPTION\"|" "$pyproject_file"
+    sed_inplace "s|description = \"A brief description of your project\"|description = \"$PYTHON_PROJECT_DESCRIPTION\"|" "$pyproject_file"
   fi
 
   # Update license
   if [[ -n "$PYTHON_LICENSE" ]]; then
-    sed -i "s|license = \"MIT\"|license = \"$PYTHON_LICENSE\"|" "$pyproject_file"
+    sed_inplace "s|license = \"MIT\"|license = \"$PYTHON_LICENSE\"|" "$pyproject_file"
   fi
 
   # Update keywords
@@ -1778,20 +1817,20 @@ update_pyproject_toml() {
     # Remove spaces, split by comma, and format as TOML array
     local keywords_array
     keywords_array=$(echo "$PYTHON_KEYWORDS" | sed 's/ //g' | sed 's/,/", "/g' | sed 's/^/["/' | sed 's/$/"]/')
-    sed -i "s|keywords = \[\"python\", \"cli\", \"automation\"\]|keywords = $keywords_array|" "$pyproject_file"
+    sed_inplace "s|keywords = \[\"python\", \"cli\", \"automation\"\]|keywords = $keywords_array|" "$pyproject_file"
   fi
 
   # Update author information
   if [[ -n "$PYTHON_AUTHOR_NAME" && -n "$PYTHON_AUTHOR_EMAIL" ]]; then
-    sed -i "s|{ name = \"Your Name\", email = \"your.email@example.com\" }|{ name = \"$PYTHON_AUTHOR_NAME\", email = \"$PYTHON_AUTHOR_EMAIL\" }|" "$pyproject_file"
+    sed_inplace "s|{ name = \"Your Name\", email = \"your.email@example.com\" }|{ name = \"$PYTHON_AUTHOR_NAME\", email = \"$PYTHON_AUTHOR_EMAIL\" }|" "$pyproject_file"
   fi
 
   # Update GitHub URLs
   if [[ -n "$PYTHON_GITHUB_USERNAME" && -n "$PYTHON_GITHUB_PROJECT" ]]; then
     local base_url="https://github.com/${PYTHON_GITHUB_USERNAME}/${PYTHON_GITHUB_PROJECT}"
-    sed -i "s|https://github.com/yourusername/my-awesome-project/blob/main/README.md|${base_url}/blob/main/README.md|" "$pyproject_file"
-    sed -i "s|https://github.com/yourusername/my-awesome-project/issues|${base_url}/issues|" "$pyproject_file"
-    sed -i "s|https://github.com/yourusername/my-awesome-project|${base_url}|g" "$pyproject_file"
+    sed_inplace "s|https://github.com/yourusername/my-awesome-project/blob/main/README.md|${base_url}/blob/main/README.md|" "$pyproject_file"
+    sed_inplace "s|https://github.com/yourusername/my-awesome-project/issues|${base_url}/issues|" "$pyproject_file"
+    sed_inplace "s|https://github.com/yourusername/my-awesome-project|${base_url}|g" "$pyproject_file"
   fi
 }
 
@@ -1815,7 +1854,8 @@ generate_devcontainer_json() {
   
   # Read the base devcontainer.json up to extensions
   echo "DEBUG: About to process base devcontainer.json with awk..." >&2
-  awk '/^      "extensions": \[/,/^      \],$/{if(/^      "extensions": \[/) print; else if(/^      \],$/) exit; else next} !/^      "extensions": \[/' .devcontainer/devcontainer.json | head -n -1 > "$temp_file"
+  # Use sed instead of head -n -1 for macOS compatibility (head -n -1 is GNU-specific)
+  awk '/^      "extensions": \[/,/^      \],$/{if(/^      "extensions": \[/) print; else if(/^      \],$/) exit; else next} !/^      "extensions": \[/' .devcontainer/devcontainer.json | sed '$d' > "$temp_file"
   local awk_exit=$?
   echo "DEBUG: Base awk processing completed with exit code: $awk_exit" >&2
   
@@ -1833,10 +1873,10 @@ generate_devcontainer_json() {
   fi
   
   # Update the name and runArgs in the temp file
-  sed -i "s/\"name\": \"[^\"]*\"/\"name\": \"${display_name}\"/" "$temp_file"
-  sed -i "s/--name=dynamic-dev-container/--name=${container_name}/g" "$temp_file"
-  sed -i "s/dynamic-dev-container-shellhistory/${container_name}-shellhistory/g" "$temp_file"
-  sed -i "s/dynamic-dev-container-plugins/${container_name}-plugins/g" "$temp_file"
+  sed_inplace "s/\"name\": \"[^\"]*\"/\"name\": \"${display_name}\"/" "$temp_file"
+  sed_inplace "s/--name=dynamic-dev-container/--name=${container_name}/g" "$temp_file"
+  sed_inplace "s/dynamic-dev-container-shellhistory/${container_name}-shellhistory/g" "$temp_file"
+  sed_inplace "s/dynamic-dev-container-plugins/${container_name}-plugins/g" "$temp_file"
   
   # Start extensions array
   echo '      "extensions": [' >> "$temp_file"
@@ -2015,7 +2055,7 @@ generate_devcontainer_json() {
   last_ext_line=$(grep -n '^\s*".*",' "$temp_file" | tail -n 1 | cut -d: -f1)
   if [[ -n "$last_ext_line" ]]; then
     echo "DEBUG: Found trailing comma at line $last_ext_line, removing it" >&2
-    sed -i "${last_ext_line}s/,$//" "$temp_file"
+    sed_inplace "${last_ext_line}s/,$//" "$temp_file"
     echo "DEBUG: Trailing comma removed successfully" >&2
   else
     echo "DEBUG: No trailing comma found" >&2
@@ -2194,7 +2234,7 @@ generate_devcontainer_json() {
       [[ -n "$line_num" ]] || continue
       # Only add comma if line doesn't already have one
       if ! sed -n "${line_num}p" "$temp_file" | grep -q ',$'; then
-        sed -i "${line_num}s/$/,/" "$temp_file"
+        sed_inplace "${line_num}s/$/,/" "$temp_file"
       fi
     done <<< "$setting_line_numbers"
     
@@ -2202,7 +2242,7 @@ generate_devcontainer_json() {
     last_setting_line=$(grep -n '^        "[^"]*":' "$temp_file" | tail -n 1 | cut -d: -f1)
     if [[ -n "$last_setting_line" ]]; then
       echo "DEBUG: Removing comma from last setting line: $last_setting_line" >&2
-      sed -i "${last_setting_line}s/,$//" "$temp_file"
+      sed_inplace "${last_setting_line}s/,$//" "$temp_file"
     fi
   fi
   
