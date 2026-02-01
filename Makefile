@@ -12,6 +12,14 @@ build:
 build-no-cache:
 	docker build --build-arg GITHUB_API_TOKEN=${GITHUB_TOKEN} --progress=plain --no-cache -t "$(IMAGE_NAME):$(IMAGE_TAG)-$(GIT_BRANCH)" .
 
+.PHONY: build-multiplatform
+build-multiplatform:
+	docker buildx build --platform linux/amd64,linux/arm64 --build-arg GITHUB_API_TOKEN=${GITHUB_TOKEN} -t "$(IMAGE_NAME):$(IMAGE_TAG)-$(GIT_BRANCH)" --load .
+
+.PHONY: build-push-multiplatform
+build-push-multiplatform:
+	docker buildx build --platform linux/amd64,linux/arm64 --build-arg GITHUB_API_TOKEN=${GITHUB_TOKEN} -t "$(IMAGE_NAME):$(IMAGE_TAG)-$(GIT_BRANCH)" --push .
+
 .PHONY: run
 run:
 	docker run --mount type=bind,source="${CURRENT_DIR}",target=/workspaces/working \
