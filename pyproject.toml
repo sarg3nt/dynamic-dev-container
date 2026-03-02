@@ -46,7 +46,7 @@ dependencies = [
 # Development tools (install with: pip install -e .[dev])
 dev = [
   "hatch>=1.14,<2.0",           # Build and project management tool
-  "pytest>=8.3,<9.0",          # Testing framework
+  "pytest>=8.3,<10.0",          # Testing framework
   "pytest-mock>=3.14,<4.0",    # Mock objects for pytest
   "pytest-cov>=6.0,<7.0",      # Coverage reporting for tests
   "ruff>=0.9,<1.0",             # Fast Python linter and formatter
@@ -150,7 +150,7 @@ disable = false  # Set to true to disable publishing entirely
 # Development environment configuration for Hatch
 [tool.hatch.envs.default]
 dependencies = [
-  "pytest>=8.3,<9.0",
+  "pytest>=8.3,<10.0",
   "pytest-mock>=3.14,<4.0",
   "pytest-cov>=6.0,<7.0",
   "ruff>=0.9,<1.0",
