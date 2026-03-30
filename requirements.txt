@@ -16,7 +16,7 @@ pytest-cov~=6.3
 # https://pypi.org/project/loguru/
 loguru~=0.7.3
 # https://pypi.org/project/requests/
-requests~=2.32
+requests~=2.33
 # https://pypi.org/project/types-requests/
 types-requests~=2.32
 # https://pypi.org/project/ruff/
