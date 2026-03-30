@@ -18,7 +18,7 @@ loguru~=0.7.3
 # https://pypi.org/project/requests/
 requests~=2.32
 # https://pypi.org/project/types-requests/
-types-requests~=2.32
+types-requests~=2.33
 # https://pypi.org/project/ruff/
 ruff~=0.15.7
 # https://pypi.org/project/mypy/
