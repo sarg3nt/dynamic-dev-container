@@ -47,7 +47,7 @@ dependencies = [
 dev = [
   "hatch>=1.14,<2.0",           # Build and project management tool
   "pytest>=9.0.3,<10.0",          # Testing framework
-  "pytest-mock>=3.14,<4.0",    # Mock objects for pytest
+  "pytest-mock>=3.15.1,<4.0",    # Mock objects for pytest
   "pytest-cov>=7.1.0,<8.0",      # Coverage reporting for tests
   "ruff>=0.9,<1.0",             # Fast Python linter and formatter
   "mypy>=1.17,<2.0",            # Static type checker
@@ -151,7 +151,7 @@ disable = false  # Set to true to disable publishing entirely
 [tool.hatch.envs.default]
 dependencies = [
   "pytest>=9.0.3,<10.0",
-  "pytest-mock>=3.14,<4.0",
+  "pytest-mock>=3.15.1,<4.0",
   "pytest-cov>=7.1.0,<8.0",
   "ruff>=0.9,<1.0",
   "mypy>=1.17,<2.0",
