@@ -28,7 +28,6 @@ kubectx = 'latest'
 kubens = 'latest'
 k9s = 'latest'
 helm = 'latest'
-kubebench = 'latest'
 #### End Kubernetes
 
 #### Begin Kubernetes Utilities
@@ -69,16 +68,8 @@ powershell = 'latest'
 #### Begin Miscellaneous Tools
 gitui = 'latest'
 cosign = 'latest'
-tealdeer = 'latest'
-micro = 'latest'
 shellcheck = "latest"
 #### End Miscellaneous Tools
-
-# See: https://mise.jdx.dev/dev-tools/aliases.html for specs on the alias section.
-[alias]
-kubebench = 'asdf:sarg3nt/asdf-kube-bench'
-tealdeer = 'asdf:sarg3nt/asdf-tealdeer'
-micro = 'asdf:sarg3nt/asdf-micro'
 
 [settings]
 experimental = true
