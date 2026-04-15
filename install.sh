@@ -215,7 +215,7 @@ sed_inplace() {
     sed -i '' "$@"
   else
     # Linux sed doesn't need the extension argument
-    sed_inplace "$@"
+    sed -i "$@"
   fi
 }
 
