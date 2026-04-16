@@ -138,69 +138,72 @@ install_kubectl_plugins() {
   fi
 
   log_info "Installing ${#plugins[@]} kubectl plugins: ${plugins[*]}"
-  
-  # Try batch installation with retry logic
-  local attempt=1
-  local batch_success=false
-  
-  while [[ $attempt -le $MAX_INSTALL_ATTEMPTS && $batch_success == false ]]; do
-    log_info "Attempting batch plugin installation (attempt $attempt/$MAX_INSTALL_ATTEMPTS)..."
-    
-    if krew install "${plugins[@]}" 2>&1; then
-      log_success "Batch plugin installation completed successfully!"
-      batch_success=true
-      return 0
-    else
-      if [[ $attempt -lt $MAX_INSTALL_ATTEMPTS ]]; then
-        log_warning "Batch installation failed on attempt $attempt, retrying in $RETRY_DELAY seconds..."
-        sleep "$RETRY_DELAY"
-      else
-        log_warning "Batch installation failed after $MAX_INSTALL_ATTEMPTS attempts, trying individual installation"
-      fi
-    fi
-    
-    ((attempt++))
-  done
-  
-  # If batch install fails, try individual plugins
+
+  # Skip the batch path entirely. `krew install` with multiple plugins exits
+  # non-zero if any single plugin fails, even when every other plugin in the
+  # batch installed successfully. On arm64 some plugins (e.g. access-matrix)
+  # don't publish a binary for this platform, so the batch always "fails" and
+  # we fall back to the individual loop anyway. Going straight to individual
+  # installs avoids three minutes of pointless retries.
   local failed_plugins=()
   local succeeded_plugins=()
-  
+  local unavailable_plugins=()
+
   for plugin in "${plugins[@]}"; do
     log_info "Installing plugin: $plugin"
-    
+
     local plugin_attempt=1
-    local plugin_success=false
-    
-    while [[ $plugin_attempt -le $MAX_INSTALL_ATTEMPTS && $plugin_success == false ]]; do
-      if krew install "$plugin" 2>&1; then
+    local plugin_done=false
+    local last_output=""
+
+    while [[ $plugin_attempt -le $MAX_INSTALL_ATTEMPTS && $plugin_done == false ]]; do
+      if last_output=$(krew install "$plugin" 2>&1); then
+        printf '%s\n' "$last_output"
         log_success "Successfully installed plugin: $plugin"
         succeeded_plugins+=("$plugin")
-        plugin_success=true
-      else
-        if [[ $plugin_attempt -lt $MAX_INSTALL_ATTEMPTS ]]; then
-          log_warning "Failed to install $plugin (attempt $plugin_attempt), retrying..."
-          sleep "$RETRY_DELAY"
-        else
-          log_error "Failed to install $plugin after $MAX_INSTALL_ATTEMPTS attempts"
-          failed_plugins+=("$plugin")
-        fi
+        plugin_done=true
+        break
       fi
-      
+
+      printf '%s\n' "$last_output"
+
+      # Krew reports platform-unavailable plugins as:
+      #   plugin "<name>" does not offer installation for this platform
+      # That is a permanent upstream fact, not a transient failure, so record
+      # it as unavailable and stop retrying.
+      if grep -qF "does not offer installation for this platform" <<< "$last_output"; then
+        log_warning "Plugin $plugin is not available for this platform ($(uname -m)); skipping."
+        unavailable_plugins+=("$plugin")
+        plugin_done=true
+        break
+      fi
+
+      if [[ $plugin_attempt -lt $MAX_INSTALL_ATTEMPTS ]]; then
+        log_warning "Failed to install $plugin (attempt $plugin_attempt), retrying..."
+        sleep "$RETRY_DELAY"
+      else
+        log_error "Failed to install $plugin after $MAX_INSTALL_ATTEMPTS attempts"
+        failed_plugins+=("$plugin")
+      fi
+
       ((plugin_attempt++))
     done
   done
-  
+
   # Report results
   if [[ ${#succeeded_plugins[@]} -gt 0 ]]; then
     log_success "Successfully installed ${#succeeded_plugins[@]} plugins: ${succeeded_plugins[*]}"
   fi
-  
+
+  if [[ ${#unavailable_plugins[@]} -gt 0 ]]; then
+    log_warning "Skipped ${#unavailable_plugins[@]} plugins not available on this platform: ${unavailable_plugins[*]}"
+  fi
+
   if [[ ${#failed_plugins[@]} -gt 0 ]]; then
-    log_warning "Failed to install ${#failed_plugins[@]} plugins: ${failed_plugins[*]}"
+    log_error "Failed to install ${#failed_plugins[@]} plugins: ${failed_plugins[*]}"
     return 1
   fi
-  
+
   return 0
 }
 
