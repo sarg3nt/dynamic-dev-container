@@ -3,7 +3,9 @@
 # all tools defined in .mise.toml during the build process and any krew plugins defined.
 # cspell:ignore krew
 
-FROM ghcr.io/sarg3nt/dynamic-dev-container:latest
+# TODO: revert to ":latest" once the arm64 base image is published to ghcr.io.
+# Pinned to the locally-built tag while we iterate on M-series support.
+FROM ghcr.io/sarg3nt/dynamic-dev-container:1.0.4-support-macs
 
 # Switch to vscode user for tool installation
 USER vscode

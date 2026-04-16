@@ -30,6 +30,8 @@ package_install() {
   log "Installing essential system packages in batch" "green"
   dnf install -y \
     bash-completion \
+    binutils \
+    bzip2-libs \
     ca-certificates \
     docker-ce-cli \
     docker-buildx-plugin \
