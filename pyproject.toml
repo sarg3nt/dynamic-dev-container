@@ -50,7 +50,7 @@ dev = [
   "pytest-mock>=3.14,<4.0",    # Mock objects for pytest
   "pytest-cov>=7.1.0,<8.0",      # Coverage reporting for tests
   "ruff>=0.9,<1.0",             # Fast Python linter and formatter
-  "mypy>=1.17,<2.0",            # Static type checker
+  "mypy>=2.1.0,<3.0",            # Static type checker
   "watchdog>=6.0,<7.0",        # File system event monitoring
   "python-dotenv>=1.1,<2.0",   # Environment variable management
 ]
@@ -154,7 +154,7 @@ dependencies = [
   "pytest-mock>=3.14,<4.0",
   "pytest-cov>=7.1.0,<8.0",
   "ruff>=0.9,<1.0",
-  "mypy>=1.17,<2.0",
+  "mypy>=2.1.0,<3.0",
 ]
 
 [tool.hatch.envs.default.scripts]
@@ -166,7 +166,7 @@ type-check = "mypy {args:src tests}"
 all = ["lint", "format", "type-check", "test-cov"]
 
 [tool.hatch.envs.types]
-extra-dependencies = ["mypy>=1.17,<2.0"]
+extra-dependencies = ["mypy>=2.1.0,<3.0"]
 
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src tests}"
