@@ -11,9 +11,10 @@ main() {
 
   log "30-install-other-apps.sh" "blue"
   # Python 3.13 is already installed via mise config - no need to install again
+  # /commandhistory is created in 10_install_system_packages.sh (runs as root;
+  # the build has no working sudo).
   add_fzf_completions_files
   add_vscode_extensions_cache
-  add_bash_history_cache
   install_omz_plugins
   clean_up
   date >/home/vscode/build_date.txt
@@ -23,13 +24,6 @@ add_vscode_extensions_cache() {
   log "Adding VSCode Extensions Cache Support" "green"
   mkdir -p "/home/${USERNAME}/.vscode-server/extensions"
   chown -R "${USERNAME}" "/home/${USERNAME}/.vscode-server"
-}
-
-add_bash_history_cache() {
-  log "Adding Bash History Cache Support" "blue"
-  sudo mkdir /commandhistory
-  sudo touch /commandhistory/.bash_history
-  sudo chown -R "$USERNAME" "/commandhistory"
 }
 
 add_fzf_completions_files() {
@@ -134,7 +128,9 @@ install_omz_plugins() {
 clean_up() {
   echo ""
   log "Deleting files from /tmp" "green"
-  sudo rm -rf /tmp/* || true
+  # No sudo: the build runs this as the dev user and has no working sudo.
+  # Best-effort — root-owned entries are left to 10.sh's root cleanup.
+  rm -rf /tmp/* 2>/dev/null || true
 }
 
 # Run main

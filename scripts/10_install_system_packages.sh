@@ -61,6 +61,17 @@ install_dev_container_features() {
   cd - > /dev/null
 }
 
+# /commandhistory is a root-owned dir chowned to the dev user so shell history
+# persists across container rebuilds. Created here because 10.sh runs as root:
+# the image build has no working sudo, so this can't live in the vscode-context
+# scripts (20/30). Runs after common-utils, which creates the dev user.
+add_bash_history_cache() {
+  log "Creating persistent bash history directory" "green"
+  mkdir -p /commandhistory
+  touch /commandhistory/.bash_history
+  chown -R "${USERNAME}" /commandhistory
+}
+
 cleanup() {
   log "Running comprehensive cleanup" "green"
   
@@ -95,6 +106,7 @@ main() {
   setup
   package_install
   install_dev_container_features
+  add_bash_history_cache
   cleanup
 }
 

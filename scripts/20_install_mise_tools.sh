@@ -45,19 +45,12 @@ install_mise_packages() {
 cleanup() {
   log "Running cleanup for container size optimization" "blue"
 
-  log "Deleting files from /tmp" "green"
-  sudo rm -rfv /tmp/*
+  # No sudo: this runs as the dev user during the image build, which has no
+  # working sudo. Root-owned dirs (/tmp, /var/log) are cleaned by 10.sh as
+  # root. Only touch what the dev user owns here.
+  log "Deleting dev-user .git directories" "green"
+  find "$HOME" -type d -name ".git" -exec rm -rf {} + 2>/dev/null || true
 
-  log "Deleting all .git directories" "green"
-  find / -path /proc -prune -o -type d -name ".git" -not -path '/.git' -exec rm -rf {} + 2>/dev/null || true
-
-  log "Deleting all data in /var/log" "green"
-  sudo rm -rfv /var/log/*
-
-  log "Delete Python cache files" "green"
-  sudo find / -name "__pycache__" -type d -exec rm -rfv {} + 2>/dev/null || true
-  sudo find / -name "*.pyc" -exec rm -fv {} + 2>/dev/null || true
-  
   log "Remove pip cache (if accessible)" "green"
   rm -rf /home/vscode/.cache/pip/* 2>/dev/null || true
 }
