@@ -63,7 +63,9 @@ RUN set -eu; \
     esac; \
     curl -fsSL -o /tmp/mise \
       "https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/mise-v${MISE_VERSION}-linux-${MISE_ARCH}"; \
-    echo "${MISE_SHA256}  /tmp/mise" | sha256sum -c -; \
+    echo "${MISE_SHA256}  /tmp/mise" > /tmp/mise.sha256; \
+    sha256sum -c /tmp/mise.sha256; \
+    rm /tmp/mise.sha256; \
     strip /tmp/mise; \
     install -m 0755 /tmp/mise /usr/local/bin/mise; \
     rm /tmp/mise

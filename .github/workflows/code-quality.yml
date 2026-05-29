@@ -105,7 +105,7 @@ jobs:
       - name: Validate config files
         run: |
           python3 - <<'PY'
-          import json, os, sys, tomllib
+          import json, os, re, sys, tomllib
           import yaml
 
           # os.walk (not glob) so hidden files/dirs like .github, .mise.toml,
@@ -120,6 +120,38 @@ jobs:
                       if name.rsplit(".", 1)[-1] in exts:
                           yield os.path.join(root, name)
 
+          def strip_jsonc(text):
+              # Remove // and /* */ comments, skipping anything inside strings.
+              out, i, n = [], 0, len(text)
+              in_str = esc = False
+              while i < n:
+                  c = text[i]
+                  if in_str:
+                      out.append(c)
+                      if esc:
+                          esc = False
+                      elif c == "\\":
+                          esc = True
+                      elif c == '"':
+                          in_str = False
+                      i += 1
+                  elif c == '"':
+                      in_str = True
+                      out.append(c)
+                      i += 1
+                  elif c == "/" and i + 1 < n and text[i + 1] == "/":
+                      while i < n and text[i] != "\n":
+                          i += 1
+                  elif c == "/" and i + 1 < n and text[i + 1] == "*":
+                      i += 2
+                      while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                          i += 1
+                      i += 2
+                  else:
+                      out.append(c)
+                      i += 1
+              return "".join(out)
+
           for f in files("yml", "yaml"):
               try:
                   with open(f) as fh:
@@ -128,11 +160,17 @@ jobs:
                   errors.append(f"YAML  {f}: {e}")
 
           for f in files("json"):
+              raw = open(f).read()
               try:
-                  with open(f) as fh:
-                      json.load(fh)
-              except Exception as e:
-                  errors.append(f"JSON  {f}: {e}")
+                  json.loads(raw)
+              except Exception:
+                  # VS Code configs (devcontainer.json, cspell.json) are JSONC:
+                  # tolerate comments + trailing commas, but still catch real errors.
+                  cleaned = re.sub(r",(\s*[}\]])", r"\1", strip_jsonc(raw))
+                  try:
+                      json.loads(cleaned)
+                  except Exception as e:
+                      errors.append(f"JSON  {f}: {e}")
 
           for f in files("toml"):
               try:
