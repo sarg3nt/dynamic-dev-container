@@ -1,16 +1,20 @@
 # Dependabot version updates
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 #
-# Policy for this repo (mirrors the gearbox repo, improved):
+# Policy for this repo (mirrors the gearbox repo):
 #   - Monthly cadence on every ecosystem. Weekly produced a flood of single-dep
 #     PRs that were impossible to keep up with.
-#   - Everything is GROUPED so each ecosystem opens at most two PRs per run:
-#       <ecosystem>-minor-patch  -> auto-merged by dependabot-auto-merge.yml
-#       <ecosystem>-major        -> held for manual review (commented, not merged)
-#     Splitting minor/patch from major matters: a group's update-type is the
-#     highest member, so bundling a major in with patches would block the whole
-#     group from auto-merging. Keeping them separate lets the safe stuff sail
-#     through while majors wait for a human.
+#   - ONE group per ecosystem (patterns: ["*"], no update-types filter) so each
+#     ecosystem opens a single PR per run.
+#       * Do NOT split into minor-patch vs major via `update-types`: that filter
+#         relies on semver classification, which Dependabot cannot compute for
+#         version-RANGE requirements (e.g. pip deps in pyproject.toml like
+#         "<1.0,>=0.9"). Range updates then match no group and fall out to
+#         individual PRs — the exact flood this config is meant to prevent.
+#         A single group sidesteps that and bundles everything.
+#   - dependabot-auto-merge.yml auto-merges a grouped PR only when its overall
+#     update-type is patch/minor; a group that includes a major bump is held
+#     for manual review (commented, not merged).
 #   - Consistent labels + Conventional-Commit prefix so PRs are easy to triage.
 #
 # NOTE: Dependabot does not support YAML anchors or custom top-level keys, so the
@@ -26,17 +30,12 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
-      include: scope
     labels:
       - dependencies
       - github_actions
     groups:
-      github-actions-minor-patch:
+      github-actions:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
-      github-actions-major:
-        patterns: ["*"]
-        update-types: ["major"]
 
   - package-ecosystem: docker
     directory: /
@@ -46,17 +45,12 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
-      include: scope
     labels:
       - dependencies
       - docker
     groups:
-      docker-minor-patch:
+      docker:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
-      docker-major:
-        patterns: ["*"]
-        update-types: ["major"]
 
   - package-ecosystem: npm
     directory: /
@@ -66,17 +60,12 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
-      include: scope
     labels:
       - dependencies
       - javascript
     groups:
-      npm-minor-patch:
+      npm:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
-      npm-major:
-        patterns: ["*"]
-        update-types: ["major"]
 
   - package-ecosystem: pip
     directory: /
@@ -86,14 +75,9 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
-      include: scope
     labels:
       - dependencies
       - python
     groups:
-      pip-minor-patch:
+      pip:
         patterns: ["*"]
-        update-types: ["minor", "patch"]
-      pip-major:
-        patterns: ["*"]
-        update-types: ["major"]
