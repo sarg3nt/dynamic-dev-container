@@ -57,6 +57,7 @@ jobs:
           egress-policy: block
           allowed-endpoints: >
             github.com:443
+            api.github.com:443
             ghcr.io:443
             registry-1.docker.io:443
             auth.docker.io:443
@@ -90,6 +91,11 @@ jobs:
           platforms: ${{ matrix.platform }}
           tags: test-container:${{ github.sha }}
           load: true
+          # mise/aqua queries the GitHub API for tool releases; authenticate to
+          # avoid the 60-req/hr unauthenticated rate limit on shared runner IPs.
+          # push:false → this token is never baked into a published image.
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
       - name: Test Container - Basic Functionality
         run: |
@@ -178,6 +184,7 @@ jobs:
           egress-policy: block
           allowed-endpoints: >
             github.com:443
+            api.github.com:443
             ghcr.io:443
             registry-1.docker.io:443
             auth.docker.io:443
@@ -205,6 +212,9 @@ jobs:
           platforms: ${{ matrix.platform }}
           tags: vuln-test:${{ github.sha }}
           load: true
+          # See note in the build-test job: authenticate mise's GitHub API calls.
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518
