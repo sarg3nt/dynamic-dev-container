@@ -5,31 +5,20 @@
 
 name: Trivy
 
+# PR-time scanning is handled by container-test.yml's vulnerability-check job
+# (both arches). This workflow owns the authoritative SARIF feed to the GitHub
+# code-scanning dashboard: on main pushes and on a weekly schedule.
 on:
   push:
     branches: ["main"]
-  pull_request:
-    # The branches below must be a subset of the branches above
-    branches: ["main"]
-    paths:
-      - "home/**"
-      - "scripts/**"
-      - "usr/**"
-      - "workflow_scripts/**"
-      - ".dockerignore"
-      - ".mise.toml"
-      - ".pre-commit-config.yaml"
-      - "Dockerfile"
-      - "requirements.txt"
-      - "pyproject.toml"
-      - "package.json"
-      - "**/*.sh"
-    # Skip on draft PRs since container-test.yml already covers this
-    types: [opened, synchronize, reopened, ready_for_review]
-
   schedule:
     - cron: "19 14 * * 5"
   workflow_dispatch: # Allows manual triggering
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -41,10 +30,8 @@ permissions:
 jobs:
   trivy-scan:
     name: Trivy Security Scan
-    # Skip if this is a draft PR (container-test.yml will handle it)
-    if: github.event.pull_request.draft != true
     permissions:
-      contents: write # for actions/checkout to fetch code and for SBOM to push results
+      contents: read # actions/checkout (no SBOM is pushed, so write is not needed)
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
     runs-on: ubuntu-latest
     steps:
