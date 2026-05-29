@@ -14,6 +14,23 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+    # Only rebuild + scan the image when something that affects it changes.
+    # Skips doc/config-only PRs (e.g. dependabot.yml) — no point rebuilding
+    # 700+ MB to scan a YAML edit. Mirrors container-test.yml's filter.
+    paths:
+      - "home/**"
+      - "scripts/**"
+      - "usr/**"
+      - "workflow_scripts/**"
+      - ".dockerignore"
+      - ".mise.toml"
+      - ".pre-commit-config.yaml"
+      - "Dockerfile"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - "package.json"
+      - "**/*.sh"
+      - ".github/workflows/trivy.yml"
   schedule:
     - cron: "19 14 * * 5"
   workflow_dispatch: # Allows manual triggering
