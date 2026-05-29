@@ -36,9 +36,9 @@ classifiers = [
 # Runtime dependencies - packages your project needs to run
 dependencies = [
   # Replace these example dependencies with your actual requirements
-  "click>=8.0,<9.0",      # CLI framework for command-line tools
-  "requests>=2.28,<3.0",  # HTTP library for web requests
-  "pydantic>=2.0,<3.0",   # Data validation and parsing
+  "click>=8.4.1,<9.0",      # CLI framework for command-line tools
+  "requests>=2.34.2,<3.0",  # HTTP library for web requests
+  "pydantic>=2.13.4,<3.0",   # Data validation and parsing
 ]
 
 # Optional dependencies for development and testing
@@ -47,10 +47,10 @@ dependencies = [
 dev = [
   "hatch>=1.14,<2.0",           # Build and project management tool
   "pytest>=9.0.3,<10.0",          # Testing framework
-  "pytest-mock>=3.14,<4.0",    # Mock objects for pytest
+  "pytest-mock>=3.15.1,<4.0",    # Mock objects for pytest
   "pytest-cov>=7.1.0,<8.0",      # Coverage reporting for tests
-  "ruff>=0.9,<1.0",             # Fast Python linter and formatter
-  "mypy>=1.17,<2.0",            # Static type checker
+  "ruff>=0.15.15,<1.0",             # Fast Python linter and formatter
+  "mypy>=2.1.0,<3.0",            # Static type checker
   "watchdog>=6.0,<7.0",        # File system event monitoring
   "python-dotenv>=1.1,<2.0",   # Environment variable management
 ]
@@ -151,10 +151,10 @@ disable = false  # Set to true to disable publishing entirely
 [tool.hatch.envs.default]
 dependencies = [
   "pytest>=9.0.3,<10.0",
-  "pytest-mock>=3.14,<4.0",
+  "pytest-mock>=3.15.1,<4.0",
   "pytest-cov>=7.1.0,<8.0",
-  "ruff>=0.9,<1.0",
-  "mypy>=1.17,<2.0",
+  "ruff>=0.15.15,<1.0",
+  "mypy>=2.1.0,<3.0",
 ]
 
 [tool.hatch.envs.default.scripts]
@@ -166,7 +166,7 @@ type-check = "mypy {args:src tests}"
 all = ["lint", "format", "type-check", "test-cov"]
 
 [tool.hatch.envs.types]
-extra-dependencies = ["mypy>=1.17,<2.0"]
+extra-dependencies = ["mypy>=2.1.0,<3.0"]
 
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src tests}"
