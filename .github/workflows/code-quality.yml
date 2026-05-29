@@ -7,6 +7,11 @@ on:
     branches: ["main"]
   workflow_dispatch: # Allows manual triggering
 
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -30,40 +35,27 @@ jobs:
 
       - name: Install ShellCheck
         run: |
-          # Use apt to install shellcheck from Ubuntu repositories.
           sudo apt-get update
           sudo apt-get install -y shellcheck
 
-      - name: Run ShellCheck on Scripts
+      # One invocation so a single failing file fails the job. (Previously every
+      # step ended in `|| true`, so the lint could never fail — pure decoration.)
+      - name: Run ShellCheck
         run: |
-          echo "Running ShellCheck on scripts directory..."
-          if [ -d "./scripts" ]; then
-            find ./scripts -name "*.sh" -type f -exec shellcheck -S warning {} + || true
+          # Portable array build (no `mapfile`, which needs bash 4+).
+          files=()
+          while IFS= read -r f; do files+=("$f"); done < <(
+            {
+              find scripts workflow_scripts usr -type f -name '*.sh' 2>/dev/null
+              for f in install.sh dev.sh run.sh; do [ -f "$f" ] && echo "$f"; done
+            } | sort -u)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No shell scripts found to lint."
+            exit 0
           fi
-
-      - name: Run ShellCheck on Root Scripts
-        run: |
-          echo "Running ShellCheck on root scripts..."
-          for file in install.sh dev.sh run.sh; do
-            if [ -f "$file" ]; then
-              echo "Checking $file"
-              shellcheck -S warning "$file" || true
-            fi
-          done
-
-      - name: Run ShellCheck on Workflow Scripts
-        run: |
-          echo "Running ShellCheck on workflow_scripts directory..."
-          if [ -d "./workflow_scripts" ]; then
-            find ./workflow_scripts -name "*.sh" -type f -exec shellcheck -S warning {} + || true
-          fi
-
-      - name: Run ShellCheck on Usr Scripts
-        run: |
-          echo "Running ShellCheck on usr directory..."
-          if [ -d "./usr" ]; then
-            find ./usr -name "*.sh" -type f -exec shellcheck -S warning {} + || true
-          fi
+          echo "Linting ${#files[@]} script(s):"
+          printf '  %s\n' "${files[@]}"
+          shellcheck -S warning "${files[@]}"
 
   dockerfile-quality:
     name: Dockerfile Quality
@@ -103,74 +95,107 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - name: Install Python YAML Parser
-        run: |
-          pip install pyyaml
+      - name: Install YAML parser
+        run: pip install pyyaml
 
-      - name: Validate YAML Files
+      # Parses every config file and FAILS on the first syntax error. JSON and
+      # TOML use the stdlib (json / tomllib); YAML uses pyyaml. node_modules and
+      # .git are skipped. Previously this job swallowed all errors and even
+      # called the non-existent `tomli_w.load`, so it validated nothing.
+      - name: Validate config files
         run: |
-          echo "Validating YAML files..."
-          find . -name "*.yml" -o -name "*.yaml" | while read -r file; do
-            echo "Validating $file"
-            python -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null || echo "Warning: $file may have syntax issues"
-          done
+          python3 - <<'PY'
+          import json, os, re, sys, tomllib
+          import yaml
 
-      - name: Validate JSON Files
+          # os.walk (not glob) so hidden files/dirs like .github, .mise.toml,
+          # and .pre-commit-config.yaml are included. node_modules/.git pruned.
+          PRUNE = {"node_modules", ".git"}
+          errors = []
+
+          def files(*exts):
+              for root, dirs, names in os.walk("."):
+                  dirs[:] = [d for d in dirs if d not in PRUNE]
+                  for name in names:
+                      if name.rsplit(".", 1)[-1] in exts:
+                          yield os.path.join(root, name)
+
+          def strip_jsonc(text):
+              # Remove // and /* */ comments, skipping anything inside strings.
+              out, i, n = [], 0, len(text)
+              in_str = esc = False
+              while i < n:
+                  c = text[i]
+                  if in_str:
+                      out.append(c)
+                      if esc:
+                          esc = False
+                      elif c == "\\":
+                          esc = True
+                      elif c == '"':
+                          in_str = False
+                      i += 1
+                  elif c == '"':
+                      in_str = True
+                      out.append(c)
+                      i += 1
+                  elif c == "/" and i + 1 < n and text[i + 1] == "/":
+                      while i < n and text[i] != "\n":
+                          i += 1
+                  elif c == "/" and i + 1 < n and text[i + 1] == "*":
+                      i += 2
+                      while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                          i += 1
+                      i += 2
+                  else:
+                      out.append(c)
+                      i += 1
+              return "".join(out)
+
+          for f in files("yml", "yaml"):
+              try:
+                  with open(f) as fh:
+                      list(yaml.safe_load_all(fh))
+              except Exception as e:
+                  errors.append(f"YAML  {f}: {e}")
+
+          for f in files("json"):
+              raw = open(f).read()
+              try:
+                  json.loads(raw)
+              except Exception:
+                  # VS Code configs (devcontainer.json, cspell.json) are JSONC:
+                  # tolerate comments + trailing commas, but still catch real errors.
+                  cleaned = re.sub(r",(\s*[}\]])", r"\1", strip_jsonc(raw))
+                  try:
+                      json.loads(cleaned)
+                  except Exception as e:
+                      errors.append(f"JSON  {f}: {e}")
+
+          for f in files("toml"):
+              try:
+                  with open(f, "rb") as fh:
+                      tomllib.load(fh)
+              except Exception as e:
+                  errors.append(f"TOML  {f}: {e}")
+
+          if errors:
+              print("Config validation FAILED:")
+              for e in errors:
+                  print(f"  ✗ {e}")
+              sys.exit(1)
+          print("All YAML/JSON/TOML config files parsed cleanly.")
+          PY
+
+      - name: Check for required files
         run: |
-          echo "Validating JSON files..."
-          find . -name "*.json" | while read -r file; do
-            echo "Validating $file"
-            python -m json.tool "$file" > /dev/null || echo "Warning: $file may have syntax issues"
-          done
-
-      - name: Validate TOML Files
-        run: |
-          echo "Validating TOML files..."
-          pip install tomli-w
-          find . -name "*.toml" | while read -r file; do
-            echo "Validating $file"
-            python -c "import tomli_w; import sys; tomli_w.load(open(sys.argv[1], 'rb'))" "$file" 2>/dev/null || echo "Warning: $file may have syntax issues"
-          done
-
-      - name: Check for Required Files
-        run: |
-          echo "Checking for required files..."
-          required_files=(
-            "Dockerfile"
-            ".mise.toml"
-            "requirements.txt"
-            "pyproject.toml"
-            "package.json"
-            ".pre-commit-config.yaml"
-          )
-
-          for file in "${required_files[@]}"; do
-            if [ -f "$file" ]; then
-              echo "✅ $file exists"
+          missing=0
+          for f in Dockerfile .mise.toml requirements.txt pyproject.toml package.json .pre-commit-config.yaml; do
+            if [ -f "$f" ]; then
+              echo "✅ $f"
             else
-              echo "❌ $file is missing"
+              echo "❌ $f is missing"
+              missing=1
             fi
           done
-
-      - name: Validate Mise Configuration
-        run: |
-          echo "Validating .mise.toml configuration..."
-          if [ -f ".mise.toml" ]; then
-            # Check for common mise configuration issues
-            echo "Checking mise configuration syntax..."
-            python -c "
-            import tomli_w
-            try:
-                config = tomli_w.load(open('.mise.toml', 'rb'))
-                if 'tools' in config:
-                    print(f'✅ Found {len(config[\"tools\"])} tools configured')
-                else:
-                    print('⚠️  No tools section found in .mise.toml')
-                if 'env' in config:
-                    print(f'✅ Found environment configuration')
-            except Exception as e:
-                print(f'❌ Error parsing .mise.toml: {e}')
-            " 2>/dev/null || echo "Could not validate mise configuration"
-          else
-            echo "❌ .mise.toml not found"
-          fi
+          exit "$missing"

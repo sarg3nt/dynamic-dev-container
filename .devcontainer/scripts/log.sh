@@ -1,32 +1,32 @@
 #!/bin/bash
+# Must remain bash 3.2 compatible: this script is sourced by
+# initialize_command.sh which runs on the host. macOS still ships bash 3.2
+# as /bin/bash, so no associative arrays (`declare -A`).
+
+_log_color_code() {
+  case "$1" in
+    red)    printf '\033[31m' ;;
+    yellow) printf '\033[33m' ;;
+    green)  printf '\033[1;32m' ;;
+    blue)   printf '\033[34m' ;;
+    cyan)   printf '\033[36m' ;;
+    gray)   printf '\033[30m' ;;
+    *)      printf '\033[0m'  ;;
+  esac
+}
 
 log() {
   local message=${1:-}
-  local color=${2:-"nc"}
-  local level=${3:-"INFO"}
+  local color=${2:-nc}
+  local level=${3:-INFO}
 
-  # Define colors using an associative array
-  declare -A colors=(
-    ["red"]="\033[31m"
-    ["yellow"]="\033[33m"
-    ["green"]="\033[1;32m" # Bold green
-    ["blue"]="\033[34m"
-    ["cyan"]="\033[36m"
-    ["gray"]="\033[30m"
-    ["nc"]="\033[0m"
-  )
-
-  # Validate the color input
-  if [[ -z "${colors[$color]}" ]]; then
-    color="nc"
-  fi
-
-  # Get the current timestamp
-  local timestamp
+  local gray reset color_code timestamp
+  gray=$(_log_color_code gray)
+  reset=$(_log_color_code nc)
+  color_code=$(_log_color_code "$color")
   timestamp=$(date '+%H:%M:%S')
 
-  # Print the log message
-  printf "%b%s %b%s: %s%b\n" "${colors["gray"]}" "[$timestamp]" "${colors[$color]}" "$level" "$message" "${colors["nc"]}"
+  printf '%b%s %b%s: %s%b\n' "$gray" "[$timestamp]" "$color_code" "$level" "$message" "$reset"
 }
 
 log_warning() {

@@ -64,7 +64,6 @@ PYTHON_KEYWORDS=""
 INSTALL_PSI_HEADER=false
 PSI_HEADER_COMPANY=""
 PSI_HEADER_TEMPLATES=()
-declare -A PSI_HEADER_LANG_CONFIG
 
 # Files and directories to copy to new projects
 FILES_TO_COPY=(
@@ -215,7 +214,7 @@ sed_inplace() {
     sed -i '' "$@"
   else
     # Linux sed doesn't need the extension argument
-    sed_inplace "$@"
+    sed -i "$@"
   fi
 }
 

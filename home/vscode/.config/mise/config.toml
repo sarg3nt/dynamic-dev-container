@@ -3,8 +3,10 @@
 MISE_PYTHON_COMPILE = false
 
 [tools]
-####### Pinned versions
-python = '3.13'
+# Python is intentionally NOT installed in the base image. Consumers install
+# their own Python version via their project's .mise.toml. Keeps the base
+# image small and sidesteps python-build-standalone variant regressions
+# (e.g. the arm64 3.13 freethreaded-stripped tarball is missing lib/).
 
 ######### Latest versions
 fzf = "latest"

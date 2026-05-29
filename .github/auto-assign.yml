@@ -1,0 +1,19 @@
+# Configuration for the auto-assign action (kentaro-m/auto-assign-action).
+# Adds reviewers to human PRs. Bot PRs are excluded in the workflow.
+
+addReviewers: true
+addAssignees: false
+
+reviewers:
+  - sarg3nt
+
+# 0 = add all listed reviewers.
+numberOfReviewers: 0
+
+assignees: []
+numberOfAssignees: 0
+
+# Don't request review on work-in-progress / draft PRs.
+skipKeywords:
+  - wip
+  - draft

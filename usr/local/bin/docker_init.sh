@@ -10,9 +10,12 @@
 # Delete the existing docker socket.
 sudo rm /var/run/docker.sock > /dev/null 2>&1
 
-# Shellcheck rule SC2188 is disabled in `.devcontainer/devcontainer.json` because it doesn't seem to be disablable inline.
-# shellcheck disable=SC2069,SC1105,SC2188
 # Use socat to mount our passed in docker socket to the correct docker.sock version.
-((sudo socat UNIX-LISTEN:/var/run/docker.sock,fork,mode=660,user=vscode UNIX-CONNECT:/var/run/docker-host.sock) 2>&1 >> /tmp/vscr-dind-socat.log) & > /dev/null
+# The disable directive must sit immediately above the command; an intervening
+# comment stops shellcheck applying it, which is why SC2188 leaked before. The
+# stray `> /dev/null` after `&` (a command-less redirect) was the SC2188 cause
+# and is removed — socat output already goes to the log file.
+# shellcheck disable=SC2069,SC1105
+((sudo socat UNIX-LISTEN:/var/run/docker.sock,fork,mode=660,user=vscode UNIX-CONNECT:/var/run/docker-host.sock) 2>&1 >> /tmp/vscr-dind-socat.log) &
 
 "$@"

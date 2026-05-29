@@ -5,31 +5,23 @@
 
 name: Trivy
 
+# Single source of container vulnerability scanning: build the image and feed
+# results to the GitHub code-scanning dashboard (SARIF). Runs on PRs, main
+# pushes, and weekly. container-test.yml handles functional build tests and no
+# longer rebuilds the image just to scan it.
 on:
   push:
     branches: ["main"]
   pull_request:
-    # The branches below must be a subset of the branches above
     branches: ["main"]
-    paths:
-      - "home/**"
-      - "scripts/**"
-      - "usr/**"
-      - "workflow_scripts/**"
-      - ".dockerignore"
-      - ".mise.toml"
-      - ".pre-commit-config.yaml"
-      - "Dockerfile"
-      - "requirements.txt"
-      - "pyproject.toml"
-      - "package.json"
-      - "**/*.sh"
-    # Skip on draft PRs since container-test.yml already covers this
-    types: [opened, synchronize, reopened, ready_for_review]
-
   schedule:
     - cron: "19 14 * * 5"
   workflow_dispatch: # Allows manual triggering
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -41,10 +33,8 @@ permissions:
 jobs:
   trivy-scan:
     name: Trivy Security Scan
-    # Skip if this is a draft PR (container-test.yml will handle it)
-    if: github.event.pull_request.draft != true
     permissions:
-      contents: write # for actions/checkout to fetch code and for SBOM to push results
+      contents: read # actions/checkout (no SBOM is pushed, so write is not needed)
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
     runs-on: ubuntu-latest
     steps:
@@ -52,21 +42,13 @@ jobs:
         uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d
         with:
           disable-sudo: true
-          egress-policy: block
-          allowed-endpoints: >
-            github.com:443
-            ghcr.io:443
-            registry-1.docker.io:443
-            auth.docker.io:443
-            production.cloudflare.docker.com:443
-            public.ecr.aws:443
-            mirrors.rockylinux.org:443
-            download.rockylinux.org:443
-            dl.rockylinux.org:443
-            vault.rockylinux.org:443
-            download.docker.com:443
-            registry.fedoraproject.org:443
-            mirror.stream.centos.org:443
+          # audit (not block) for this job: the Trivy binary + vuln DB are
+          # pulled from several CDNs (GitHub release assets, ghcr, public.ecr,
+          # blob storage) whose hosts shift, and harden-runner's DNS-based
+          # blocking is brittle against them (it intermittently fails to resolve
+          # allowed hosts). Egress is still monitored/reported. Every other job
+          # in this repo keeps egress-policy: block.
+          egress-policy: audit
 
       - name: Log Into Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
@@ -81,11 +63,17 @@ jobs:
       - name: Build Docker Image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:
+          context: .
           push: false
           tags: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ github.sha }}
+          # Authenticate mise's GitHub API calls during the build (avoids the
+          # unauthenticated rate limit). ARG-only in the Dockerfile, so not
+          # baked into the image being scanned.
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Trivy Vulnerability Scanner
-        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: "${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ github.sha }}"
           format: "template"

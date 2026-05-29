@@ -11,17 +11,20 @@
 # home/vscode/.config/mise/config.toml
 # Add custom Mise tools and version to your projects root as .mise.toml  See: https://mise.jdx.dev/configuration.html
 
-# Use mise from package manager or smaller binary
-# https://github.com/jdx/mise/pkgs/container/mise/versions
-FROM jdxcode/mise:2025.12.13@sha256:e1732a34debd36f1d5dfdcf9e357c56b639098094607fd5b43e22ed87bd47b5f AS mise
-
-# Extract only the mise binary and strip it
-RUN strip /usr/local/bin/mise || true
-
+# Base image digest is pinned for supply-chain integrity. The default is the
+# OCI index digest (multi-arch manifest list) so `docker buildx` picks the right
+# arch automatically. The Makefile overrides this with a single-arch manifest
+# digest for native `make build` to tighten pinning further.
 # https://hub.docker.com/r/rockylinux/rockylinux/tags
-FROM rockylinux/rockylinux:10-ubi@sha256:02564b26a5d147fcdbd1058abd9b358008f5608b382dcb288cfc718d627256cb AS final
+ARG BASE_IMAGE=rockylinux/rockylinux:10-ubi@sha256:02564b26a5d147fcdbd1058abd9b358008f5608b382dcb288cfc718d627256cb
+
+FROM ${BASE_IMAGE} AS final
 ARG GITHUB_TOKEN
-ENV GITHUB_API_TOKEN=$GITHUB_TOKEN
+# Use ARG (not ENV) for both token names. ARG values are available to build-time
+# RUN steps (mise/aqua read GITHUB_TOKEN; helper scripts read GITHUB_API_TOKEN)
+# but are NOT baked into the published image — so the token never persists into
+# a layer's env or trips image secret scanners.
+ARG GITHUB_API_TOKEN=${GITHUB_TOKEN}
 LABEL org.opencontainers.image.source=https://github.com/sarg3nt/dynamic-dev-container
 
 ARG VER=""
@@ -29,7 +32,7 @@ ENV DEV_CONTAINER_VERSION=$VER
 ENV TZ='America/Los_Angeles'
 
 # What user will be created in the dev container and will we run under.
-# Reccomend not changing this.
+# Recommend not changing this.
 ENV USERNAME="vscode"
 
 # Copy script libraries for use by internal scripts
@@ -38,11 +41,39 @@ COPY usr/bin/lib /usr/bin/lib
 # Install packages using the dnf package manager
 RUN --mount=type=bind,source=scripts/10_install_system_packages.sh,target=/10.sh,ro bash -c "/10.sh"
 
+# Install mise. We download the glibc build of the static binary directly from
+# the official GitHub release and verify it against a pinned SHA256 for the
+# host architecture. The glibc build (not musl) is required so that mise
+# auto-selects the python-build-standalone `linux-gnu` tarballs for
+# MISE_PYTHON_COMPILE=false — the musl-freethreaded tarballs python-build-
+# standalone ships are broken upstream (missing `lib` directory). libbz2.so.1.0
+# is a runtime dep of the glibc mise binary; bzip2-libs is installed via dnf
+# in scripts/10_install_system_packages.sh.
+# SHA256s come from https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/SHASUMS256.txt
+ARG MISE_VERSION=2025.12.13
+ARG MISE_SHA256_AMD64=2134c55725d08547cddc921f84ddac05c9de1700115c32817563435072cae5ed
+ARG MISE_SHA256_ARM64=e4a4b6990007d1918da8181093b79b50b01a5f056bdd1567960aadfdf3c86752
+ARG TARGETARCH
+# Strip the mise binary before installing it (~63MB -> ~15MB). `strip` comes
+# from binutils, which is installed persistently by scripts/10_install_system_packages.sh.
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64) MISE_ARCH=x64;   MISE_SHA256="$MISE_SHA256_AMD64" ;; \
+      arm64) MISE_ARCH=arm64; MISE_SHA256="$MISE_SHA256_ARM64" ;; \
+      *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /tmp/mise \
+      "https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/mise-v${MISE_VERSION}-linux-${MISE_ARCH}"; \
+    echo "${MISE_SHA256}  /tmp/mise" > /tmp/mise.sha256; \
+    sha256sum -c /tmp/mise.sha256; \
+    rm /tmp/mise.sha256; \
+    strip /tmp/mise; \
+    install -m 0755 /tmp/mise /usr/local/bin/mise; \
+    rm /tmp/mise
+
 # Set current user to the vscode user, run all future commands as this user.
 USER vscode
 
-# Copy the mise binary from the mise container
-COPY --from=mise /usr/local/bin/mise /usr/local/bin/mise
 COPY --chown=vscode:vscode home/vscode/.config/mise /home/vscode/.config/mise
 
 # Install mise tools and configure environment in one layer

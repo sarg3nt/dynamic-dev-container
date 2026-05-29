@@ -1,0 +1,39 @@
+# Auto-label PRs by changed paths (actions/labeler).
+# Labels referenced here must already exist in the repo, otherwise they are
+# silently skipped. All of the below exist.
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"
+
+github_actions:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "Dockerfile"
+          - ".devcontainer/**"
+          - ".dockerignore"
+
+python:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.py"
+          - "requirements.txt"
+          - "pyproject.toml"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".mise.toml"
+          - "requirements.txt"
+          - "pyproject.toml"
+          - "package.json"
+          - "package-lock.json"
+          - ".packages"
+          - ".krew_plugins"
+          - ".github/dependabot.yml"

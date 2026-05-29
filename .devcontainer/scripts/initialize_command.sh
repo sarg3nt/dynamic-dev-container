@@ -16,7 +16,10 @@ set -euo pipefail
 source "$(dirname "$0")/log.sh"
 
 # Constants
-readonly CONTAINER_IMAGE="ghcr.io/sarg3nt/dynamic-dev-container:latest"
+# TODO: revert to ":latest" once the arm64 base image is published to ghcr.io.
+# Pinned to the locally-built tag while we iterate on M-series support so the
+# pull step does not clobber the local build with the amd64-only published tag.
+readonly CONTAINER_IMAGE="ghcr.io/sarg3nt/dynamic-dev-container:1.0.4-support-macs"
 
 # Directory configuration: "name|permission|log_level|impact_message"
 readonly DIRECTORY_CONFIG=(
@@ -26,28 +29,84 @@ readonly DIRECTORY_CONFIG=(
 )
 
 #######################################
-# Get the latest version of the dev container
-# Arguments:
-#   None
-# Returns:
-#   0 on success, 1 on failure
+# Print the host's docker platform ("linux/amd64" or "linux/arm64").
+# Dev containers always run as linux/<arch> regardless of host OS (macOS,
+# Windows, Linux) because the container engine provides a Linux VM.
+#######################################
+host_docker_platform() {
+  local arch
+  arch=$(uname -m)
+  case "$arch" in
+    x86_64|amd64)   arch=amd64 ;;
+    arm64|aarch64)  arch=arm64 ;;
+    *)              arch="$arch" ;;
+  esac
+  printf 'linux/%s\n' "$arch"
+}
+
+#######################################
+# Print the platform of a locally-present image ("os/arch"), or empty if the
+# image is not present locally.
+#######################################
+local_image_platform() {
+  docker image inspect "$1" --format '{{.Os}}/{{.Architecture}}' 2>/dev/null || true
+}
+
+#######################################
+# Ensure the base image is available locally and matches the host platform.
+#
+# - If `SKIP_BASE_IMAGE_PULL=1` is set, trust whatever is tagged locally.
+# - If the locally-tagged image already matches the host platform, skip the
+#   pull. This protects a locally-built image (e.g. `make build` followed by
+#   `docker tag …:latest`) from being clobbered on every restart when the
+#   published `:latest` only has a different arch.
+# - Otherwise pull. If the pulled image's platform does not match the host,
+#   fail with a clear message rather than let the build blow up later with
+#   a cryptic "CPU does not support x86-64-v3" from Rocky 10 glibc under QEMU.
 # Globals:
 #   CONTAINER_IMAGE - The container image to pull
+# Returns:
+#   0 on success, 1 on failure
 #######################################
 get_latest_dev_container_version() {
+  local host_plat local_plat
+  host_plat=$(host_docker_platform)
+  local_plat=$(local_image_platform "$CONTAINER_IMAGE")
+
+  if [[ -n "${SKIP_BASE_IMAGE_PULL:-}" ]]; then
+    log_info "SKIP_BASE_IMAGE_PULL is set; using local ${CONTAINER_IMAGE} (${local_plat:-not present})."
+    return 0
+  fi
+
+  if [[ -n "$local_plat" && "$local_plat" == "$host_plat" ]]; then
+    log_info "Local ${CONTAINER_IMAGE} already matches host platform (${host_plat}); skipping pull."
+    log_info "Set SKIP_BASE_IMAGE_PULL=1 to suppress this check. Unset to force a pull."
+    return 0
+  fi
+
   log_info "Pulling latest 'dynamic-dev-container' image from GitHub Container Registry."
   echo ""
-  
-  if docker pull "$CONTAINER_IMAGE" 2>&1; then
-    echo ""
-    log_success "Latest dynamic-dev-container image pulled successfully."
-    return 0
-  else
+
+  if ! docker pull "$CONTAINER_IMAGE" 2>&1; then
     echo ""
     log_error "Failed to pull the latest dynamic-dev-container image. Please check your connection or credentials."
     log_error "The container will attempt to load with a cached copy if you have it."
     return 1
   fi
+
+  echo ""
+  local pulled_plat
+  pulled_plat=$(local_image_platform "$CONTAINER_IMAGE")
+
+  if [[ -n "$pulled_plat" && "$pulled_plat" != "$host_plat" ]]; then
+    log_error "Pulled ${CONTAINER_IMAGE} has platform ${pulled_plat}, host is ${host_plat}."
+    log_error "Rocky Linux 10 glibc is compiled for x86-64-v3 and will not run under Docker's QEMU emulation."
+    log_error "Build a local base image with 'make build' and tag it as ${CONTAINER_IMAGE}, then set SKIP_BASE_IMAGE_PULL=1."
+    return 1
+  fi
+
+  log_success "Latest dynamic-dev-container image pulled successfully (${pulled_plat})."
+  return 0
 }
 
 #######################################
@@ -98,11 +157,15 @@ create_required_folders() {
           fi
         done
         
-        log "Created ${dir_name} folder in your home directory." "$color" "${log_level^^}"
-        
+        # Uppercase the log level without bash 4's ${var^^} — this script
+        # runs on the host and macOS ships bash 3.2.
+        local log_level_upper
+        log_level_upper=$(printf '%s' "$log_level" | tr '[:lower:]' '[:upper:]')
+        log "Created ${dir_name} folder in your home directory." "$color" "$log_level_upper"
+
         # Log the impact message if provided (only for newly created directories)
         if [[ -n "$impact_message" ]]; then
-          log "$impact_message" "$color" "${log_level^^}"
+          log "$impact_message" "$color" "$log_level_upper"
         fi
       fi
     else
