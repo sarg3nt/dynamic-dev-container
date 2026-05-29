@@ -20,10 +20,11 @@ ARG BASE_IMAGE=rockylinux/rockylinux:10-ubi@sha256:02564b26a5d147fcdbd1058abd9b3
 
 FROM ${BASE_IMAGE} AS final
 ARG GITHUB_TOKEN
-# Both names are exported so mise (looks for GITHUB_TOKEN) and any legacy
-# scripts/tools that check GITHUB_API_TOKEN both find the token during build.
-ENV GITHUB_TOKEN=$GITHUB_TOKEN
-ENV GITHUB_API_TOKEN=$GITHUB_TOKEN
+# Use ARG (not ENV) for both token names. ARG values are available to build-time
+# RUN steps (mise/aqua read GITHUB_TOKEN; helper scripts read GITHUB_API_TOKEN)
+# but are NOT baked into the published image — so the token never persists into
+# a layer's env or trips image secret scanners.
+ARG GITHUB_API_TOKEN=${GITHUB_TOKEN}
 LABEL org.opencontainers.image.source=https://github.com/sarg3nt/dynamic-dev-container
 
 ARG VER=""

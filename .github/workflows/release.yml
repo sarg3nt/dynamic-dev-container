@@ -79,3 +79,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Authenticate mise's GitHub API calls during the build. ARG-only in
+          # the Dockerfile, so the token is not baked into the published image.
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}

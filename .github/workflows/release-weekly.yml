@@ -83,6 +83,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ env.TAG_MAJOR }},${{ env.TAG_MINOR }},${{ env.TAG_PATCH }},${{ env.TAG_LATEST }}
+          # Authenticate mise's GitHub API calls during the build. ARG-only in
+          # the Dockerfile, so the token is not baked into the published image.
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
       # Generate a categorized changelog from merged PRs since the last release.
       # Categories/label-extractor live in .github/changelog-config.json.

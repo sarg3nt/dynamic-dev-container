@@ -5,11 +5,14 @@
 
 name: Trivy
 
-# PR-time scanning is handled by container-test.yml's vulnerability-check job
-# (both arches). This workflow owns the authoritative SARIF feed to the GitHub
-# code-scanning dashboard: on main pushes and on a weekly schedule.
+# Single source of container vulnerability scanning: build the image and feed
+# results to the GitHub code-scanning dashboard (SARIF). Runs on PRs, main
+# pushes, and weekly. container-test.yml handles functional build tests and no
+# longer rebuilds the image just to scan it.
 on:
   push:
+    branches: ["main"]
+  pull_request:
     branches: ["main"]
   schedule:
     - cron: "19 14 * * 5"
@@ -42,6 +45,9 @@ jobs:
           egress-policy: block
           allowed-endpoints: >
             github.com:443
+            api.github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
             ghcr.io:443
             registry-1.docker.io:443
             auth.docker.io:443
@@ -68,8 +74,14 @@ jobs:
       - name: Build Docker Image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
         with:
+          context: .
           push: false
           tags: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ github.sha }}
+          # Authenticate mise's GitHub API calls during the build (avoids the
+          # unauthenticated rate limit). ARG-only in the Dockerfile, so not
+          # baked into the image being scanned.
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518
