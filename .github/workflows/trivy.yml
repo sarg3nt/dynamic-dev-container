@@ -42,24 +42,13 @@ jobs:
         uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d
         with:
           disable-sudo: true
-          egress-policy: block
-          allowed-endpoints: >
-            github.com:443
-            api.github.com:443
-            objects.githubusercontent.com:443
-            release-assets.githubusercontent.com:443
-            ghcr.io:443
-            registry-1.docker.io:443
-            auth.docker.io:443
-            production.cloudflare.docker.com:443
-            public.ecr.aws:443
-            mirrors.rockylinux.org:443
-            download.rockylinux.org:443
-            dl.rockylinux.org:443
-            vault.rockylinux.org:443
-            download.docker.com:443
-            registry.fedoraproject.org:443
-            mirror.stream.centos.org:443
+          # audit (not block) for this job: the Trivy binary + vuln DB are
+          # pulled from several CDNs (GitHub release assets, ghcr, public.ecr,
+          # blob storage) whose hosts shift, and harden-runner's DNS-based
+          # blocking is brittle against them (it intermittently fails to resolve
+          # allowed hosts). Egress is still monitored/reported. Every other job
+          # in this repo keeps egress-policy: block.
+          egress-policy: audit
 
       - name: Log Into Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
