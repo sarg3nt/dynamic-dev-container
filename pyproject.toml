@@ -45,7 +45,7 @@ dependencies = [
 [project.optional-dependencies]
 # Development tools (install with: pip install -e .[dev])
 dev = [
-  "hatch>=1.14,<2.0",           # Build and project management tool
+  "hatch>=1.17.0,<2.0",           # Build and project management tool
   "pytest>=9.0.3,<10.0",          # Testing framework
   "pytest-mock>=3.15.1,<4.0",    # Mock objects for pytest
   "pytest-cov>=7.1.0,<8.0",      # Coverage reporting for tests
