@@ -36,7 +36,7 @@ classifiers = [
 # Runtime dependencies - packages your project needs to run
 dependencies = [
   # Replace these example dependencies with your actual requirements
-  "click>=8.4.1,<9.0",      # CLI framework for command-line tools
+  "click>=8.4.2,<9.0",      # CLI framework for command-line tools
   "requests>=2.34.2,<3.0",  # HTTP library for web requests
   "pydantic>=2.13.4,<3.0",   # Data validation and parsing
 ]
@@ -45,12 +45,12 @@ dependencies = [
 [project.optional-dependencies]
 # Development tools (install with: pip install -e .[dev])
 dev = [
-  "hatch>=1.14,<2.0",           # Build and project management tool
-  "pytest>=9.0.3,<10.0",          # Testing framework
+  "hatch>=1.17.1,<2.0",           # Build and project management tool
+  "pytest>=9.1.1,<10.0",          # Testing framework
   "pytest-mock>=3.15.1,<4.0",    # Mock objects for pytest
   "pytest-cov>=7.1.0,<8.0",      # Coverage reporting for tests
-  "ruff>=0.15.15,<1.0",             # Fast Python linter and formatter
-  "mypy>=2.1.0,<3.0",            # Static type checker
+  "ruff>=0.16.0,<1.0",             # Fast Python linter and formatter
+  "mypy>=2.3.0,<3.0",            # Static type checker
   "watchdog>=6.0,<7.0",        # File system event monitoring
   "python-dotenv>=1.1,<2.0",   # Environment variable management
 ]
@@ -150,11 +150,11 @@ disable = false  # Set to true to disable publishing entirely
 # Development environment configuration for Hatch
 [tool.hatch.envs.default]
 dependencies = [
-  "pytest>=9.0.3,<10.0",
+  "pytest>=9.1.1,<10.0",
   "pytest-mock>=3.15.1,<4.0",
   "pytest-cov>=7.1.0,<8.0",
-  "ruff>=0.15.15,<1.0",
-  "mypy>=2.1.0,<3.0",
+  "ruff>=0.16.0,<1.0",
+  "mypy>=2.3.0,<3.0",
 ]
 
 [tool.hatch.envs.default.scripts]
@@ -166,7 +166,7 @@ type-check = "mypy {args:src tests}"
 all = ["lint", "format", "type-check", "test-cov"]
 
 [tool.hatch.envs.types]
-extra-dependencies = ["mypy>=2.1.0,<3.0"]
+extra-dependencies = ["mypy>=2.3.0,<3.0"]
 
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src tests}"
